@@ -1,0 +1,165 @@
+---
+title: "Location Attestations"
+description: "Signed spatial records that serve as inputs to geospatial operations"
+---
+
+<Warning>
+  **Development Preview** — This describes the target specification.
+</Warning>
+
+# Location Attestations
+
+Location Attestations are **signed spatial records** that conform to the [Location Protocol](https://easierdata.org/updates/2025/2025-05-19-location-protocol-spec) schema. They can represent points, polygons, routes, or any GeoJSON geometry.
+
+## What is a Location Attestation?
+
+A Location Attestation is an EAS attestation containing:
+
+- **Geometry**: The spatial data (GeoJSON format)
+- **Metadata**: Optional descriptive information
+- **Signature**: Cryptographic proof of the attester's identity
+
+```typescript
+// Creating a location attestation
+const landmark = await astral.location.create({
+  type: 'Point',
+  coordinates: [2.2945, 48.8584]
+}, {
+  submitOnchain: true,
+  metadata: {
+    name: "Eiffel Tower",
+    description: "Iconic Paris landmark"
+  }
+});
+
+console.log(landmark.uid);  // 0xabc123...
+```
+
+## Storage Options
+
+Location Attestations can be stored **onchain** or **offchain**:
+
+<CardGroup cols={2}>
+  <Card title="Onchain Attestations" icon="link">
+    - Stored on EAS contracts
+    - Referenced by UID alone
+    - Higher gas cost
+    - Permanent, immutable
+  </Card>
+  <Card title="Offchain Attestations" icon="cloud">
+    - Stored on IPFS, servers, etc.
+    - Referenced by UID + URI
+    - No gas cost to create
+    - EIP-712 signed
+  </Card>
+</CardGroup>
+
+### Onchain
+
+```typescript
+// Create onchain attestation
+const location = await astral.location.create(geojson, {
+  submitOnchain: true
+});
+
+// Reference by UID only
+await astral.compute.distance(location.uid, otherUID);
+```
+
+### Offchain
+
+```typescript
+// Create offchain attestation
+const location = await astral.location.create(geojson, {
+  submitOnchain: false,
+  storage: 'ipfs'  // or 'arweave', 'https', etc.
+});
+
+// Reference by UID + URI
+await astral.compute.distance(
+  { uid: location.uid, uri: location.uri },
+  otherUID
+);
+```
+
+## Schema
+
+Location Attestations follow the Location Protocol schema, inspired by PostGIS geometry tables:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `geometry` | bytes | Encoded GeoJSON geometry |
+| `geometryType` | string | "Point", "Polygon", "LineString", etc. |
+| `srs` | string | Spatial reference system (default: EPSG:4326) |
+| `properties` | bytes | Optional metadata (JSON encoded) |
+
+## Using Location Attestations
+
+Location Attestations serve as **inputs** to geospatial operations:
+
+```typescript
+// As direct UID (onchain attestation)
+const result = await astral.compute.distance(
+  '0xabc123...',  // UID of first location
+  '0xdef456...'   // UID of second location
+);
+
+// As UID + URI (offchain attestation)
+const result = await astral.compute.contains(
+  { uid: '0xabc123...', uri: 'ipfs://Qm...' },
+  userLocationUID
+);
+
+// As inline attestation object
+const result = await astral.compute.within(
+  { attestation: signedOffchainAttestation },
+  landmarkUID,
+  500
+);
+```
+
+## Raw GeoJSON Alternative
+
+You can also use **raw GeoJSON** without creating an attestation first:
+
+```typescript
+// Raw GeoJSON as input
+const result = await astral.compute.contains(
+  {
+    type: 'Polygon',
+    coordinates: [[[...]]]  // SF Bay Area boundary
+  },
+  userLocationUID
+);
+```
+
+<Warning>
+  Raw GeoJSON is **not verified**. The Policy Attestation proves "Astral computed the relationship between inputs A and B" but does NOT prove where those geometries came from. Use raw GeoJSON for reference geometries (official boundaries) or prototyping.
+</Warning>
+
+## Fetching Location Attestations
+
+```typescript
+// Get by UID
+const location = await astral.location.get('0xabc123...');
+console.log(location.geometry);  // { type: 'Point', coordinates: [...] }
+
+// Query with filters
+const locations = await astral.location.query({
+  bbox: [-122.5, 37.7, -122.4, 37.8],  // Bounding box
+  limit: 100
+});
+```
+
+## Coordinate System
+
+Location Attestations honor the `srs` field:
+
+- **Default**: WGS84 (EPSG:4326) — standard GPS coordinates
+- **Custom**: Any EPSG code supported by PostGIS
+
+Coordinates should be in **[longitude, latitude]** order (GeoJSON standard).
+
+<Card title="Next: Geospatial Operations" icon="calculator" href="/concepts/geospatial-operations">
+  Learn about the spatial computations you can perform
+</Card>

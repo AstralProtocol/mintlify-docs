@@ -1,0 +1,341 @@
+---
+title: "Delivery Verification"
+description: "Build an escrow that releases when delivery arrives at the right location"
+---
+
+<Warning>
+  **Development Preview** — This guide demonstrates the intended patterns.
+</Warning>
+
+# Delivery Verification
+
+Build an escrow contract that releases payment only when the delivery is confirmed at the correct location.
+
+## Concept
+
+A trustless delivery system where:
+- Buyer locks payment in escrow
+- Delivery person proves they arrived at the destination
+- Escrow releases automatically on location verification
+
+---
+
+## Step 1: The Escrow Contract
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@eas/contracts/resolver/SchemaResolver.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract DeliveryEscrow is SchemaResolver, ReentrancyGuard {
+    address public astralSigner;
+
+    struct Delivery {
+        address buyer;
+        address courier;
+        bytes32 destinationUID;  // Location attestation of delivery address
+        uint256 amount;
+        uint256 radius;          // Acceptable radius in meters
+        uint256 deadline;
+        bool completed;
+        bool refunded;
+    }
+
+    mapping(bytes32 => Delivery) public deliveries;
+    mapping(bytes32 => bool) public usedAttestations;
+
+    event DeliveryCreated(bytes32 indexed deliveryId, address buyer, uint256 amount);
+    event DeliveryCompleted(bytes32 indexed deliveryId, address courier);
+    event DeliveryRefunded(bytes32 indexed deliveryId, address buyer);
+
+    constructor(IEAS eas, address _astralSigner) SchemaResolver(eas) {
+        astralSigner = _astralSigner;
+    }
+
+    // Buyer creates delivery escrow
+    function createDelivery(
+        bytes32 deliveryId,
+        address courier,
+        bytes32 destinationUID,
+        uint256 radiusMeters,
+        uint256 deadline
+    ) external payable {
+        require(msg.value > 0, "Must send payment");
+        require(deliveries[deliveryId].buyer == address(0), "Already exists");
+        require(deadline > block.timestamp, "Invalid deadline");
+
+        deliveries[deliveryId] = Delivery({
+            buyer: msg.sender,
+            courier: courier,
+            destinationUID: destinationUID,
+            amount: msg.value,
+            radius: radiusMeters * 100,  // Convert to cm
+            deadline: deadline,
+            completed: false,
+            refunded: false
+        });
+
+        emit DeliveryCreated(deliveryId, msg.sender, msg.value);
+    }
+
+    function onAttest(
+        Attestation calldata attestation,
+        uint256 /*value*/
+    ) internal override returns (bool) {
+        require(attestation.attester == astralSigner, "Not from Astral");
+        require(!usedAttestations[attestation.uid], "Already used");
+        usedAttestations[attestation.uid] = true;
+
+        // Decode policy attestation
+        (
+            bool isWithinRadius,
+            bytes32[] memory inputRefs,
+            uint64 timestamp,
+            string memory operation
+        ) = abi.decode(
+            attestation.data,
+            (bool, bytes32[], uint64, string)
+        );
+
+        // Verify operation type
+        require(
+            keccak256(bytes(operation)) == keccak256(bytes("within")),
+            "Wrong operation"
+        );
+
+        // Extract delivery ID from recipient field
+        bytes32 deliveryId = bytes32(uint256(uint160(attestation.recipient)));
+        Delivery storage delivery = deliveries[deliveryId];
+
+        require(delivery.buyer != address(0), "Delivery not found");
+        require(!delivery.completed, "Already completed");
+        require(!delivery.refunded, "Already refunded");
+        require(block.timestamp <= delivery.deadline, "Deadline passed");
+
+        // Verify correct destination was checked
+        require(inputRefs.length >= 2, "Invalid inputs");
+        require(inputRefs[1] == delivery.destinationUID, "Wrong destination");
+
+        // Verify courier is within radius
+        require(isWithinRadius, "Not at delivery location");
+
+        // Verify timestamp is recent
+        require(timestamp > block.timestamp - 30 minutes, "Attestation too old");
+
+        // Complete delivery
+        delivery.completed = true;
+
+        // Release funds to courier
+        (bool success, ) = delivery.courier.call{value: delivery.amount}("");
+        require(success, "Transfer failed");
+
+        emit DeliveryCompleted(deliveryId, delivery.courier);
+        return true;
+    }
+
+    // Buyer can refund after deadline
+    function refund(bytes32 deliveryId) external nonReentrant {
+        Delivery storage delivery = deliveries[deliveryId];
+
+        require(msg.sender == delivery.buyer, "Not buyer");
+        require(!delivery.completed, "Already completed");
+        require(!delivery.refunded, "Already refunded");
+        require(block.timestamp > delivery.deadline, "Deadline not passed");
+
+        delivery.refunded = true;
+
+        (bool success, ) = delivery.buyer.call{value: delivery.amount}("");
+        require(success, "Refund failed");
+
+        emit DeliveryRefunded(deliveryId, delivery.buyer);
+    }
+
+    function onRevoke(Attestation calldata, uint256) internal pure override returns (bool) {
+        return false;
+    }
+}
+```
+
+---
+
+## Step 2: Buyer Flow
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { ethers } from 'ethers';
+
+async function createDeliveryOrder(
+  destinationCoords: [number, number],
+  courierAddress: string,
+  paymentAmount: bigint,
+  wallet: Signer
+) {
+  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+  const escrow = new Contract(ESCROW_ADDRESS, ESCROW_ABI, wallet);
+
+  // Create destination location attestation
+  const destination = await astral.location.create({
+    type: 'Point',
+    coordinates: destinationCoords
+  }, {
+    submitOnchain: true,
+    metadata: {
+      name: "Delivery Address",
+      description: "Package destination"
+    }
+  });
+
+  // Generate delivery ID
+  const deliveryId = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(
+    ['address', 'address', 'uint256'],
+    [await wallet.getAddress(), courierAddress, Date.now()]
+  ));
+
+  // Create escrow
+  const tx = await escrow.createDelivery(
+    deliveryId,
+    courierAddress,
+    destination.uid,
+    100,  // 100 meter radius
+    Math.floor(Date.now() / 1000) + 86400,  // 24 hour deadline
+    { value: paymentAmount }
+  );
+
+  await tx.wait();
+
+  return {
+    deliveryId,
+    destinationUID: destination.uid
+  };
+}
+```
+
+---
+
+## Step 3: Courier Flow
+
+```typescript
+async function confirmDelivery(
+  deliveryId: string,
+  destinationUID: string,
+  wallet: Signer
+) {
+  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+  // Get current location
+  const coords = await getCurrentLocation();
+
+  // Create location attestation
+  const courierLocation = await astral.location.create({
+    type: 'Point',
+    coordinates: coords
+  }, { submitOnchain: true });
+
+  // Prove within radius of destination
+  const proof = await astral.compute.within(
+    courierLocation.uid,
+    destinationUID,
+    100,  // Must match contract radius
+    {
+      schema: SCHEMA_UID,
+      recipient: deliveryId  // Pass delivery ID
+    }
+  );
+
+  if (!proof.result) {
+    throw new Error('Not close enough to delivery address');
+  }
+
+  // Submit proof → triggers payment release
+  const tx = await astral.eas.submitDelegated(proof.delegatedAttestation);
+  await tx.wait();
+
+  return { success: true, transactionHash: tx.hash };
+}
+```
+
+---
+
+## Step 4: Mobile App Integration
+
+```typescript
+// React Native example
+import Geolocation from '@react-native-community/geolocation';
+
+function DeliveryConfirmButton({ deliveryId, destinationUID }) {
+  const [status, setStatus] = useState<'idle' | 'checking' | 'confirming' | 'done'>('idle');
+
+  const handleConfirm = async () => {
+    setStatus('checking');
+
+    Geolocation.getCurrentPosition(
+      async (position) => {
+        const coords: [number, number] = [
+          position.coords.longitude,
+          position.coords.latitude
+        ];
+
+        try {
+          setStatus('confirming');
+          await confirmDelivery(deliveryId, destinationUID, wallet);
+          setStatus('done');
+          Alert.alert('Success', 'Delivery confirmed! Payment released.');
+        } catch (error) {
+          setStatus('idle');
+          Alert.alert('Error', error.message);
+        }
+      },
+      (error) => {
+        setStatus('idle');
+        Alert.alert('Location Error', 'Could not get your location');
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
+  return (
+    <Button
+      title={status === 'confirming' ? 'Confirming...' : 'Confirm Delivery'}
+      onPress={handleConfirm}
+      disabled={status !== 'idle'}
+    />
+  );
+}
+```
+
+---
+
+## Enhanced Features
+
+### Multi-Signature Confirmation
+
+Require both courier arrival AND buyer confirmation:
+
+```solidity
+function confirmByBuyer(bytes32 deliveryId) external {
+    require(msg.sender == deliveries[deliveryId].buyer);
+    deliveries[deliveryId].buyerConfirmed = true;
+}
+
+// In onAttest, check both:
+require(delivery.buyerConfirmed, "Buyer hasn't confirmed receipt");
+```
+
+### Dispute Resolution
+
+Add an arbiter role for disputes:
+
+```solidity
+address public arbiter;
+
+function resolveDispute(bytes32 deliveryId, bool payToCourier) external {
+    require(msg.sender == arbiter);
+    // Handle dispute resolution
+}
+```
+
+<Card title="Back: Use Cases" icon="arrow-left" href="/use-cases">
+  See more use cases
+</Card>

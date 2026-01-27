@@ -1,0 +1,128 @@
+---
+title: "SDK Overview"
+description: "TypeScript SDK for Astral Location Services"
+---
+
+<Warning>
+  **Development Preview** — The SDK is under development.
+</Warning>
+
+# SDK Overview
+
+The Astral SDK (`@decentralized-geo/astral-sdk`) is the official TypeScript client for Astral Location Services.
+
+## Design Philosophy
+
+- **Developer experience first**: Intuitive API that feels natural
+- **Type-safe**: Full TypeScript support with comprehensive types
+- **Batteries included**: Handles signing, encoding, and EAS integration
+
+## Namespace Structure
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({ chainId: 84532 });
+
+// Location attestation operations
+astral.location.create(geojson);
+astral.location.get(uid);
+astral.location.query(filters);
+
+// Geospatial computation operations
+astral.compute.distance(input1, input2, options);
+astral.compute.contains(container, geometry, options);
+astral.compute.within(point, target, radius, options);
+astral.compute.intersects(geom1, geom2, options);
+astral.compute.area(geometry, options);
+astral.compute.length(geometry, options);
+
+// EAS submission helpers
+astral.eas.submitDelegated(attestation);
+```
+
+## Quick Start
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { ethers } from 'ethers';
+
+// Initialize with signer
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY);
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet
+});
+
+// Create a location
+const location = await astral.location.create({
+  type: 'Point',
+  coordinates: [2.2945, 48.8584]
+}, {
+  submitOnchain: true
+});
+
+// Compute relationship
+const result = await astral.compute.within(
+  location.uid,
+  landmarkUID,
+  500,
+  { schema: SCHEMA_UID }
+);
+
+// Submit onchain
+if (result.result) {
+  await astral.eas.submitDelegated(result.delegatedAttestation);
+}
+```
+
+## Key Concepts
+
+<CardGroup cols={2}>
+  <Card title="Chain Scope" icon="link">
+    All operations are scoped to the configured `chainId`. Input UIDs must exist on that chain.
+  </Card>
+  <Card title="Flexible Inputs" icon="shuffle">
+    Accept UIDs, raw GeoJSON, or offchain attestations interchangeably.
+  </Card>
+  <Card title="Delegated Attestations" icon="signature">
+    SDK handles the delegated attestation pattern — you pay gas, Astral is attester.
+  </Card>
+  <Card title="Type Safety" icon="shield-check">
+    Full TypeScript types for all inputs, outputs, and options.
+  </Card>
+</CardGroup>
+
+## Configuration
+
+```typescript
+interface AstralSDKConfig {
+  chainId: number;              // Required: target chain
+  signer?: Signer;              // Optional: for authenticated requests
+  apiUrl?: string;              // Optional: defaults to api.astral.global
+}
+```
+
+| Chain | Chain ID |
+|-------|----------|
+| Base Sepolia | 84532 |
+| Base Mainnet | 8453 |
+| Ethereum Sepolia | 11155111 |
+| Ethereum Mainnet | 1 |
+
+## Pages
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/sdk/installation">
+    Install and configure the SDK
+  </Card>
+  <Card title="Compute" icon="calculator" href="/sdk/compute">
+    Geospatial computation methods
+  </Card>
+  <Card title="Location" icon="location-dot" href="/sdk/location">
+    Location attestation methods
+  </Card>
+  <Card title="EAS" icon="signature" href="/sdk/eas">
+    EAS submission helpers
+  </Card>
+</CardGroup>

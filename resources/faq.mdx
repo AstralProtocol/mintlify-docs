@@ -1,0 +1,177 @@
+---
+title: "FAQ"
+description: "Frequently asked questions"
+---
+
+<Warning>
+  **Development Preview** — This project is under active development.
+</Warning>
+
+# Frequently Asked Questions
+
+## General
+
+<AccordionGroup>
+  <Accordion title="What is Astral Location Services?">
+    Astral Location Services is a verifiable geospatial computation oracle for Ethereum. It runs spatial operations (distance, containment, intersection) in a trusted execution environment and produces signed attestations you can verify onchain.
+  </Accordion>
+
+  <Accordion title="How is this different from a regular oracle?">
+    Unlike traditional oracles that report external data, Astral performs **computation** on location data and signs the results. The computation runs in a TEE (EigenCompute), providing cryptographic proof that the operation was performed correctly.
+  </Accordion>
+
+  <Accordion title="What can I build with this?">
+    Any application that needs to gate onchain actions by physical location:
+    - Proof-of-visit NFTs
+    - Local currencies (geofenced token swaps)
+    - Neighborhood DAOs
+    - Delivery verification
+    - Location-based games
+
+    See [Use Cases](/use-cases) for detailed examples.
+  </Accordion>
+
+  <Accordion title="Is this production ready?">
+    No. Astral Location Services is under active development. APIs may change. We're building in public and welcome feedback!
+  </Accordion>
+</AccordionGroup>
+
+## Technical
+
+<AccordionGroup>
+  <Accordion title="What spatial operations are supported?">
+    **MVP operations:**
+    - `distance` - Distance between two geometries (meters)
+    - `contains` - Is geometry B inside geometry A?
+    - `within` - Is point within radius of target?
+    - `intersects` - Do geometries overlap?
+    - `area` - Area of a polygon (square meters)
+    - `length` - Length of a line (meters)
+
+    **Future operations:**
+    - `buffer`, `centroid`, `union`, `intersection`, `disjoint`
+  </Accordion>
+
+  <Accordion title="What chains are supported?">
+    MVP targets **Base Sepolia** (chain ID 84532). Additional chains (Base Mainnet, Ethereum Sepolia/Mainnet) are planned.
+  </Accordion>
+
+  <Accordion title="How does verification work?">
+    1. Operations run in EigenCompute's TEE (Trusted Execution Environment)
+    2. The TEE attests that specific code executed on specific inputs
+    3. Results are signed with a key held inside the TEE
+    4. Smart contracts verify `attestation.attester == astralSigner`
+  </Accordion>
+
+  <Accordion title="What's the trust model?">
+    **MVP:** Centralized service with TEE execution attestation. Trust Astral + TEE.
+
+    **Future:** AVS consensus (multiple operators), ZK proofs, decentralized signing.
+  </Accordion>
+
+  <Accordion title="Can users spoof their GPS?">
+    Yes. Astral verifies that **computations are correct**, not that **inputs are authentic**. If a user provides a fake GPS coordinate, we'll compute on that fake coordinate.
+
+    Future: Location proofs with multiple corroborating stamps will make spoofing harder.
+  </Accordion>
+</AccordionGroup>
+
+## Integration
+
+<AccordionGroup>
+  <Accordion title="Do I need to run my own service?">
+    No. Astral operates the compute service. You just use the SDK to call it and submit attestations to your contracts.
+  </Accordion>
+
+  <Accordion title="Who pays gas?">
+    You do. The delegated attestation pattern means:
+    - Astral signs the attestation offchain
+    - You submit with Astral's signature (paying gas)
+    - EAS records Astral as the attester
+
+    This lets you control costs and timing.
+  </Accordion>
+
+  <Accordion title="Can I use this without submitting onchain?">
+    Yes. Policy Attestations are signed offchain and can be used in your application directly. Onchain submission is optional.
+  </Accordion>
+
+  <Accordion title="How do I verify in my smart contract?">
+    Use an EAS resolver:
+    ```solidity
+    function onAttest(Attestation calldata attestation, uint256)
+        internal override returns (bool)
+    {
+        require(attestation.attester == astralSigner, "Not from Astral");
+        (bool result, , , ) = abi.decode(attestation.data, (bool, bytes32[], uint64, string));
+        require(result, "Location check failed");
+        // ... your logic
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="What's the relationship to Turf.js?">
+    Complementary!
+    - **Turf.js**: Client-side, instant, free, unverified
+    - **Astral**: Server-side, verified, signed attestation
+
+    Use Turf for UX (showing distance in real-time), use Astral for verification (proving location for onchain actions).
+  </Accordion>
+</AccordionGroup>
+
+## Data
+
+<AccordionGroup>
+  <Accordion title="What coordinate format do you use?">
+    GeoJSON standard: **[longitude, latitude]** in WGS84 (EPSG:4326).
+
+    ```typescript
+    // San Francisco
+    const sf = { type: 'Point', coordinates: [-122.4194, 37.7749] };
+    ```
+  </Accordion>
+
+  <Accordion title="What units are results in?">
+    Metric only:
+    - Distance/length: **meters**
+    - Area: **square meters**
+    - Radius (in `within`): **meters**
+
+    No unit conversion options. Convert client-side if needed.
+  </Accordion>
+
+  <Accordion title="Can I use raw GeoJSON or do I need attestations?">
+    Both work! You can pass:
+    - Attestation UIDs (verified, traceable)
+    - Raw GeoJSON (unverified, for reference data or prototyping)
+
+    For security-sensitive operations, prefer attestation UIDs.
+  </Accordion>
+
+  <Accordion title="Where is data stored?">
+    - **Location attestations**: On EAS (onchain) or IPFS/your storage (offchain)
+    - **Policy attestations**: Returned to you; optionally submitted to EAS
+    - **Compute service**: Stateless, no persistent storage
+  </Accordion>
+</AccordionGroup>
+
+## Getting Help
+
+<AccordionGroup>
+  <Accordion title="Where can I get help?">
+    - **Documentation**: You're here!
+    - **GitHub Issues**: Report bugs or request features
+    - **Discord**: Join our community (coming soon)
+  </Accordion>
+
+  <Accordion title="How can I contribute?">
+    We're building in public! Once the repo is public:
+    - Open issues with feedback
+    - Share your use cases
+    - Submit PRs for improvements
+  </Accordion>
+</AccordionGroup>
+
+<Card title="Back: Introduction" icon="arrow-left" href="/introduction">
+  Return to the introduction
+</Card>

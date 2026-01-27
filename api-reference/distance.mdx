@@ -1,0 +1,136 @@
+---
+title: "POST /distance"
+description: "Calculate distance between two geometries"
+---
+
+<Warning>
+  **Development Preview** — This API is under development.
+</Warning>
+
+# Distance
+
+Calculate the distance between two geometries in meters.
+
+```
+POST /compute/v0/distance
+```
+
+## Request Body
+
+<ParamField body="from" type="Input" required>
+  First geometry. Can be a UID, GeoJSON, or offchain attestation reference.
+</ParamField>
+
+<ParamField body="to" type="Input" required>
+  Second geometry. Can be a UID, GeoJSON, or offchain attestation reference.
+</ParamField>
+
+<ParamField body="schema" type="string" required>
+  EAS schema UID to issue the attestation against.
+</ParamField>
+
+<ParamField body="recipient" type="string">
+  Ethereum address to receive the attestation. Defaults to zero address.
+</ParamField>
+
+## Example Request
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.astral.global/compute/v0/distance \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "0xabc123...",
+    "to": {
+      "type": "Point",
+      "coordinates": [2.2945, 48.8584]
+    },
+    "schema": "0xschema...",
+    "recipient": "0xdef456..."
+  }'
+```
+
+```typescript TypeScript
+const response = await fetch('https://api.astral.global/compute/v0/distance', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    from: '0xabc123...',
+    to: { type: 'Point', coordinates: [2.2945, 48.8584] },
+    schema: '0xschema...',
+    recipient: '0xdef456...'
+  })
+});
+
+const result = await response.json();
+```
+
+</CodeGroup>
+
+## Response
+
+<ResponseField name="result" type="number" required>
+  Distance in meters (e.g., 523.45)
+</ResponseField>
+
+<ResponseField name="units" type="string" required>
+  Always "meters"
+</ResponseField>
+
+<ResponseField name="operation" type="string" required>
+  Always "distance"
+</ResponseField>
+
+<ResponseField name="timestamp" type="number" required>
+  Unix timestamp of computation
+</ResponseField>
+
+<ResponseField name="inputRefs" type="string[]" required>
+  Array of input references (UIDs or geometry hashes)
+</ResponseField>
+
+<ResponseField name="attestation" type="object" required>
+  The signed attestation object
+</ResponseField>
+
+<ResponseField name="delegatedAttestation" type="object" required>
+  Signature for delegated onchain submission
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "result": 523.45,
+  "units": "meters",
+  "operation": "distance",
+  "timestamp": 1706400000,
+  "inputRefs": [
+    "0xabc123...",
+    "0x7d3e8f..."
+  ],
+  "attestation": {
+    "schema": "0x...",
+    "attester": "0x...",
+    "recipient": "0xdef456...",
+    "data": "0x...",
+    "signature": "0x..."
+  },
+  "delegatedAttestation": {
+    "signature": "0x...",
+    "attester": "0x...",
+    "deadline": 1706403600
+  }
+}
+```
+
+## Notes
+
+- Distance is calculated using PostGIS `ST_Distance` with geodetic coordinates
+- Result is in meters with centimeter precision (rounded to 0.01m)
+- For raw GeoJSON inputs, a keccak256 hash is used in `inputRefs`
+
+<Card title="SDK Method" icon="code" href="/sdk/compute#distance">
+  See `astral.compute.distance()`
+</Card>

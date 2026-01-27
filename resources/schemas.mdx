@@ -1,0 +1,168 @@
+---
+title: "Schemas"
+description: "EAS schema definitions for Astral attestations"
+---
+
+<Warning>
+  **Development Preview** — Schema UIDs will be published when deployed.
+</Warning>
+
+# EAS Schemas
+
+Astral Location Services uses the Ethereum Attestation Service (EAS) for all attestations. This page documents the schema definitions.
+
+## Location Attestation Schema
+
+Used for storing spatial data (points, polygons, routes).
+
+```
+bytes geometry, string geometryType, string srs, bytes properties
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `geometry` | bytes | Encoded GeoJSON geometry |
+| `geometryType` | string | "Point", "Polygon", "LineString", etc. |
+| `srs` | string | Spatial reference system (default: "EPSG:4326") |
+| `properties` | bytes | JSON-encoded metadata |
+
+---
+
+## Policy Attestation Schemas
+
+Output schemas for geospatial computations.
+
+### BooleanPolicyAttestation
+
+For predicate operations (`contains`, `within`, `intersects`).
+
+```
+bool result, bytes32[] inputRefs, uint64 timestamp, string operation
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `result` | bool | The boolean computation result |
+| `inputRefs` | bytes32[] | References to inputs (UIDs or hashes) |
+| `timestamp` | uint64 | Unix timestamp of computation |
+| `operation` | string | Operation name ("contains", "within", "intersects") |
+
+### NumericPolicyAttestation
+
+For measurement operations (`distance`, `length`, `area`).
+
+```
+uint256 result, string units, bytes32[] inputRefs, uint64 timestamp, string operation
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `result` | uint256 | Scaled integer result (centimeters or cm²) |
+| `units` | string | Base unit ("meters" or "square_meters") |
+| `inputRefs` | bytes32[] | References to inputs |
+| `timestamp` | uint64 | Unix timestamp of computation |
+| `operation` | string | Operation name ("distance", "length", "area") |
+
+### GeometryPolicyAttestation (Future)
+
+For transformation operations (`buffer`, `centroid`, `union`).
+
+```
+bytes geometry, string geometryType, bytes32[] inputRefs, uint64 timestamp, string operation
+```
+
+---
+
+## Input References
+
+The `inputRefs` array contains a `bytes32` for each input:
+
+| Input Type | Reference |
+|------------|-----------|
+| Onchain attestation | The UID |
+| Offchain attestation | The UID |
+| Raw GeoJSON | `keccak256(abi.encode(geojson))` |
+
+This enables verification that specific inputs were used:
+
+```solidity
+(bool result, bytes32[] memory inputRefs, , ) = abi.decode(...);
+
+// Verify expected landmark was checked
+require(inputRefs[1] == EXPECTED_LANDMARK_UID, "Wrong location");
+```
+
+---
+
+## Result Scaling
+
+Numeric results are stored as scaled integers:
+
+| Measurement | Storage | Conversion |
+|-------------|---------|------------|
+| Distance | centimeters | `meters = result / 100` |
+| Length | centimeters | `meters = result / 100` |
+| Area | square centimeters | `m² = result / 10000` |
+
+```solidity
+// In your resolver
+(uint256 resultCm, , , , ) = abi.decode(...);
+uint256 meters = resultCm / 100;
+```
+
+---
+
+## Decoding in Solidity
+
+### Boolean Policy
+
+```solidity
+function decodeBooleanPolicy(bytes memory data) public pure returns (
+    bool result,
+    bytes32[] memory inputRefs,
+    uint64 timestamp,
+    string memory operation
+) {
+    return abi.decode(data, (bool, bytes32[], uint64, string));
+}
+```
+
+### Numeric Policy
+
+```solidity
+function decodeNumericPolicy(bytes memory data) public pure returns (
+    uint256 result,
+    string memory units,
+    bytes32[] memory inputRefs,
+    uint64 timestamp,
+    string memory operation
+) {
+    return abi.decode(data, (uint256, string, bytes32[], uint64, string));
+}
+```
+
+---
+
+## Schema Registry
+
+Schemas are registered in the EAS SchemaRegistry. When deploying your resolver:
+
+```typescript
+import { SchemaRegistry } from '@ethereum-attestation-service/eas-sdk';
+
+const registry = new SchemaRegistry(REGISTRY_ADDRESS);
+
+// Register schema with your resolver
+const tx = await registry.connect(signer).register({
+  schema: "bool result,bytes32[] inputRefs,uint64 timestamp,string operation",
+  resolverAddress: yourResolver.address,
+  revocable: false
+});
+
+const receipt = await tx.wait();
+const schemaUID = receipt.logs[0].args.uid;
+```
+
+<Card title="Next: Security" icon="shield" href="/resources/security">
+  Security considerations
+</Card>

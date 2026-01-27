@@ -1,0 +1,178 @@
+---
+title: "Verifiable Computation"
+description: "How EigenCompute provides trust in geospatial operations"
+---
+
+<Warning>
+  **Development Preview** — This describes the target specification.
+</Warning>
+
+# Verifiable Computation
+
+Astral Location Services runs in a **Trusted Execution Environment (TEE)** via EigenCompute, providing cryptographic guarantees that computations were performed correctly.
+
+## Why Verification Matters
+
+Without verification, you're trusting a black box:
+
+```
+User Location → ??? → "Yes, they're nearby"
+```
+
+With verifiable computation:
+
+```
+User Location → TEE (attested code) → Signed proof of computation
+```
+
+The difference is **trust**. Smart contracts can verify that Astral performed the computation correctly, not just that Astral *claims* it did.
+
+## EigenCompute
+
+[EigenCompute](https://blog.eigencloud.xyz/eigencloud-brings-verifiable-ai-to-mass-market-with-eigenai-and-eigencompute-launches/) is part of the EigenCloud ecosystem. It provides:
+
+<CardGroup cols={2}>
+  <Card title="TEE Execution" icon="microchip">
+    Code runs in a hardware-isolated environment that even the operator can't tamper with
+  </Card>
+  <Card title="Attestation" icon="certificate">
+    Hardware-generated proof that specific code executed on specific inputs
+  </Card>
+  <Card title="Determinism" icon="equals">
+    Same inputs always produce same outputs — reproducible and auditable
+  </Card>
+  <Card title="Future-Proof" icon="road">
+    Path to additional verifiability (ZK proofs, AVS consensus)
+  </Card>
+</CardGroup>
+
+## The Execution Model
+
+```
+┌─────────────────────────────────────────────────────┐
+│           EigenCompute TEE Environment              │
+│  ┌───────────────────────────────────────────────┐  │
+│  │         Docker Container                      │  │
+│  │                                               │  │
+│  │  ┌─────────────────────────────────────────┐  │  │
+│  │  │  Astral Compute Service                 │  │  │
+│  │  │  - Validates input attestations         │  │  │
+│  │  │  - Executes PostGIS queries             │  │  │
+│  │  │  - Signs results with TEE-held key      │  │  │
+│  │  └─────────────────────────────────────────┘  │  │
+│  │                                               │  │
+│  │  ┌─────────────────────────────────────────┐  │  │
+│  │  │  PostgreSQL + PostGIS                   │  │  │
+│  │  │  - All spatial computations happen here │  │  │
+│  │  │  - Ephemeral, no persistent state       │  │  │
+│  │  └─────────────────────────────────────────┘  │  │
+│  │                                               │  │
+│  └───────────────────────────────────────────────┘  │
+│                                                     │
+│  TEE guarantees:                                    │
+│  - Code hasn't been modified                        │
+│  - Inputs weren't tampered with                     │
+│  - Outputs came from executing that code            │
+└─────────────────────────────────────────────────────┘
+```
+
+## Verifiability Properties
+
+| Property | How It's Achieved |
+|----------|-------------------|
+| **Input Integrity** | Attestation signatures verified at TEE boundary before processing |
+| **Execution Integrity** | TEE ensures code runs as deployed, can't be modified |
+| **Output Authenticity** | Signing key held inside TEE, can't be extracted |
+| **Determinism** | Stateless model + fixed precision = same inputs → same outputs |
+
+## The Signing Key
+
+The service holds a signing key **inside** the TEE:
+
+- Key is generated within the TEE or securely provisioned
+- Cannot be extracted by the operator
+- All Policy Attestations are signed with this key
+- Resolver contracts verify `attestation.attester` matches the known signer
+
+```solidity
+// In your resolver
+require(attestation.attester == ASTRAL_SIGNER, "Not from Astral");
+```
+
+## Trust Model
+
+### Current (MVP)
+
+The MVP uses a **centralized trust model**:
+
+- Single service with known signer
+- TEE provides execution attestation
+- Deterministic operations ensure reproducibility
+- Trust assumption: Astral operates the service honestly
+
+```
+Trust = TEE guarantees + Astral reputation
+```
+
+### Future Enhancements
+
+<Steps>
+  <Step title="AVS Consensus">
+    Multiple independent operators run the computation. Results must match to be accepted. No single operator can lie.
+  </Step>
+  <Step title="ZK Proofs">
+    Cryptographic proof that the computation was correct. Verifiable by anyone without trusting the prover.
+  </Step>
+  <Step title="Decentralized Signers">
+    Multi-party computation for attestation signing. No single party holds the full key.
+  </Step>
+</Steps>
+
+## Why This Matters
+
+Consider a location-gated NFT:
+
+**Without verification:**
+```
+User claims "I'm at the Eiffel Tower" → Mint NFT
+```
+*Problem: User can lie*
+
+**With Astral:**
+```
+User submits location → Astral verifies in TEE → Signs attestation → Contract mints
+```
+*Guarantee: Astral performed the computation correctly. If the result says "within 500m", the computation was actually performed.*
+
+## Limitations
+
+<Warning>
+  Verifiable computation proves **correct execution**, not **correct inputs**.
+</Warning>
+
+Astral can prove that it correctly computed "distance between A and B = 500m". It cannot prove:
+
+- That location A is where the user actually is
+- That the user didn't spoof their GPS
+
+For input verification, see [Location Proofs](/guides/location-proofs) (future feature).
+
+## Determinism Guarantees
+
+To ensure reproducibility:
+
+- **Precision**: Results rounded to centimeter precision before signing
+- **Stateless**: No persistent state between requests
+- **Fixed algorithms**: PostGIS version pinned in container
+
+```typescript
+// Same inputs always produce same outputs
+const result1 = await astral.compute.distance(uid1, uid2);
+const result2 = await astral.compute.distance(uid1, uid2);
+
+result1.result === result2.result  // Always true
+```
+
+<Card title="Back to: How It Works" icon="arrow-left" href="/how-it-works">
+  See the full architecture
+</Card>

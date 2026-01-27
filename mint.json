@@ -1,0 +1,120 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Astral Location Services",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#6366F1",
+    "light": "#818CF8",
+    "dark": "#4F46E5",
+    "anchors": {
+      "from": "#6366F1",
+      "to": "#8B5CF6"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/AstralProtocol/astral-location-services"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "/quickstart"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    },
+    {
+      "name": "SDK",
+      "url": "sdk"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "Community",
+      "icon": "discord",
+      "url": "https://discord.gg/astral"
+    },
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/AstralProtocol"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "how-it-works"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "concepts/location-attestations",
+        "concepts/geospatial-operations",
+        "concepts/policy-attestations",
+        "concepts/eas-resolvers",
+        "concepts/verifiable-computation"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/location-gated-nft",
+        "guides/geofenced-token",
+        "guides/delivery-verification"
+      ]
+    },
+    {
+      "group": "Use Cases",
+      "pages": [
+        "use-cases"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/overview",
+        "api-reference/distance",
+        "api-reference/contains",
+        "api-reference/within",
+        "api-reference/intersects",
+        "api-reference/area",
+        "api-reference/length"
+      ]
+    },
+    {
+      "group": "SDK Reference",
+      "pages": [
+        "sdk/overview",
+        "sdk/installation",
+        "sdk/compute",
+        "sdk/location",
+        "sdk/eas"
+      ]
+    },
+    {
+      "group": "Resources",
+      "pages": [
+        "resources/schemas",
+        "resources/security",
+        "resources/roadmap",
+        "resources/faq"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "twitter": "https://twitter.com/AstralProtocol",
+    "github": "https://github.com/AstralProtocol",
+    "discord": "https://discord.gg/astral"
+  }
+}

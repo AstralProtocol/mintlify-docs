@@ -1,0 +1,193 @@
+---
+title: "Policy Attestations"
+description: "Signed computation results for offchain and onchain use"
+---
+
+<Warning>
+  **Development Preview** — This describes the target specification.
+</Warning>
+
+# Policy Attestations
+
+Policy Attestations are the **signed outputs** of geospatial operations. They contain the computation result and can be verified offchain or submitted onchain.
+
+## What is a Policy Attestation?
+
+When you call a compute operation, Astral returns a Policy Attestation:
+
+```typescript
+const result = await astral.compute.within(
+  userLocationUID,
+  landmarkUID,
+  500,
+  { schema: SCHEMA_UID, recipient: userAddress }
+);
+
+// result is a PolicyAttestationResult
+console.log(result.result);      // true
+console.log(result.operation);   // "within"
+console.log(result.attestation); // { uid, schema, signature, ... }
+```
+
+The attestation proves:
+- The computation was performed by Astral
+- The inputs were exactly as specified
+- The result is accurate
+
+## Schema Types
+
+Policy Attestations use per-result-type schemas. The SDK auto-selects based on the operation.
+
+### BooleanPolicyAttestation
+
+For predicates (`contains`, `within`, `intersects`):
+
+```solidity
+// Schema: "bool result, bytes32[] inputRefs, uint64 timestamp, string operation"
+struct BooleanPolicyAttestation {
+    bool result;              // The boolean result
+    bytes32[] inputRefs;      // Input references (UIDs or hashes)
+    uint64 timestamp;         // When computation was performed
+    string operation;         // "contains", "within", "intersects"
+}
+```
+
+### NumericPolicyAttestation
+
+For measurements (`distance`, `length`, `area`):
+
+```solidity
+// Schema: "uint256 result, string units, bytes32[] inputRefs, uint64 timestamp, string operation"
+struct NumericPolicyAttestation {
+    uint256 result;           // Scaled integer (centimeters)
+    string units;             // "meters" or "square_meters"
+    bytes32[] inputRefs;      // Input references
+    uint64 timestamp;         // When computation was performed
+    string operation;         // "distance", "length", "area"
+}
+```
+
+### GeometryPolicyAttestation (Future)
+
+For transformations (`buffer`, `centroid`, `union`):
+
+```solidity
+// Schema: "bytes geometry, string geometryType, bytes32[] inputRefs, uint64 timestamp, string operation"
+struct GeometryPolicyAttestation {
+    bytes geometry;           // Encoded geometry result
+    string geometryType;      // "Point", "Polygon", etc.
+    bytes32[] inputRefs;      // Input references
+    uint64 timestamp;         // When computation was performed
+    string operation;         // "buffer", "centroid", "union"
+}
+```
+
+## Input References
+
+The `inputRefs` array contains a `bytes32` reference for each input:
+
+| Input Type | Reference Value |
+|------------|-----------------|
+| Location Attestation UID | The UID itself |
+| Offchain Attestation | The attestation UID |
+| Raw GeoJSON | `keccak256(abi.encode(geojson))` |
+
+This enables verification that specific inputs were used:
+
+```solidity
+// In your resolver
+(bool result, bytes32[] memory inputRefs, , ) = abi.decode(...);
+
+// Verify the expected location was checked
+require(inputRefs[1] == EXPECTED_LANDMARK_UID, "Wrong location checked");
+```
+
+<Note>
+  For raw GeoJSON, the hash allows verification if the original geometry is known, but does not reveal the geometry itself.
+</Note>
+
+## SDK Return Object
+
+```typescript
+interface PolicyAttestationResult<T> {
+  // Decoded result (convenience)
+  result: T;                          // boolean | number | GeoJSON.Geometry
+  units?: string;                     // For measurements
+  operation: string;                  // Operation name
+  timestamp: number;                  // Unix timestamp
+  inputRefs: string[];                // Input references
+
+  // Full attestation data
+  attestation: {
+    uid: string;                      // EAS UID (if submitted onchain)
+    schema: string;                   // Schema UID
+    attester: string;                 // Astral signer address
+    recipient: string;                // Developer-specified recipient
+    data: string;                     // ABI-encoded attestation data
+    signature: string;                // EIP-712 signature
+  };
+
+  // For delegated onchain submission
+  delegatedAttestation: {
+    signature: string;                // Astral's signature
+    attester: string;                 // Astral's address
+    deadline: number;                 // Signature expiry
+  };
+}
+```
+
+## Using Policy Attestations
+
+### Offchain
+
+Use the result directly in your application:
+
+```typescript
+const result = await astral.compute.within(uid1, uid2, 500, options);
+
+if (result.result) {
+  // User is nearby — enable feature
+  enableFeature();
+}
+```
+
+### Onchain
+
+Submit using delegated attestation:
+
+```typescript
+const result = await astral.compute.within(uid1, uid2, 500, options);
+
+// Submit to EAS — triggers your resolver
+const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
+await tx.wait();
+```
+
+## Result Scaling
+
+Numeric results are stored as scaled integers for determinism:
+
+| Original | Stored | To Recover |
+|----------|--------|------------|
+| 523.45 meters | 52345 | divide by 100 |
+| 1234.5678 m² | 12345678 | divide by 10000 |
+
+```solidity
+// In your resolver
+(uint256 resultCm, , , , ) = abi.decode(...);
+uint256 meters = resultCm / 100;
+```
+
+## Attestation Expiry
+
+The `delegatedAttestation.deadline` indicates when the signature expires. Submissions after the deadline will fail.
+
+```typescript
+if (Date.now() / 1000 < result.delegatedAttestation.deadline) {
+  await astral.eas.submitDelegated(result.delegatedAttestation);
+}
+```
+
+<Card title="Next: EAS Resolvers" icon="gavel" href="/concepts/eas-resolvers">
+  Learn how to gate smart contracts with Policy Attestations
+</Card>

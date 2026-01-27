@@ -1,0 +1,326 @@
+---
+title: "Location-Gated NFT"
+description: "Build an NFT that requires physical presence to mint"
+---
+
+<Warning>
+  **Development Preview** — This guide demonstrates the intended patterns.
+</Warning>
+
+# Build a Location-Gated NFT
+
+Create an NFT collection where each token can only be minted by someone physically at a specific location.
+
+## Overview
+
+This guide walks through:
+1. Setting up the canonical location
+2. Creating the resolver contract
+3. Building the frontend
+4. Handling the mint flow
+
+---
+
+## Step 1: Set Up the Location
+
+First, create a permanent location attestation for the target location.
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+// Create the landmark location
+const landmark = await astral.location.create({
+  type: 'Point',
+  coordinates: [-122.4194, 37.7749]  // San Francisco
+}, {
+  submitOnchain: true,
+  metadata: {
+    name: "SF Visitor Center",
+    description: "San Francisco Welcome NFT location"
+  }
+});
+
+console.log('Landmark UID:', landmark.uid);
+// Store this UID for your contract
+```
+
+---
+
+## Step 2: Deploy the Resolver Contract
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@eas/contracts/resolver/SchemaResolver.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract LocationGatedNFT is SchemaResolver, ERC721, Ownable {
+    address public astralSigner;
+    bytes32 public landmarkUID;
+    uint256 public radius;  // in centimeters (for precision)
+    uint256 public nextTokenId = 1;
+
+    mapping(address => bool) public hasMinted;
+    mapping(bytes32 => bool) public usedAttestations;
+
+    event NFTMinted(address indexed recipient, uint256 tokenId, bytes32 attestationUID);
+
+    constructor(
+        IEAS eas,
+        address _astralSigner,
+        bytes32 _landmarkUID,
+        uint256 _radiusMeters
+    )
+        SchemaResolver(eas)
+        ERC721("SF Visitor", "SFVISIT")
+        Ownable(msg.sender)
+    {
+        astralSigner = _astralSigner;
+        landmarkUID = _landmarkUID;
+        radius = _radiusMeters * 100;  // Convert to cm
+    }
+
+    function onAttest(
+        Attestation calldata attestation,
+        uint256 /*value*/
+    ) internal override returns (bool) {
+        // 1. Verify from Astral
+        require(attestation.attester == astralSigner, "Not from Astral");
+
+        // 2. Prevent replay
+        require(!usedAttestations[attestation.uid], "Already used");
+        usedAttestations[attestation.uid] = true;
+
+        // 3. Decode policy attestation (BooleanPolicy for 'within')
+        (
+            bool policyPassed,
+            bytes32[] memory inputRefs,
+            uint64 timestamp,
+            string memory operation
+        ) = abi.decode(
+            attestation.data,
+            (bool, bytes32[], uint64, string)
+        );
+
+        // 4. Verify correct operation
+        require(
+            keccak256(bytes(operation)) == keccak256(bytes("within")),
+            "Wrong operation"
+        );
+
+        // 5. Verify correct landmark was checked
+        require(inputRefs.length >= 2, "Invalid inputs");
+        require(inputRefs[1] == landmarkUID, "Wrong location");
+
+        // 6. Verify timestamp is recent (within 1 hour)
+        require(timestamp > block.timestamp - 1 hours, "Attestation too old");
+
+        // 7. Verify policy passed (user is within radius)
+        require(policyPassed, "Not close enough to location");
+
+        // 8. One mint per address
+        require(!hasMinted[attestation.recipient], "Already minted");
+        hasMinted[attestation.recipient] = true;
+
+        // 9. Mint NFT
+        uint256 tokenId = nextTokenId++;
+        _mint(attestation.recipient, tokenId);
+
+        emit NFTMinted(attestation.recipient, tokenId, attestation.uid);
+        return true;
+    }
+
+    function onRevoke(Attestation calldata, uint256)
+        internal pure override returns (bool)
+    {
+        return false;
+    }
+
+    // Admin functions
+    function updateAstralSigner(address _signer) external onlyOwner {
+        astralSigner = _signer;
+    }
+
+    function updateRadius(uint256 _radiusMeters) external onlyOwner {
+        radius = _radiusMeters * 100;
+    }
+}
+```
+
+---
+
+## Step 3: Register the Schema
+
+```typescript
+import { SchemaRegistry } from '@ethereum-attestation-service/eas-sdk';
+
+const schemaRegistry = new SchemaRegistry(SCHEMA_REGISTRY_ADDRESS);
+
+// Boolean policy schema for 'within' operation
+const schema = "bool result,bytes32[] inputRefs,uint64 timestamp,string operation";
+
+const tx = await schemaRegistry.connect(signer).register({
+  schema,
+  resolverAddress: nftContract.address,
+  revocable: false
+});
+
+const receipt = await tx.wait();
+const SCHEMA_UID = receipt.logs[0].args.uid;
+
+console.log('Schema UID:', SCHEMA_UID);
+```
+
+---
+
+## Step 4: Frontend Integration
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import * as turf from '@turf/turf';
+
+const LANDMARK_UID = '0x...';  // Your landmark
+const SCHEMA_UID = '0x...';    // Your schema
+const RADIUS_METERS = 500;
+
+async function checkEligibility(userCoords: [number, number]) {
+  const astral = new AstralSDK({ chainId: 84532 });
+
+  // Quick local check first (UX)
+  const landmark = await astral.location.get(LANDMARK_UID);
+  const distance = turf.distance(
+    turf.point(userCoords),
+    turf.point(landmark.geometry.coordinates),
+    { units: 'meters' }
+  );
+
+  if (distance > RADIUS_METERS) {
+    return {
+      eligible: false,
+      message: `You're ${Math.round(distance)}m away. Get within ${RADIUS_METERS}m to mint!`
+    };
+  }
+
+  return {
+    eligible: true,
+    message: `You're close enough! Ready to mint.`,
+    distance
+  };
+}
+
+async function mintNFT(userCoords: [number, number], wallet: Signer) {
+  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+  // Create user's location attestation
+  const userLocation = await astral.location.create({
+    type: 'Point',
+    coordinates: userCoords
+  }, {
+    submitOnchain: true
+  });
+
+  // Compute proximity and submit attestation
+  const result = await astral.compute.within(
+    userLocation.uid,
+    LANDMARK_UID,
+    RADIUS_METERS,
+    {
+      schema: SCHEMA_UID,
+      recipient: await wallet.getAddress()
+    }
+  );
+
+  if (!result.result) {
+    throw new Error('Location check failed - not close enough');
+  }
+
+  // Submit to EAS (triggers resolver → mints NFT)
+  const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
+  const receipt = await tx.wait();
+
+  return {
+    transactionHash: tx.hash,
+    attestationUID: result.attestation.uid
+  };
+}
+```
+
+---
+
+## Step 5: React Component
+
+```tsx
+import { useState, useEffect } from 'react';
+import { useAccount, useSigner } from 'wagmi';
+
+function MintButton() {
+  const { address } = useAccount();
+  const { data: signer } = useSigner();
+  const [status, setStatus] = useState<'checking' | 'eligible' | 'minting' | 'done'>('checking');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    // Get user's location
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const coords: [number, number] = [
+        position.coords.longitude,
+        position.coords.latitude
+      ];
+
+      const eligibility = await checkEligibility(coords);
+      setMessage(eligibility.message);
+      setStatus(eligibility.eligible ? 'eligible' : 'checking');
+    });
+  }, []);
+
+  const handleMint = async () => {
+    if (!signer) return;
+
+    setStatus('minting');
+    try {
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const coords: [number, number] = [
+          position.coords.longitude,
+          position.coords.latitude
+        ];
+
+        const result = await mintNFT(coords, signer);
+        setStatus('done');
+        setMessage(`NFT minted! TX: ${result.transactionHash}`);
+      });
+    } catch (error) {
+      setStatus('eligible');
+      setMessage(`Error: ${error.message}`);
+    }
+  };
+
+  return (
+    <div>
+      <p>{message}</p>
+      <button
+        onClick={handleMint}
+        disabled={status !== 'eligible'}
+      >
+        {status === 'minting' ? 'Minting...' : 'Mint NFT'}
+      </button>
+    </div>
+  );
+}
+```
+
+---
+
+## Security Considerations
+
+1. **Timestamp validation**: Contract requires attestation < 1 hour old
+2. **Replay prevention**: Track used attestation UIDs
+3. **Input verification**: Check that the expected landmark was used
+4. **One mint per address**: Prevent farming
+
+<Card title="Next: Geofenced Token" icon="coins" href="/guides/geofenced-token">
+  Build a token with geographic restrictions
+</Card>

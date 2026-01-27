@@ -1,0 +1,188 @@
+---
+title: "How It Works"
+description: "The architecture behind verifiable geospatial computation"
+---
+
+<Warning>
+  **Development Preview** — This describes the target architecture per the specification.
+</Warning>
+
+# How Astral Location Services Works
+
+Astral provides verifiable geospatial computation by combining three key technologies: **PostGIS** for spatial operations, **EigenCompute TEE** for verifiable execution, and **EAS** for attestation management.
+
+## System Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Developer Application                                        │
+│  - Collects user location                                     │
+│  - Calls Astral SDK                                           │
+└────────────────────────┬─────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Astral SDK (@decentralized-geo/astral-sdk)                   │
+│  - astral.location.* (create, get, query attestations)        │
+│  - astral.compute.* (distance, contains, intersects, etc.)    │
+│  - Handles request signing, attestation decoding              │
+└────────────────────────┬─────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Astral API Gateway (api.astral.global)                       │
+│                                                               │
+│  /locations/*     → Indexer Service                           │
+│  /compute/*       → Compute Service (TEE)                     │
+└──────┬───────────────────────────────────┬───────────────────┘
+       │                                   │
+       ▼                                   ▼
+┌─────────────────┐         ┌─────────────────────────────────┐
+│  Indexer        │         │  Compute Service                │
+│  Service        │         │  (runs in EigenCompute TEE)     │
+│                 │         │                                 │
+│  - Syncs EAS    │         │  ┌───────────────────────────┐  │
+│  - OGC Features │         │  │  TypeScript API Layer     │  │
+│                 │         │  │  - Request validation     │  │
+└─────────────────┘         │  │  - Attestation signing    │  │
+                            │  └─────────────┬─────────────┘  │
+                            │                │                │
+                            │  ┌─────────────▼─────────────┐  │
+                            │  │  PostgreSQL + PostGIS     │  │
+                            │  │  - ST_Distance, etc.      │  │
+                            │  │  - Ephemeral, no state    │  │
+                            │  └───────────────────────────┘  │
+                            └─────────────────────────────────┘
+```
+
+## Key Architectural Decisions
+
+<AccordionGroup>
+  <Accordion title="Self-Contained Container" icon="box">
+    PostGIS runs **inside** the Docker container, not as an external service. This is essential for verifiable computation in the TEE — no external dependencies means the entire execution environment is attested.
+  </Accordion>
+  <Accordion title="Stateless Model" icon="rotate">
+    Each request brings all required inputs. No persistent state between requests. This ensures determinism and simplifies verification — same inputs always produce same outputs.
+  </Accordion>
+  <Accordion title="Separate Service" icon="layer-group">
+    The compute service is deployed independently from the indexer. They share nothing at runtime. This separation enables the compute service to run in a TEE without compromising the indexer's functionality.
+  </Accordion>
+  <Accordion title="Delegated Attestations" icon="signature">
+    Developers submit Policy Attestations onchain using EAS's delegated attestation pattern. Astral signs, developer pays gas, Astral is recorded as the attester.
+  </Accordion>
+</AccordionGroup>
+
+## The Computation Flow
+
+<Steps>
+  <Step title="Request Arrives">
+    Developer's app calls `astral.compute.within(uid1, uid2, 500)` via the SDK
+  </Step>
+  <Step title="Input Resolution">
+    The compute service fetches/validates location attestations by UID, or accepts raw GeoJSON
+  </Step>
+  <Step title="Spatial Computation">
+    PostGIS executes the spatial operation (e.g., `ST_DWithin`) inside the TEE
+  </Step>
+  <Step title="Result Signing">
+    The service creates a Policy Attestation and signs it with the TEE-held key
+  </Step>
+  <Step title="Response">
+    Signed attestation returned to SDK, ready for offchain use or onchain submission
+  </Step>
+</Steps>
+
+## Verifiable Execution with EigenCompute
+
+The compute service runs in **EigenCompute**, part of the EigenCloud ecosystem:
+
+```
+┌─────────────────────────────────────────────────────┐
+│           EigenCompute TEE Environment              │
+│  ┌───────────────────────────────────────────────┐  │
+│  │         Docker Container                      │  │
+│  │  ┌─────────────────────────────────────────┐  │  │
+│  │  │  Astral Compute Service                 │  │  │
+│  │  │  - TypeScript/Node.js API               │  │  │
+│  │  │  - Request validation                   │  │  │
+│  │  │  - Signature verification               │  │  │
+│  │  │  - PostGIS query execution              │  │  │
+│  │  │  - Policy Attestation signing           │  │  │
+│  │  └─────────────────────────────────────────┘  │  │
+│  │  ┌─────────────────────────────────────────┐  │  │
+│  │  │  PostgreSQL + PostGIS                   │  │  │
+│  │  │  - Spatial computations                 │  │  │
+│  │  │  - Ephemeral (no persistent state)      │  │  │
+│  │  └─────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
+```
+
+### Verifiability Properties
+
+| Property | How It's Achieved |
+|----------|-------------------|
+| **Input Verification** | Attestation signatures verified at TEE boundary |
+| **Deterministic Computation** | Same inputs always produce same result |
+| **Signed Output** | Service key signs Policy Attestation inside TEE |
+| **TEE Attestation** | EigenCompute provides hardware attestation of execution |
+
+## Input Resolution
+
+The service accepts multiple input formats:
+
+| Input Format | Resolution |
+|--------------|------------|
+| UID string | Fetch from EAS contracts (onchain attestations) |
+| `{ uid, uri }` | Fetch from URI, verify UID matches, verify signature |
+| `{ attestation }` | Verify signature, extract geometry directly |
+| Raw GeoJSON | Use directly, hash for `inputRefs` |
+
+<Note>
+  For offchain attestations, the UID acts as a checksum. Even when fetching from HTTPS (not content-addressed), we verify the fetched attestation's UID matches. Mismatch = reject.
+</Note>
+
+## Delegated Attestation Flow
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer App
+    participant SDK as Astral SDK
+    participant Svc as Compute Service
+    participant EAS as EAS Contracts
+    participant Res as Resolver
+
+    Dev->>SDK: compute.within(...)
+    SDK->>Svc: POST /compute/within
+    Svc->>Svc: Execute PostGIS operation
+    Svc->>Svc: Sign attestation
+    Svc-->>SDK: Signed attestation + delegated sig
+    SDK->>EAS: Submit with Astral's signature
+    EAS->>Res: onAttest() callback
+    Res->>Res: Execute business logic
+```
+
+The delegated attestation pattern means:
+- **Astral signs** the attestation data offchain
+- **Developer submits** with Astral's signature (pays gas)
+- **EAS verifies** the signature and records Astral as attester
+- **Resolver contracts** can verify `attestation.attester == astralSigner`
+
+## Trust Model
+
+### Current (MVP)
+
+- Centralized service with known signer
+- Runs in TEE (EigenCompute) for execution attestation
+- Deterministic operations ensure reproducibility
+- Single point of trust: Astral's signing key
+
+### Future
+
+- **AVS Consensus**: Multiple operators verify computations
+- **ZK Proofs**: Cryptographic proof of correct execution
+- **Decentralized Signers**: Multi-party attestation signing
+
+<Card title="Next: Core Concepts" icon="book" href="/concepts/location-attestations">
+  Deep dive into Location Attestations
+</Card>

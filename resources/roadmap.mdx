@@ -1,0 +1,168 @@
+---
+title: "Roadmap"
+description: "What's built, what's coming, and what's missing"
+---
+
+<Warning>
+  **Development Preview** — This project is under active development.
+</Warning>
+
+# Roadmap
+
+Astral Location Services is being built as part of the EigenLayer Open Innovation Program. This page tracks what's done, what we're working on, and what's planned.
+
+## Current Status
+
+<Steps>
+  <Step title="Specification" icon="check">
+    Complete technical specification defining architecture, API, SDK, and schemas
+  </Step>
+  <Step title="Implementation" icon="spinner">
+    Building the compute service, SDK extensions, and example contracts
+  </Step>
+  <Step title="Testing" icon="circle">
+    Integration testing with EigenCompute and EAS
+  </Step>
+  <Step title="Launch" icon="circle">
+    Testnet deployment and public launch
+  </Step>
+</Steps>
+
+---
+
+## What's Built
+
+<CardGroup cols={2}>
+  <Card title="Technical Specification" icon="check">
+    Complete spec defining architecture, API design, SDK structure, and security model
+  </Card>
+  <Card title="SDK Foundation" icon="check">
+    Core SDK with location and compute namespaces defined
+  </Card>
+  <Card title="Schema Definitions" icon="check">
+    EAS schema designs for Location and Policy attestations
+  </Card>
+  <Card title="Documentation" icon="check">
+    This documentation site
+  </Card>
+</CardGroup>
+
+---
+
+## In Progress
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Compute Service API | Building | Express/Fastify service |
+| PostGIS Integration | Building | Docker container setup |
+| SDK Compute Extension | Building | TypeScript client |
+| EigenCompute Deployment | Pending | TEE environment setup |
+| Example Contracts | Building | Resolver templates |
+
+---
+
+## Planned Features
+
+### Phase 1: MVP
+
+- [ ] Core operations: `distance`, `contains`, `within`, `intersects`, `area`, `length`
+- [ ] PostGIS-powered computations
+- [ ] EigenCompute TEE deployment
+- [ ] Delegated attestation signing
+- [ ] SDK with compute namespace
+- [ ] Basic rate limiting (IP-based)
+
+### Phase 2: Authentication
+
+- [ ] Wallet-based request signing
+- [ ] Per-wallet rate limiting
+- [ ] Higher limits for authenticated users
+
+### Phase 3: Extended Operations
+
+- [ ] `buffer` - Create buffer zone around geometry
+- [ ] `centroid` - Find center point
+- [ ] `union` - Merge geometries
+- [ ] `intersection` - Overlapping area
+- [ ] `disjoint` - Geometries don't touch
+
+### Phase 4: Location Proofs
+
+- [ ] Multi-stamp location verification
+- [ ] GPS time series analysis
+- [ ] Accelerometer pattern matching
+- [ ] NFC/QR physical proof integration
+
+### Phase 5: Decentralization
+
+- [ ] AVS consensus (multiple operators)
+- [ ] Cryptoeconomic security
+- [ ] ZK proof generation (optional)
+- [ ] Decentralized signer rotation
+
+---
+
+## What's Missing (MVP)
+
+These are explicitly **out of scope** for the MVP:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Location proof verification | Deferred | Stamps/verification is separate workstream |
+| Gas sponsorship | Deferred | Developers pay via delegated attestations |
+| Reference data caching | Deferred | Start stateless, add if needed |
+| Complex geometry limits | Deferred | Add based on usage patterns |
+| Cross-chain operations | Not planned | Single chain per SDK instance |
+| Unit conversion | Not planned | Metric only |
+
+---
+
+## Research Questions
+
+These are open questions being investigated:
+
+1. **Nonce/Replay Protection**
+   - Should Policy Attestations include explicit nonce?
+   - Current design relies on unique UIDs + timestamps
+
+2. **EigenCompute Networking**
+   - Verify TEE allows outbound for EAS queries
+   - Understand latency characteristics
+
+3. **PostGIS in TEE**
+   - Validate performance in TEE environment
+   - Benchmark spatial operations
+
+---
+
+## Grant Milestones
+
+This project is part of the **EigenLayer Open Innovation Program**.
+
+### Milestone 1: MVP + EigenCloud Integration
+- Technical specification
+- GitHub repository
+- Basic implementation
+
+### Milestone 2: Internal Demo
+- Video walkthrough
+- Working demonstration
+
+### Milestone 3: Final Product
+- Architecture documentation
+- Public announcement
+- Production deployment
+
+---
+
+## Contributing
+
+We're building in public! Ways to contribute:
+
+- **Feedback**: Open issues with suggestions or questions
+- **Use cases**: Share what you'd build with location-based contracts
+- **Code**: Contributions welcome once repo is public
+
+<Card title="Back: Security" icon="arrow-left" href="/resources/security">
+  Security considerations
+</Card>

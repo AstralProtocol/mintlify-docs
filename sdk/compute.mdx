@@ -1,0 +1,256 @@
+---
+title: "Compute"
+description: "Geospatial computation methods"
+---
+
+<Warning>
+  **Development Preview** — The SDK is under development.
+</Warning>
+
+# Compute Methods
+
+The `astral.compute` namespace provides verifiable geospatial operations.
+
+## Input Types
+
+All methods accept flexible input types:
+
+```typescript
+type Input =
+  | string                              // Onchain attestation UID
+  | GeoJSON.Geometry                    // Raw GeoJSON
+  | GeoJSON.Feature                     // GeoJSON Feature
+  | { attestation: OffchainAttestation } // Inline offchain attestation
+  | { uid: string, uri: string }        // Offchain by reference
+```
+
+## Compute Options
+
+All methods accept options:
+
+```typescript
+interface ComputeOptions {
+  schema: string;         // Required: EAS schema UID
+  recipient?: string;     // Optional: attestation recipient
+}
+```
+
+---
+
+## distance()
+
+Calculate distance between two geometries.
+
+```typescript
+astral.compute.distance(
+  input1: Input,
+  input2: Input,
+  options: ComputeOptions
+): Promise<NumericPolicyAttestation>
+```
+
+### Example
+
+```typescript
+const result = await astral.compute.distance(
+  userLocationUID,
+  landmarkUID,
+  { schema: SCHEMA_UID }
+);
+
+console.log(result.result);  // 523.45 (meters)
+console.log(result.units);   // "meters"
+```
+
+---
+
+## contains()
+
+Check if a geometry is inside a container.
+
+```typescript
+astral.compute.contains(
+  container: Input,
+  geometry: Input,
+  options: ComputeOptions
+): Promise<BooleanPolicyAttestation>
+```
+
+### Example
+
+```typescript
+const result = await astral.compute.contains(
+  sfBayAreaUID,       // Polygon
+  userLocationUID,    // Point
+  { schema: SCHEMA_UID }
+);
+
+console.log(result.result);  // true or false
+```
+
+---
+
+## within()
+
+Check if a point is within a radius of a target.
+
+```typescript
+astral.compute.within(
+  point: Input,
+  target: Input,
+  radius: number,        // meters
+  options: ComputeOptions
+): Promise<BooleanPolicyAttestation>
+```
+
+### Example
+
+```typescript
+const result = await astral.compute.within(
+  userLocationUID,
+  landmarkUID,
+  500,  // 500 meters
+  { schema: SCHEMA_UID, recipient: userAddress }
+);
+
+if (result.result) {
+  console.log('User is nearby!');
+  await astral.eas.submitDelegated(result.delegatedAttestation);
+}
+```
+
+---
+
+## intersects()
+
+Check if two geometries overlap.
+
+```typescript
+astral.compute.intersects(
+  geom1: Input,
+  geom2: Input,
+  options: ComputeOptions
+): Promise<BooleanPolicyAttestation>
+```
+
+### Example
+
+```typescript
+const result = await astral.compute.intersects(
+  territory1UID,
+  territory2UID,
+  { schema: SCHEMA_UID }
+);
+```
+
+---
+
+## area()
+
+Calculate area of a polygon.
+
+```typescript
+astral.compute.area(
+  geometry: Input,
+  options: ComputeOptions
+): Promise<NumericPolicyAttestation>
+```
+
+### Example
+
+```typescript
+const result = await astral.compute.area(
+  propertyBoundaryUID,
+  { schema: SCHEMA_UID }
+);
+
+console.log(result.result);  // 5432.10 (square meters)
+console.log(result.units);   // "square_meters"
+```
+
+---
+
+## length()
+
+Calculate length of a line.
+
+```typescript
+astral.compute.length(
+  geometry: Input,
+  options: ComputeOptions
+): Promise<NumericPolicyAttestation>
+```
+
+### Example
+
+```typescript
+const result = await astral.compute.length(
+  routeUID,
+  { schema: SCHEMA_UID }
+);
+
+console.log(result.result);  // 2345.67 (meters)
+```
+
+---
+
+## Return Types
+
+### BooleanPolicyAttestation
+
+```typescript
+interface PolicyAttestationResult<boolean> {
+  result: boolean;
+  operation: string;
+  timestamp: number;
+  inputRefs: string[];
+  attestation: { ... };
+  delegatedAttestation: { ... };
+}
+```
+
+### NumericPolicyAttestation
+
+```typescript
+interface PolicyAttestationResult<number> {
+  result: number;
+  units: string;        // "meters" or "square_meters"
+  operation: string;
+  timestamp: number;
+  inputRefs: string[];
+  attestation: { ... };
+  delegatedAttestation: { ... };
+}
+```
+
+---
+
+## Using Raw GeoJSON
+
+You can mix UIDs and raw GeoJSON:
+
+```typescript
+// Check if user is inside a custom polygon
+const result = await astral.compute.contains(
+  {
+    type: 'Polygon',
+    coordinates: [[[
+      [-122.4194, 37.7749],
+      [-122.4094, 37.7749],
+      [-122.4094, 37.7849],
+      [-122.4194, 37.7849],
+      [-122.4194, 37.7749]
+    ]]]
+  },
+  userLocationUID,
+  { schema: SCHEMA_UID }
+);
+```
+
+<Note>
+  Raw GeoJSON is not verified for authenticity. The `inputRefs` will contain a keccak256 hash of the geometry.
+</Note>
+
+<Card title="Next: Location Methods" icon="location-dot" href="/sdk/location">
+  Learn about location attestation methods
+</Card>

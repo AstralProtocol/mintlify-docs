@@ -1,0 +1,68 @@
+---
+title: "POST /area"
+description: "Calculate area of a polygon"
+---
+
+<Warning>
+  **Development Preview** — This API is under development.
+</Warning>
+
+# Area
+
+Calculate the area of a polygon in square meters.
+
+```
+POST /compute/v0/area
+```
+
+## Request Body
+
+<ParamField body="geometry" type="Input" required>
+  The polygon geometry to measure.
+</ParamField>
+
+<ParamField body="schema" type="string" required>
+  EAS schema UID to issue the attestation against.
+</ParamField>
+
+<ParamField body="recipient" type="string">
+  Ethereum address to receive the attestation.
+</ParamField>
+
+## Example Request
+
+```bash
+curl -X POST https://api.astral.global/compute/v0/area \
+  -H "Content-Type: application/json" \
+  -d '{
+    "geometry": "0xpolygon...",
+    "schema": "0xschema...",
+    "recipient": "0xdef456..."
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "result": 5432.10,
+  "units": "square_meters",
+  "operation": "area",
+  "timestamp": 1706400000,
+  "inputRefs": [
+    "0xpolygon..."
+  ],
+  "attestation": { ... },
+  "delegatedAttestation": { ... }
+}
+```
+
+## Notes
+
+- Uses PostGIS `ST_Area` function with geodetic calculation
+- Result is in square meters with square centimeter precision
+- Only valid for polygon geometries
+
+<Card title="SDK Method" icon="code" href="/sdk/compute#area">
+  See `astral.compute.area()`
+</Card>

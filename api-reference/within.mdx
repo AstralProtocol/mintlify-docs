@@ -1,0 +1,96 @@
+---
+title: "POST /within"
+description: "Check if a geometry is within a radius of another"
+---
+
+<Warning>
+  **Development Preview** — This API is under development.
+</Warning>
+
+# Within
+
+Check if a geometry is within a specified radius of a target geometry.
+
+```
+POST /compute/v0/within
+```
+
+## Request Body
+
+<ParamField body="geometry" type="Input" required>
+  The geometry to check (typically a point).
+</ParamField>
+
+<ParamField body="target" type="Input" required>
+  The target geometry to measure distance from.
+</ParamField>
+
+<ParamField body="radius" type="number" required>
+  Maximum distance in **meters**.
+</ParamField>
+
+<ParamField body="schema" type="string" required>
+  EAS schema UID to issue the attestation against.
+</ParamField>
+
+<ParamField body="recipient" type="string">
+  Ethereum address to receive the attestation.
+</ParamField>
+
+## Example Request
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.astral.global/compute/v0/within \
+  -H "Content-Type: application/json" \
+  -d '{
+    "geometry": "0xpoint...",
+    "target": "0xlandmark...",
+    "radius": 500,
+    "schema": "0xschema...",
+    "recipient": "0xdef456..."
+  }'
+```
+
+```typescript TypeScript
+const response = await fetch('https://api.astral.global/compute/v0/within', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    geometry: '0xpoint...',
+    target: '0xlandmark...',
+    radius: 500,
+    schema: '0xschema...',
+    recipient: '0xdef456...'
+  })
+});
+```
+
+</CodeGroup>
+
+## Example Response
+
+```json
+{
+  "result": true,
+  "operation": "within",
+  "timestamp": 1706400000,
+  "inputRefs": [
+    "0xpoint...",
+    "0xlandmark..."
+  ],
+  "attestation": { ... },
+  "delegatedAttestation": { ... }
+}
+```
+
+## Notes
+
+- Uses PostGIS `ST_DWithin` function
+- Radius is always in **meters** (no unit conversion)
+- Returns `true` if the distance between geometries is less than or equal to the radius
+
+<Card title="SDK Method" icon="code" href="/sdk/compute#within">
+  See `astral.compute.within()`
+</Card>

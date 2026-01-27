@@ -1,0 +1,68 @@
+---
+title: "POST /length"
+description: "Calculate length of a line"
+---
+
+<Warning>
+  **Development Preview** — This API is under development.
+</Warning>
+
+# Length
+
+Calculate the length of a line in meters.
+
+```
+POST /compute/v0/length
+```
+
+## Request Body
+
+<ParamField body="geometry" type="Input" required>
+  The line geometry to measure.
+</ParamField>
+
+<ParamField body="schema" type="string" required>
+  EAS schema UID to issue the attestation against.
+</ParamField>
+
+<ParamField body="recipient" type="string">
+  Ethereum address to receive the attestation.
+</ParamField>
+
+## Example Request
+
+```bash
+curl -X POST https://api.astral.global/compute/v0/length \
+  -H "Content-Type: application/json" \
+  -d '{
+    "geometry": "0xline...",
+    "schema": "0xschema...",
+    "recipient": "0xdef456..."
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "result": 2345.67,
+  "units": "meters",
+  "operation": "length",
+  "timestamp": 1706400000,
+  "inputRefs": [
+    "0xline..."
+  ],
+  "attestation": { ... },
+  "delegatedAttestation": { ... }
+}
+```
+
+## Notes
+
+- Uses PostGIS `ST_Length` function with geodetic calculation
+- Result is in meters with centimeter precision
+- Valid for LineString and MultiLineString geometries
+
+<Card title="SDK Method" icon="code" href="/sdk/compute#length">
+  See `astral.compute.length()`
+</Card>

@@ -1,80 +1,307 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Build a location-gated NFT in 10 minutes"
 ---
 
-## Get started in three steps
+<Warning>
+  **Development Preview** — This quickstart demonstrates the intended developer experience.
+  Code samples are illustrative of the target API. We're building this now!
+</Warning>
 
-Get your documentation site running locally and make your first customization.
+# Build a Location-Gated NFT
 
-### Step 1: Set up your local environment
+Create an NFT that can only be minted by people physically at the Eiffel Tower — verified with Astral location proofs.
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## What You'll Learn
 
-### Step 2: Deploy your changes
+<Steps>
+  <Step title="Create a canonical location">
+    Set up a permanent reference point that anyone can use
+  </Step>
+  <Step title="Show real-time feedback">
+    Use Turf.js for instant UX (unverified)
+  </Step>
+  <Step title="Verify location">
+    Submit to Astral for verifiable computation
+  </Step>
+  <Step title="Gate the smart contract">
+    Use EAS resolvers to mint based on location proof
+  </Step>
+</Steps>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Prerequisites
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+```bash
+npm install @decentralized-geo/astral-sdk @turf/turf ethers
+```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+You'll need:
+- A wallet with testnet ETH
+- Basic TypeScript and Solidity knowledge
+- 10 minutes
 
-### Step 3: Go live
+---
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Step 1: Create the Canonical Location
 
-## Next steps
+First, create a permanent location attestation for the Eiffel Tower that everyone can reference.
 
-Now that you have your docs running, explore these key features:
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { ethers } from 'ethers';
 
-<CardGroup cols={2}>
+// Connect your wallet
+const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+// Initialize Astral SDK
+const astral = new AstralSDK({
+  signer: wallet,
+  chainId: 84532  // Base Sepolia
+});
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+// Define the Eiffel Tower as a point
+const eiffelTowerLocation = {
+  type: 'Point',
+  coordinates: [2.2945, 48.8584]  // [longitude, latitude]
+};
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+// Create a location attestation
+const eiffelTower = await astral.location.create(eiffelTowerLocation, {
+  submitOnchain: true,
+  metadata: {
+    name: "Eiffel Tower",
+    description: "Iconic Paris landmark"
+  }
+});
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+console.log('Eiffel Tower UID:', eiffelTower.uid);
+// Save this UID - it's a permanent reference to this location
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Location attestations follow the [Location Protocol](https://easierdata.org/updates/2025/2025-05-19-location-protocol-spec) schema.
+  Anyone can now reference the Eiffel Tower by UID instead of hardcoding coordinates.
 </Note>
+
+---
+
+## Step 2: Show Real-Time Distance (UX)
+
+Give users instant feedback using **Turf.js** — client-side, unverified, but perfect for UX.
+
+```typescript
+import * as turf from '@turf/turf';
+
+// User's current location (from navigator.geolocation)
+const userCoords = {
+  type: 'Point',
+  coordinates: [2.2951, 48.8580]  // Unverified GPS
+};
+
+// Calculate distance locally (instant)
+const distanceKm = turf.distance(
+  eiffelTowerLocation,
+  userCoords,
+  { units: 'kilometers' }
+);
+
+console.log(`You are ${distanceKm.toFixed(2)}km from the Eiffel Tower`);
+
+if (distanceKm > 0.5) {
+  showUI('Keep going! ' + distanceKm.toFixed(2) + 'km to go.');
+} else {
+  showUI('You're close! Ready to claim your NFT.');
+}
+```
+
+<Tip>
+  **Why Turf.js?** Instant, free, great for UX. But you can't trust it for minting — users can spoof GPS. That's where Astral comes in.
+</Tip>
+
+---
+
+## Step 3: Verify Location with Astral
+
+When the user is ready to claim, submit their location to Astral for verified computation.
+
+```typescript
+// Create user's location attestation
+const userLocation = await astral.location.create(userCoords, {
+  submitOnchain: true
+});
+
+// Compute proximity with automatic EAS submission
+const result = await astral.compute.within(
+  userLocation.uid,           // User's location
+  eiffelTower.uid,            // Target location
+  500,                        // 500 meters radius
+  {
+    submitOnchain: true,
+    schema: RESOLVER_SCHEMA_UID,
+    recipient: wallet.address
+  }
+);
+
+// Behind the scenes:
+// 1. Astral computes ST_DWithin in PostGIS (inside TEE)
+// 2. Signs a policy attestation with the result
+// 3. SDK submits to EAS
+// 4. EAS calls your resolver contract
+// 5. Resolver mints NFT if policy passed
+
+console.log('Result:', result.result);  // true or false
+console.log('Attestation UID:', result.attestation.uid);
+```
+
+<Info>
+  The service runs inside EigenCompute's TEE, providing verifiable execution. The signed attestation proves the computation was performed correctly.
+</Info>
+
+---
+
+## Step 4: The Smart Contract (EAS Resolver)
+
+Your resolver contract gates NFT minting based on the policy attestation.
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@eas/contracts/resolver/SchemaResolver.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+
+contract EiffelTowerNFT is SchemaResolver, ERC721 {
+    address public astralSigner;
+    uint256 public nextTokenId = 1;
+    mapping(address => bool) public hasMinted;
+
+    constructor(IEAS eas, address _astralSigner)
+        SchemaResolver(eas)
+        ERC721("Eiffel Tower Visitor", "EIFFEL")
+    {
+        astralSigner = _astralSigner;
+    }
+
+    function onAttest(
+        Attestation calldata attestation,
+        uint256 /*value*/
+    ) internal override returns (bool) {
+        // 1. Verify attestation is from Astral
+        require(attestation.attester == astralSigner, "Not from Astral");
+
+        // 2. Decode the policy result
+        (
+            bool policyPassed,
+            bytes32[] memory inputRefs,
+            uint64 timestamp,
+            string memory operation
+        ) = abi.decode(
+            attestation.data,
+            (bool, bytes32[], uint64, string)
+        );
+
+        // 3. Verify policy passed
+        require(policyPassed, "Not close enough");
+
+        // 4. One mint per address
+        require(!hasMinted[attestation.recipient], "Already minted");
+
+        // 5. Mint NFT atomically
+        hasMinted[attestation.recipient] = true;
+        _mint(attestation.recipient, nextTokenId++);
+
+        return true;
+    }
+
+    function onRevoke(Attestation calldata, uint256)
+        internal pure override returns (bool)
+    {
+        return false;
+    }
+}
+```
+
+---
+
+## Step 5: Deploy and Register Schema
+
+```typescript
+// Deploy resolver
+const EiffelNFT = await ethers.getContractFactory("EiffelTowerNFT");
+const resolver = await EiffelNFT.deploy(
+  EAS_ADDRESS,
+  ASTRAL_SIGNER_ADDRESS
+);
+await resolver.waitForDeployment();
+
+// Register schema with EAS
+const schemaRegistry = new SchemaRegistry(SCHEMA_REGISTRY_ADDRESS);
+const schema = "bool result,bytes32[] inputRefs,uint64 timestamp,string operation";
+
+const tx = await schemaRegistry.register({
+  schema,
+  resolverAddress: resolver.address,
+  revocable: false
+});
+const receipt = await tx.wait();
+
+const RESOLVER_SCHEMA_UID = receipt.logs[0].args.uid;
+console.log('Schema UID:', RESOLVER_SCHEMA_UID);
+```
+
+---
+
+## The Complete Flow
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import * as turf from '@turf/turf';
+
+const astral = new AstralSDK({ signer: wallet, chainId: 84532 });
+
+// 1. Reference location exists
+const landmarkUID = '0x...';  // Eiffel Tower
+
+// 2. Show instant feedback (Turf.js)
+const distance = turf.distance(userCoords, landmarkCoords);
+console.log(`${distance}km away`);
+
+// 3. User arrives — create location attestation
+const userLocation = await astral.location.create(userCoords, {
+  submitOnchain: true
+});
+
+// 4. Verify + compute + mint
+const result = await astral.compute.within(
+  userLocation.uid,
+  landmarkUID,
+  500,
+  {
+    submitOnchain: true,
+    schema: RESOLVER_SCHEMA_UID,
+    recipient: userAddress
+  }
+);
+
+console.log('NFT minted!', result.attestation.uid);
+```
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book" href="/concepts/location-attestations">
+    Understand the building blocks
+  </Card>
+  <Card title="Use Cases" icon="lightbulb" href="/use-cases">
+    Explore what you can build
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/overview">
+    Dive into the API details
+  </Card>
+  <Card title="SDK Reference" icon="cube" href="/sdk/overview">
+    Full SDK documentation
+  </Card>
+</CardGroup>

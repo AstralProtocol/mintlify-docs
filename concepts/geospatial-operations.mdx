@@ -1,0 +1,200 @@
+---
+title: "Geospatial Operations"
+description: "Spatial computations powered by PostGIS"
+---
+
+<Warning>
+  **Development Preview** — This describes the target specification.
+</Warning>
+
+# Geospatial Operations
+
+Astral provides verifiable spatial computations backed by **PostGIS** — the gold standard in geospatial databases with 20+ years of production use.
+
+## Available Operations
+
+### Measurements
+
+Operations that return **numeric** results:
+
+| Operation | Description | PostGIS Function |
+|-----------|-------------|------------------|
+| `distance` | Distance between two geometries | `ST_Distance` |
+| `area` | Area of a polygon | `ST_Area` |
+| `length` | Length of a line | `ST_Length` |
+
+### Predicates
+
+Operations that return **boolean** results:
+
+| Operation | Description | PostGIS Function |
+|-----------|-------------|------------------|
+| `contains` | Is geometry B inside geometry A? | `ST_Contains` |
+| `within` | Is point within distance of target? | `ST_DWithin` |
+| `intersects` | Do geometries overlap? | `ST_Intersects` |
+
+## Operation Examples
+
+### Distance
+
+Calculate the distance between two locations in meters.
+
+```typescript
+const result = await astral.compute.distance(
+  userLocationUID,
+  landmarkUID,
+  { schema: SCHEMA_UID }
+);
+
+console.log(result.result);  // 523.45 (meters)
+console.log(result.units);   // "meters"
+```
+
+### Contains
+
+Check if a point is inside a polygon.
+
+```typescript
+const result = await astral.compute.contains(
+  sfBayAreaPolygonUID,  // Container
+  userLocationUID,       // Point to check
+  { schema: SCHEMA_UID }
+);
+
+console.log(result.result);  // true or false
+```
+
+### Within
+
+Check if a point is within a radius of a target.
+
+```typescript
+const result = await astral.compute.within(
+  userLocationUID,   // Point to check
+  landmarkUID,       // Target location
+  500,               // Radius in meters
+  { schema: SCHEMA_UID }
+);
+
+console.log(result.result);  // true if within 500m
+```
+
+### Intersects
+
+Check if two geometries overlap.
+
+```typescript
+const result = await astral.compute.intersects(
+  polygon1UID,
+  polygon2UID,
+  { schema: SCHEMA_UID }
+);
+
+console.log(result.result);  // true if they overlap
+```
+
+### Area
+
+Calculate the area of a polygon.
+
+```typescript
+const result = await astral.compute.area(
+  propertyBoundaryUID,
+  { schema: SCHEMA_UID }
+);
+
+console.log(result.result);  // 5432.10 (square meters)
+console.log(result.units);   // "square_meters"
+```
+
+### Length
+
+Calculate the length of a line.
+
+```typescript
+const result = await astral.compute.length(
+  routeUID,
+  { schema: SCHEMA_UID }
+);
+
+console.log(result.result);  // 2345.67 (meters)
+console.log(result.units);   // "meters"
+```
+
+## Units
+
+All measurements use **metric units only**:
+
+| Measurement | Unit |
+|-------------|------|
+| Distance | meters |
+| Length | meters |
+| Area | square meters |
+| Radius (in `within`) | meters |
+
+<Note>
+  No unit conversion options are provided. Developers should convert client-side if needed.
+</Note>
+
+## Precision
+
+Results are stored with centimeter precision:
+
+| Type | Precision | Storage |
+|------|-----------|---------|
+| Distance/Length | 0.01m | Scaled integer (cm) |
+| Area | 0.0001 m² | Scaled integer (cm²) |
+
+```
+523.45 meters → stored as 52345 (centimeters)
+1234.5678 m² → stored as 12345678 (cm²)
+```
+
+This ensures deterministic, reproducible results across invocations.
+
+## Compute Options
+
+All operations accept a `ComputeOptions` object:
+
+```typescript
+interface ComputeOptions {
+  schema: string;         // EAS schema UID (required)
+  recipient?: string;     // Attestation recipient address
+}
+```
+
+<Warning>
+  The `schema` parameter is **required**. It determines which resolver the attestation can be submitted to.
+</Warning>
+
+## Future Operations
+
+Post-MVP, additional operations will be added:
+
+| Operation | Type | Description |
+|-----------|------|-------------|
+| `disjoint` | Predicate | Do geometries not touch? |
+| `buffer` | Transformation | Create buffer zone around geometry |
+| `centroid` | Transformation | Find center point |
+| `union` | Transformation | Merge geometries |
+| `intersection` | Transformation | Overlapping area |
+
+## Turf.js Integration
+
+Use **Turf.js** for client-side operations (instant, free, unverified) and **Astral** for verifiable operations:
+
+```typescript
+import * as turf from '@turf/turf';
+
+// Client-side: instant UX feedback
+const localDistance = turf.distance(point1, point2);
+showUI(`${localDistance}km away`);
+
+// Verifiable: signed attestation for onchain use
+const attestedResult = await astral.compute.distance(uid1, uid2, options);
+await submitToContract(attestedResult);
+```
+
+<Card title="Next: Policy Attestations" icon="file-signature" href="/concepts/policy-attestations">
+  Learn about the signed outputs of geospatial operations
+</Card>

@@ -1,0 +1,73 @@
+---
+title: "POST /intersects"
+description: "Check if two geometries overlap"
+---
+
+<Warning>
+  **Development Preview** — This API is under development.
+</Warning>
+
+# Intersects
+
+Check if two geometries intersect (share any portion of space).
+
+```
+POST /compute/v0/intersects
+```
+
+## Request Body
+
+<ParamField body="geometry1" type="Input" required>
+  First geometry to check.
+</ParamField>
+
+<ParamField body="geometry2" type="Input" required>
+  Second geometry to check.
+</ParamField>
+
+<ParamField body="schema" type="string" required>
+  EAS schema UID to issue the attestation against.
+</ParamField>
+
+<ParamField body="recipient" type="string">
+  Ethereum address to receive the attestation.
+</ParamField>
+
+## Example Request
+
+```bash
+curl -X POST https://api.astral.global/compute/v0/intersects \
+  -H "Content-Type: application/json" \
+  -d '{
+    "geometry1": "0xpolygon1...",
+    "geometry2": "0xpolygon2...",
+    "schema": "0xschema...",
+    "recipient": "0xdef456..."
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "result": true,
+  "operation": "intersects",
+  "timestamp": 1706400000,
+  "inputRefs": [
+    "0xpolygon1...",
+    "0xpolygon2..."
+  ],
+  "attestation": { ... },
+  "delegatedAttestation": { ... }
+}
+```
+
+## Notes
+
+- Uses PostGIS `ST_Intersects` function
+- Returns `true` if geometries share any space (including boundaries)
+- More permissive than `contains` — touching boundaries count as intersection
+
+<Card title="SDK Method" icon="code" href="/sdk/compute#intersects">
+  See `astral.compute.intersects()`
+</Card>

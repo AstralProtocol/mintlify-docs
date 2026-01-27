@@ -1,0 +1,132 @@
+---
+title: "API Overview"
+description: "REST API for verifiable geospatial computations"
+---
+
+<Warning>
+  **Development Preview** — This API specification is under development.
+</Warning>
+
+# API Reference
+
+The Astral Compute API provides REST endpoints for verifiable geospatial operations.
+
+## Base URL
+
+```
+https://api.astral.global/compute/v0
+```
+
+## Authentication
+
+### Phase 1 (MVP)
+
+No authentication required. Rate limiting by IP address.
+
+```bash
+# No auth headers needed
+curl https://api.astral.global/compute/v0/distance \
+  -H "Content-Type: application/json" \
+  -d '{"from": "0xabc...", "to": "0xdef...", "schema": "0x..."}'
+```
+
+### Phase 2 (Future)
+
+Wallet-based authentication with signed requests.
+
+```bash
+curl https://api.astral.global/compute/v0/distance \
+  -H "Content-Type: application/json" \
+  -H "X-Wallet-Address: 0x..." \
+  -H "X-Signature: 0x..." \
+  -d '...'
+```
+
+## Input Types
+
+All endpoints accept geometry inputs in these formats:
+
+| Format | Description | Example |
+|--------|-------------|---------|
+| UID string | Onchain attestation | `"0xabc123..."` |
+| GeoJSON | Raw geometry | `{"type": "Point", "coordinates": [2.29, 48.85]}` |
+| UID + URI | Offchain attestation | `{"uid": "0xabc...", "uri": "ipfs://Qm..."}` |
+| Inline attestation | Full offchain object | `{"attestation": {...}}` |
+
+## Response Format
+
+All successful responses include:
+
+```json
+{
+  "result": "<computed value>",
+  "operation": "<operation name>",
+  "timestamp": 1706400000,
+  "inputRefs": ["0x...", "0x..."],
+  "attestation": {
+    "schema": "0x...",
+    "attester": "0x...",
+    "recipient": "0x...",
+    "data": "0x...",
+    "signature": "0x..."
+  },
+  "delegatedAttestation": {
+    "signature": "0x...",
+    "attester": "0x...",
+    "deadline": 1706403600
+  }
+}
+```
+
+## Error Format
+
+Errors follow [RFC 7807](https://tools.ietf.org/html/rfc7807) (Problem Details for HTTP APIs):
+
+```json
+{
+  "type": "https://api.astral.global/errors/attestation-not-found",
+  "title": "Attestation Not Found",
+  "status": 404,
+  "detail": "Location attestation with UID 0xabc123... not found on chain 84532"
+}
+```
+
+### Error Types
+
+| Type | Status | Description |
+|------|--------|-------------|
+| `invalid-input` | 400 | Bad request data, missing fields, invalid geometry |
+| `attestation-not-found` | 404 | UID doesn't exist on specified chain |
+| `verification-failed` | 401 | Signature verification failed |
+| `computation-error` | 500 | PostGIS operation failed |
+| `rate-limited` | 429 | Too many requests |
+
+## Rate Limits
+
+| Auth Level | Limit |
+|------------|-------|
+| Unauthenticated | 100 requests/hour |
+| Wallet authenticated | 1000 requests/hour |
+
+## Available Endpoints
+
+<CardGroup cols={2}>
+  <Card title="POST /distance" href="/api-reference/distance">
+    Distance between two geometries
+  </Card>
+  <Card title="POST /contains" href="/api-reference/contains">
+    Is geometry B inside geometry A?
+  </Card>
+  <Card title="POST /within" href="/api-reference/within">
+    Is point within radius of target?
+  </Card>
+  <Card title="POST /intersects" href="/api-reference/intersects">
+    Do geometries overlap?
+  </Card>
+  <Card title="POST /area" href="/api-reference/area">
+    Area of a polygon
+  </Card>
+  <Card title="POST /length" href="/api-reference/length">
+    Length of a line
+  </Card>
+</CardGroup>

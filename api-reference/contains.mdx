@@ -1,0 +1,118 @@
+---
+title: "POST /contains"
+description: "Check if a geometry is inside another geometry"
+---
+
+<Warning>
+  **Development Preview** — This API is under development.
+</Warning>
+
+# Contains
+
+Check if a geometry is inside a container geometry.
+
+```
+POST /compute/v0/contains
+```
+
+## Request Body
+
+<ParamField body="container" type="Input" required>
+  The containing geometry (typically a polygon). Can be a UID, GeoJSON, or offchain attestation reference.
+</ParamField>
+
+<ParamField body="geometry" type="Input" required>
+  The geometry to check. Can be a UID, GeoJSON, or offchain attestation reference.
+</ParamField>
+
+<ParamField body="schema" type="string" required>
+  EAS schema UID to issue the attestation against.
+</ParamField>
+
+<ParamField body="recipient" type="string">
+  Ethereum address to receive the attestation.
+</ParamField>
+
+## Example Request
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.astral.global/compute/v0/contains \
+  -H "Content-Type: application/json" \
+  -d '{
+    "container": "0xpolygon...",
+    "geometry": "0xpoint...",
+    "schema": "0xschema...",
+    "recipient": "0xdef456..."
+  }'
+```
+
+```typescript TypeScript
+const response = await fetch('https://api.astral.global/compute/v0/contains', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    container: '0xpolygon...',
+    geometry: '0xpoint...',
+    schema: '0xschema...',
+    recipient: '0xdef456...'
+  })
+});
+```
+
+</CodeGroup>
+
+## Response
+
+<ResponseField name="result" type="boolean" required>
+  `true` if the geometry is inside the container, `false` otherwise
+</ResponseField>
+
+<ResponseField name="operation" type="string" required>
+  Always "contains"
+</ResponseField>
+
+<ResponseField name="timestamp" type="number" required>
+  Unix timestamp of computation
+</ResponseField>
+
+<ResponseField name="inputRefs" type="string[]" required>
+  Array containing [containerRef, geometryRef]
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "result": true,
+  "operation": "contains",
+  "timestamp": 1706400000,
+  "inputRefs": [
+    "0xpolygon...",
+    "0xpoint..."
+  ],
+  "attestation": {
+    "schema": "0x...",
+    "attester": "0x...",
+    "recipient": "0xdef456...",
+    "data": "0x...",
+    "signature": "0x..."
+  },
+  "delegatedAttestation": {
+    "signature": "0x...",
+    "attester": "0x...",
+    "deadline": 1706403600
+  }
+}
+```
+
+## Notes
+
+- Uses PostGIS `ST_Contains` function
+- The container must completely contain the geometry for `true`
+- Points on the boundary may return `false` (use `intersects` for boundary cases)
+
+<Card title="SDK Method" icon="code" href="/sdk/compute#contains">
+  See `astral.compute.contains()`
+</Card>

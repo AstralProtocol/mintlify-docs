@@ -1,0 +1,207 @@
+---
+title: "Security"
+description: "Security considerations and trust model"
+---
+
+<Warning>
+  **Development Preview** — Security audit pending.
+</Warning>
+
+# Security Considerations
+
+This page documents the security model, known considerations, and best practices for building with Astral Location Services.
+
+## Trust Model
+
+### Current (MVP)
+
+```
+┌─────────────────────────────────────────┐
+│  Trust Assumptions                       │
+├─────────────────────────────────────────┤
+│  ✓ TEE executes code correctly          │
+│  ✓ Astral operates service honestly     │
+│  ✓ Signing key held securely in TEE     │
+│  ✗ Input locations verified (future)    │
+└─────────────────────────────────────────┘
+```
+
+The MVP uses a **centralized trust model**:
+- Single service with known signer
+- TEE (EigenCompute) provides execution attestation
+- Deterministic operations ensure reproducibility
+
+### Future Enhancements
+
+| Phase | Enhancement | Benefit |
+|-------|-------------|---------|
+| 2 | AVS Consensus | Multiple operators must agree |
+| 3 | ZK Proofs | Cryptographic computation proof |
+| 4 | Decentralized Signing | No single point of failure |
+
+---
+
+## Known Considerations
+
+### Replay Attacks
+
+**Status:** Documented, resolver responsibility
+
+Policy Attestations could potentially be reused:
+- **Temporal replay:** Old attestation used for current benefit
+- **Cross-context replay:** Attestation for one resolver used at another
+
+**Mitigations (your responsibility):**
+
+```solidity
+contract SecureResolver is SchemaResolver {
+    mapping(bytes32 => bool) public usedAttestations;
+
+    function onAttest(Attestation calldata attestation, uint256)
+        internal override returns (bool)
+    {
+        // 1. Check not already used
+        bytes32 attHash = keccak256(abi.encode(attestation.uid));
+        require(!usedAttestations[attHash], "Already used");
+        usedAttestations[attHash] = true;
+
+        // 2. Check timestamp freshness
+        (, , uint64 timestamp, ) = abi.decode(...);
+        require(timestamp > block.timestamp - 1 hours, "Too old");
+
+        // 3. Verify expected inputs
+        (, bytes32[] memory inputRefs, , ) = abi.decode(...);
+        require(inputRefs[1] == EXPECTED_LOCATION, "Wrong location");
+
+        // ... business logic
+    }
+}
+```
+
+---
+
+### Input Trust
+
+**Status:** Raw GeoJSON not verified
+
+Raw GeoJSON inputs are accepted for flexibility, but are **not verified for authenticity**:
+
+```typescript
+// This works but geometry source is unverified
+const result = await astral.compute.contains(
+  { type: 'Polygon', coordinates: [...] },  // Raw, unverified
+  userLocationUID
+);
+```
+
+The Policy Attestation proves:
+- "Astral computed the relationship between A and B"
+
+It does **NOT** prove:
+- "Geometry A came from a trusted source"
+- "User was actually at location B"
+
+**Best practice:** For high-security applications, require attested inputs (UIDs) rather than raw GeoJSON.
+
+---
+
+### GPS Spoofing
+
+**Status:** Out of scope for MVP
+
+Astral can verify that a computation was correct, but cannot verify that the input location represents where the user actually was. GPS can be spoofed.
+
+**Future:** Location proofs with multiple corroborating stamps will make spoofing harder.
+
+---
+
+## Best Practices
+
+### For Resolver Authors
+
+<AccordionGroup>
+  <Accordion title="Always verify attester" icon="shield-check">
+    ```solidity
+    require(attestation.attester == astralSigner, "Not from Astral");
+    ```
+  </Accordion>
+  <Accordion title="Check timestamp freshness" icon="clock">
+    ```solidity
+    require(timestamp > block.timestamp - MAX_AGE, "Attestation too old");
+    ```
+  </Accordion>
+  <Accordion title="Verify input references" icon="link">
+    ```solidity
+    require(inputRefs[1] == EXPECTED_LANDMARK, "Wrong location checked");
+    ```
+  </Accordion>
+  <Accordion title="Track used attestations" icon="list-check">
+    ```solidity
+    require(!usedAttestations[uid], "Already used");
+    usedAttestations[uid] = true;
+    ```
+  </Accordion>
+  <Accordion title="Support key rotation" icon="rotate">
+    ```solidity
+    function updateSigner(address newSigner) external onlyMultisig {
+        astralSigner = newSigner;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### For Application Developers
+
+- **Prefer attestation UIDs** over raw GeoJSON for sensitive operations
+- **Set appropriate timeouts** — don't accept stale attestations
+- **Validate recipient** — ensure attestation is for the right user
+- **Handle signature expiry** — delegated attestation signatures have deadlines
+
+---
+
+## Key Management
+
+### Service Signing Key
+
+- Key generated/provisioned within TEE
+- Cannot be extracted by operators
+- Used to sign all Policy Attestations
+
+### Key Rotation
+
+Resolver contracts should support key rotation:
+
+```solidity
+address public multisig;
+address public astralSigner;
+
+event SignerUpdated(address oldSigner, address newSigner);
+
+modifier onlyMultisig() {
+    require(msg.sender == multisig, "Not multisig");
+    _;
+}
+
+function updateAstralSigner(address newSigner) external onlyMultisig {
+    emit SignerUpdated(astralSigner, newSigner);
+    astralSigner = newSigner;
+}
+```
+
+---
+
+## Audit Status
+
+| Component | Status |
+|-----------|--------|
+| Compute Service | Pending |
+| SDK | Pending |
+| Example Contracts | Pending |
+
+<Note>
+  Full security audit will be conducted before mainnet deployment.
+</Note>
+
+<Card title="Next: Roadmap" icon="road" href="/resources/roadmap">
+  See what's coming
+</Card>

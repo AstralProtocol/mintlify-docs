@@ -1,0 +1,304 @@
+---
+title: "Geofenced Token"
+description: "Create a token that can only be traded within a geographic region"
+---
+
+<Warning>
+  **Development Preview** — This guide demonstrates the intended patterns.
+</Warning>
+
+# Build a Geofenced Token
+
+Create a local currency that can only be traded by people physically in a specific region — enabling hyperlocal economies.
+
+## Concept
+
+Imagine a "San Francisco Token" (SFT) that:
+- Can only be minted by SF residents
+- Can only be transferred to people currently in SF
+- Creates a true local currency for the Bay Area
+
+---
+
+## Step 1: Define the Region
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+// San Francisco city boundary (simplified)
+const sfBoundary = {
+  type: 'Polygon',
+  coordinates: [[[
+    [-122.517, 37.708],
+    [-122.358, 37.708],
+    [-122.358, 37.812],
+    [-122.517, 37.812],
+    [-122.517, 37.708]
+  ]]]
+};
+
+// Create region attestation
+const region = await astral.location.create(sfBoundary, {
+  submitOnchain: true,
+  metadata: {
+    name: "San Francisco",
+    description: "SF city boundary for local currency"
+  }
+});
+
+console.log('Region UID:', region.uid);
+```
+
+---
+
+## Step 2: The Token Contract
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@eas/contracts/resolver/SchemaResolver.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract GeofencedToken is SchemaResolver, ERC20, Ownable {
+    address public astralSigner;
+    bytes32 public regionUID;
+
+    // Track pending operations
+    mapping(bytes32 => PendingMint) public pendingMints;
+    mapping(bytes32 => PendingTransfer) public pendingTransfers;
+
+    struct PendingMint {
+        address recipient;
+        uint256 amount;
+        bool exists;
+    }
+
+    struct PendingTransfer {
+        address from;
+        address to;
+        uint256 amount;
+        bool exists;
+    }
+
+    event MintRequested(bytes32 indexed requestId, address recipient, uint256 amount);
+    event TransferRequested(bytes32 indexed requestId, address from, address to, uint256 amount);
+
+    constructor(
+        IEAS eas,
+        address _astralSigner,
+        bytes32 _regionUID
+    )
+        SchemaResolver(eas)
+        ERC20("San Francisco Token", "SFT")
+        Ownable(msg.sender)
+    {
+        astralSigner = _astralSigner;
+        regionUID = _regionUID;
+    }
+
+    // Request a mint - user must then prove they're in the region
+    function requestMint(uint256 amount) external returns (bytes32 requestId) {
+        requestId = keccak256(abi.encode(msg.sender, amount, block.timestamp));
+        pendingMints[requestId] = PendingMint({
+            recipient: msg.sender,
+            amount: amount,
+            exists: true
+        });
+        emit MintRequested(requestId, msg.sender, amount);
+    }
+
+    // Request a transfer - recipient must prove they're in the region
+    function requestTransfer(address to, uint256 amount) external returns (bytes32 requestId) {
+        require(balanceOf(msg.sender) >= amount, "Insufficient balance");
+        requestId = keccak256(abi.encode(msg.sender, to, amount, block.timestamp));
+        pendingTransfers[requestId] = PendingTransfer({
+            from: msg.sender,
+            to: to,
+            amount: amount,
+            exists: true
+        });
+
+        // Lock tokens during pending period
+        _transfer(msg.sender, address(this), amount);
+
+        emit TransferRequested(requestId, msg.sender, to, amount);
+    }
+
+    function onAttest(
+        Attestation calldata attestation,
+        uint256 /*value*/
+    ) internal override returns (bool) {
+        require(attestation.attester == astralSigner, "Not from Astral");
+
+        // Decode policy attestation
+        (
+            bool inRegion,
+            bytes32[] memory inputRefs,
+            uint64 timestamp,
+            string memory operation
+        ) = abi.decode(
+            attestation.data,
+            (bool, bytes32[], uint64, string)
+        );
+
+        require(inRegion, "Not in region");
+        require(inputRefs[0] == regionUID, "Wrong region");
+        require(timestamp > block.timestamp - 1 hours, "Too old");
+
+        // Extract request ID from recipient field (encoded)
+        bytes32 requestId = bytes32(uint256(uint160(attestation.recipient)));
+
+        // Check if this is a mint or transfer
+        if (pendingMints[requestId].exists) {
+            _executeMint(requestId);
+        } else if (pendingTransfers[requestId].exists) {
+            _executeTransfer(requestId);
+        } else {
+            revert("No pending operation");
+        }
+
+        return true;
+    }
+
+    function _executeMint(bytes32 requestId) internal {
+        PendingMint memory pending = pendingMints[requestId];
+        delete pendingMints[requestId];
+        _mint(pending.recipient, pending.amount);
+    }
+
+    function _executeTransfer(bytes32 requestId) internal {
+        PendingTransfer memory pending = pendingTransfers[requestId];
+        delete pendingTransfers[requestId];
+        _transfer(address(this), pending.to, pending.amount);
+    }
+
+    // Cancel pending operations
+    function cancelMint(bytes32 requestId) external {
+        require(pendingMints[requestId].recipient == msg.sender, "Not your request");
+        delete pendingMints[requestId];
+    }
+
+    function cancelTransfer(bytes32 requestId) external {
+        PendingTransfer memory pending = pendingTransfers[requestId];
+        require(pending.from == msg.sender, "Not your request");
+        delete pendingTransfers[requestId];
+        _transfer(address(this), pending.from, pending.amount);
+    }
+
+    function onRevoke(Attestation calldata, uint256) internal pure override returns (bool) {
+        return false;
+    }
+}
+```
+
+---
+
+## Step 3: SDK Integration
+
+```typescript
+async function mintLocalToken(amount: bigint, wallet: Signer) {
+  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+  const tokenContract = new Contract(TOKEN_ADDRESS, TOKEN_ABI, wallet);
+
+  // 1. Request mint
+  const tx1 = await tokenContract.requestMint(amount);
+  const receipt = await tx1.wait();
+  const requestId = receipt.logs[0].args.requestId;
+
+  // 2. Get user's current location
+  const coords = await getCurrentLocation();
+
+  // 3. Create location attestation
+  const userLocation = await astral.location.create({
+    type: 'Point',
+    coordinates: coords
+  }, { submitOnchain: true });
+
+  // 4. Prove they're in the region
+  const proof = await astral.compute.contains(
+    REGION_UID,
+    userLocation.uid,
+    {
+      schema: SCHEMA_UID,
+      recipient: requestId  // Pass request ID as recipient
+    }
+  );
+
+  if (!proof.result) {
+    await tokenContract.cancelMint(requestId);
+    throw new Error('Not in the required region');
+  }
+
+  // 5. Submit proof → triggers mint
+  const tx2 = await astral.eas.submitDelegated(proof.delegatedAttestation);
+  await tx2.wait();
+
+  return { transactionHash: tx2.hash };
+}
+```
+
+---
+
+## Alternative: Simpler Transfer Gate
+
+For a simpler implementation, gate transfers directly:
+
+```solidity
+contract SimpleGeofencedToken is ERC20 {
+    IEAS public eas;
+    address public astralSigner;
+    bytes32 public regionUID;
+    bytes32 public schemaUID;
+
+    function transferWithProof(
+        address to,
+        uint256 amount,
+        bytes32 attestationUID
+    ) external {
+        // Fetch attestation from EAS
+        Attestation memory att = eas.getAttestation(attestationUID);
+
+        // Verify
+        require(att.attester == astralSigner, "Invalid attester");
+        require(att.recipient == to, "Wrong recipient");
+
+        (bool inRegion, bytes32[] memory inputs, , ) = abi.decode(
+            att.data,
+            (bool, bytes32[], uint64, string)
+        );
+
+        require(inRegion, "Recipient not in region");
+        require(inputs[0] == regionUID, "Wrong region");
+
+        // Execute transfer
+        _transfer(msg.sender, to, amount);
+    }
+}
+```
+
+---
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Neighborhood Currency" icon="house">
+    Local money that stays in the community
+  </Card>
+  <Card title="Tourism Credits" icon="plane">
+    Tokens only spendable within city limits
+  </Card>
+  <Card title="Regional Stablecoins" icon="dollar-sign">
+    Pegged currencies for specific regions
+  </Card>
+  <Card title="Event Tokens" icon="ticket">
+    Festival/conference currency
+  </Card>
+</CardGroup>
+
+<Card title="Next: Delivery Verification" icon="truck" href="/guides/delivery-verification">
+  Build an escrow with location verification
+</Card>
