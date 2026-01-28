@@ -4,12 +4,16 @@ description: "Build an escrow that releases when delivery arrives at the right l
 ---
 
 <Warning>
-  **Development Preview** — This guide demonstrates the intended patterns.
+  **Development Preview** — Code snippets need testing against actual implementation.
 </Warning>
 
 # Delivery Verification
 
 Build an escrow contract that releases payment only when the delivery is confirmed at the correct location.
+
+<Info>
+  **About location verification**: This guide uses GPS coordinates as input. GPS is spoofable. As [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) are developed, they'll replace `Geolocation.getCurrentPosition` for stronger verification.
+</Info>
 
 ## Concept
 
@@ -163,7 +167,7 @@ contract DeliveryEscrow is SchemaResolver, ReentrancyGuard {
 ## Step 2: Buyer Flow
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralClient } from '@decentralized-geo/astral-compute';
 import { ethers } from 'ethers';
 
 async function createDeliveryOrder(
@@ -172,7 +176,7 @@ async function createDeliveryOrder(
   paymentAmount: bigint,
   wallet: Signer
 ) {
-  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+  const astral = new AstralClient({ chainId: 84532, signer: wallet });
   const escrow = new Contract(ESCROW_ADDRESS, ESCROW_ABI, wallet);
 
   // Create destination location attestation
@@ -222,7 +226,7 @@ async function confirmDelivery(
   destinationUID: string,
   wallet: Signer
 ) {
-  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+  const astral = new AstralClient({ chainId: 84532, signer: wallet });
 
   // Get current location
   const coords = await getCurrentLocation();
