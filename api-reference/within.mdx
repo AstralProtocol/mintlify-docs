@@ -17,6 +17,10 @@ POST /compute/v0/within
 
 ## Request Body
 
+<ParamField body="chainId" type="number" required>
+  Target chain ID (e.g., 84532 for Base Sepolia, 8453 for Base).
+</ParamField>
+
 <ParamField body="geometry" type="Input" required>
   The geometry to check (typically a point).
 </ParamField>
@@ -34,7 +38,7 @@ POST /compute/v0/within
 </ParamField>
 
 <ParamField body="recipient" type="string">
-  Ethereum address to receive the attestation.
+  Ethereum address to receive the attestation. Defaults to zero address if not provided.
 </ParamField>
 
 ## Example Request
@@ -45,6 +49,7 @@ POST /compute/v0/within
 curl -X POST https://api.astral.global/compute/v0/within \
   -H "Content-Type: application/json" \
   -d '{
+    "chainId": 84532,
     "geometry": "0xpoint...",
     "target": "0xlandmark...",
     "radius": 500,
@@ -58,6 +63,7 @@ const response = await fetch('https://api.astral.global/compute/v0/within', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
+    chainId: 84532,
     geometry: '0xpoint...',
     target: '0xlandmark...',
     radius: 500,
@@ -80,8 +86,18 @@ const response = await fetch('https://api.astral.global/compute/v0/within', {
     "0xpoint...",
     "0xlandmark..."
   ],
-  "attestation": { ... },
-  "delegatedAttestation": { ... }
+  "attestation": {
+    "schema": "0x...",
+    "attester": "0x...",
+    "recipient": "0xdef456...",
+    "data": "0x...",
+    "signature": "0x..."
+  },
+  "delegatedAttestation": {
+    "signature": "0x...",
+    "attester": "0x...",
+    "deadline": 1706403600
+  }
 }
 ```
 

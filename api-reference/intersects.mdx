@@ -17,6 +17,10 @@ POST /compute/v0/intersects
 
 ## Request Body
 
+<ParamField body="chainId" type="number" required>
+  Target chain ID (e.g., 84532 for Base Sepolia, 8453 for Base).
+</ParamField>
+
 <ParamField body="geometry1" type="Input" required>
   First geometry to check.
 </ParamField>
@@ -30,7 +34,7 @@ POST /compute/v0/intersects
 </ParamField>
 
 <ParamField body="recipient" type="string">
-  Ethereum address to receive the attestation.
+  Ethereum address to receive the attestation. Defaults to zero address if not provided.
 </ParamField>
 
 ## Example Request
@@ -39,6 +43,7 @@ POST /compute/v0/intersects
 curl -X POST https://api.astral.global/compute/v0/intersects \
   -H "Content-Type: application/json" \
   -d '{
+    "chainId": 84532,
     "geometry1": "0xpolygon1...",
     "geometry2": "0xpolygon2...",
     "schema": "0xschema...",
@@ -57,8 +62,18 @@ curl -X POST https://api.astral.global/compute/v0/intersects \
     "0xpolygon1...",
     "0xpolygon2..."
   ],
-  "attestation": { ... },
-  "delegatedAttestation": { ... }
+  "attestation": {
+    "schema": "0x...",
+    "attester": "0x...",
+    "recipient": "0xdef456...",
+    "data": "0x...",
+    "signature": "0x..."
+  },
+  "delegatedAttestation": {
+    "signature": "0x...",
+    "attester": "0x...",
+    "deadline": 1706403600
+  }
 }
 ```
 

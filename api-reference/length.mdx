@@ -17,6 +17,10 @@ POST /compute/v0/length
 
 ## Request Body
 
+<ParamField body="chainId" type="number" required>
+  Target chain ID (e.g., 84532 for Base Sepolia, 8453 for Base).
+</ParamField>
+
 <ParamField body="geometry" type="Input" required>
   The line geometry to measure.
 </ParamField>
@@ -26,7 +30,7 @@ POST /compute/v0/length
 </ParamField>
 
 <ParamField body="recipient" type="string">
-  Ethereum address to receive the attestation.
+  Ethereum address to receive the attestation. Defaults to zero address if not provided.
 </ParamField>
 
 ## Example Request
@@ -35,6 +39,7 @@ POST /compute/v0/length
 curl -X POST https://api.astral.global/compute/v0/length \
   -H "Content-Type: application/json" \
   -d '{
+    "chainId": 84532,
     "geometry": "0xline...",
     "schema": "0xschema...",
     "recipient": "0xdef456..."
@@ -52,8 +57,18 @@ curl -X POST https://api.astral.global/compute/v0/length \
   "inputRefs": [
     "0xline..."
   ],
-  "attestation": { ... },
-  "delegatedAttestation": { ... }
+  "attestation": {
+    "schema": "0x...",
+    "attester": "0x...",
+    "recipient": "0xdef456...",
+    "data": "0x...",
+    "signature": "0x..."
+  },
+  "delegatedAttestation": {
+    "signature": "0x...",
+    "attester": "0x...",
+    "deadline": 1706403600
+  }
 }
 ```
 
