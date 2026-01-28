@@ -4,7 +4,7 @@ description: "The architecture behind verifiable geospatial computation"
 ---
 
 <Warning>
-  **Development Preview** — This describes the target architecture per the specification.
+  **Development Preview** — Architecture is under active development.
 </Warning>
 
 # How Astral Location Services Works
@@ -13,46 +13,39 @@ Astral provides verifiable geospatial computation by combining three key technol
 
 ## System Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Developer Application                                        │
-│  - Collects user location                                     │
-│  - Calls Astral SDK                                           │
-└────────────────────────┬─────────────────────────────────────┘
-                         │
-                         ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Astral SDK (@decentralized-geo/astral-sdk)                   │
-│  - astral.location.* (create, get, query attestations)        │
-│  - astral.compute.* (distance, contains, intersects, etc.)    │
-│  - Handles request signing, attestation decoding              │
-└────────────────────────┬─────────────────────────────────────┘
-                         │
-                         ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Astral API Gateway (api.astral.global)                       │
-│                                                               │
-│  /locations/*     → Indexer Service                           │
-│  /compute/*       → Compute Service (TEE)                     │
-└──────┬───────────────────────────────────┬───────────────────┘
-       │                                   │
-       ▼                                   ▼
-┌─────────────────┐         ┌─────────────────────────────────┐
-│  Indexer        │         │  Compute Service                │
-│  Service        │         │  (runs in EigenCompute TEE)     │
-│                 │         │                                 │
-│  - Syncs EAS    │         │  ┌───────────────────────────┐  │
-│  - OGC Features │         │  │  TypeScript API Layer     │  │
-│                 │         │  │  - Request validation     │  │
-└─────────────────┘         │  │  - Attestation signing    │  │
-                            │  └─────────────┬─────────────┘  │
-                            │                │                │
-                            │  ┌─────────────▼─────────────┐  │
-                            │  │  PostgreSQL + PostGIS     │  │
-                            │  │  - ST_Distance, etc.      │  │
-                            │  │  - Ephemeral, no state    │  │
-                            │  └───────────────────────────┘  │
-                            └─────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph App["Developer Application"]
+        A1[Collects user location]
+        A2[Calls Astral SDK]
+    end
+
+    subgraph SDK["Astral SDK (@decentralized-geo/astral-compute)"]
+        S1["astral.location.* (create, get, query)"]
+        S2["astral.compute.* (distance, contains, etc.)"]
+        S3[Request signing, attestation decoding]
+    end
+
+    subgraph Gateway["Astral API Gateway (api.astral.global)"]
+        G1["/locations/* → Indexer"]
+        G2["/compute/* → Policy Engine"]
+    end
+
+    subgraph Services["Backend Services"]
+        subgraph Indexer["Indexer Service"]
+            I1[Syncs EAS]
+            I2[OGC Features]
+        end
+
+        subgraph Compute["Geospatial Policy Engine (TEE)"]
+            C1[TypeScript API Layer]
+            C2[PostgreSQL + PostGIS]
+        end
+    end
+
+    App --> SDK
+    SDK --> Gateway
+    Gateway --> Services
 ```
 
 ## Key Architectural Decisions
@@ -94,29 +87,31 @@ Astral provides verifiable geospatial computation by combining three key technol
 
 ## Verifiable Execution with EigenCompute
 
-The compute service runs in **EigenCompute**, part of the EigenCloud ecosystem:
+The geospatial policy engine runs in **EigenCompute**, part of the EigenCloud ecosystem:
 
+```mermaid
+flowchart TB
+    subgraph TEE["EigenCompute TEE Environment"]
+        subgraph Container["Docker Container"]
+            subgraph Engine["Astral Geospatial Policy Engine"]
+                E1["TypeScript/Node.js API"]
+                E2["Request validation"]
+                E3["Signature verification"]
+                E4["PostGIS query execution"]
+                E5["Policy Attestation signing"]
+            end
+            subgraph DB["PostgreSQL + PostGIS"]
+                D1["Spatial computations (GEOS)"]
+                D2["Ephemeral - no persistent state"]
+            end
+            Engine --> DB
+        end
+    end
 ```
-┌─────────────────────────────────────────────────────┐
-│           EigenCompute TEE Environment              │
-│  ┌───────────────────────────────────────────────┐  │
-│  │         Docker Container                      │  │
-│  │  ┌─────────────────────────────────────────┐  │  │
-│  │  │  Astral Compute Service                 │  │  │
-│  │  │  - TypeScript/Node.js API               │  │  │
-│  │  │  - Request validation                   │  │  │
-│  │  │  - Signature verification               │  │  │
-│  │  │  - PostGIS query execution              │  │  │
-│  │  │  - Policy Attestation signing           │  │  │
-│  │  └─────────────────────────────────────────┘  │  │
-│  │  ┌─────────────────────────────────────────┐  │  │
-│  │  │  PostgreSQL + PostGIS                   │  │  │
-│  │  │  - Spatial computations                 │  │  │
-│  │  │  - Ephemeral (no persistent state)      │  │  │
-│  │  └─────────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-```
+
+<Info>
+  PostGIS uses [GEOS](https://libgeos.org/) under the hood for geometry operations. GEOS is the gold standard C++ geometry library used by most geospatial software.
+</Info>
 
 ### Verifiability Properties
 
@@ -139,7 +134,7 @@ The service accepts multiple input formats:
 | Raw GeoJSON | Use directly, hash for `inputRefs` |
 
 <Note>
-  For offchain attestations, the UID acts as a checksum. Even when fetching from HTTPS (not content-addressed), we verify the fetched attestation's UID matches. Mismatch = reject.
+  For offchain attestations, the UID is deterministically derived from the attestation data. Even when fetching from HTTPS (not content-addressed), we verify the fetched attestation produces the expected UID. Mismatch = reject.
 </Note>
 
 ## Delegated Attestation Flow
@@ -172,10 +167,15 @@ The delegated attestation pattern means:
 
 ### Current (MVP)
 
-- Centralized service with known signer
-- Runs in TEE (EigenCompute) for execution attestation
-- Deterministic operations ensure reproducibility
-- Single point of trust: Astral's signing key
+The trust assumption is **not** that Astral operates honestly — it's that the TEE operates correctly:
+
+- **Open source code**: The compute service code is public and auditable
+- **TEE execution**: Code runs inside EigenCompute's trusted execution environment
+- **Remote attestation**: EigenCompute provides hardware attestation that the expected code is running
+- **Deterministic operations**: Same inputs always produce same outputs, enabling verification
+- **Astral signing key**: Signs attestations inside the TEE
+
+You don't need to trust Astral — you need to trust the TEE boundary and that the published code matches what's running.
 
 ### Future
 
