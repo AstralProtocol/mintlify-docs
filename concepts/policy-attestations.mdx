@@ -4,24 +4,34 @@ description: "Signed computation results for offchain and onchain use"
 ---
 
 <Warning>
-  **Development Preview** — This describes the target specification.
+  **Development Preview** — Under active development.
 </Warning>
 
 # Policy Attestations
 
-Policy Attestations are the **signed outputs** of geospatial operations. They contain the computation result and can be verified offchain or submitted onchain.
+Policy Attestations are the **signed outputs** of geospatial operations. They contain the computation result and can be used offchain or submitted onchain to trigger smart contract logic.
+
+<Info>
+  When submitted onchain via EAS resolvers, policy attestations can trigger any smart contract logic on EVM-compatible chains.
+</Info>
 
 ## What is a Policy Attestation?
 
 When you call a compute operation, Astral returns a Policy Attestation:
 
+<Note>
+  **Code snippets need testing** — Verify against actual implementation before use.
+</Note>
+
 ```typescript
-const result = await astral.compute.within(
-  userLocationUID,
-  landmarkUID,
-  500,
-  { schema: SCHEMA_UID, recipient: userAddress }
-);
+const result = await astral.compute.within({
+  geometry: userLocationUID,
+  target: landmarkUID,
+  radius: 500,
+  chainId: 84532,
+  schema: SCHEMA_UID,
+  recipient: userAddress
+});
 
 // result is a PolicyAttestationResult
 console.log(result.result);      // true
@@ -30,7 +40,7 @@ console.log(result.attestation); // { uid, schema, signature, ... }
 ```
 
 The attestation proves:
-- The computation was performed by Astral
+- The computation was performed by the Astral signing key
 - The inputs were exactly as specified
 - The result is accurate
 
@@ -143,7 +153,13 @@ interface PolicyAttestationResult<T> {
 Use the result directly in your application:
 
 ```typescript
-const result = await astral.compute.within(uid1, uid2, 500, options);
+const result = await astral.compute.within({
+  geometry: uid1,
+  target: uid2,
+  radius: 500,
+  chainId: 84532,
+  schema: SCHEMA_UID
+});
 
 if (result.result) {
   // User is nearby — enable feature
@@ -153,15 +169,26 @@ if (result.result) {
 
 ### Onchain
 
-Submit using delegated attestation:
+Submit using [delegated attestation](/sdk/eas):
 
 ```typescript
-const result = await astral.compute.within(uid1, uid2, 500, options);
+const result = await astral.compute.within({
+  geometry: uid1,
+  target: uid2,
+  radius: 500,
+  chainId: 84532,
+  schema: RESOLVER_SCHEMA_UID,
+  recipient: userAddress
+});
 
 // Submit to EAS — triggers your resolver
 const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
 await tx.wait();
 ```
+
+<Info>
+  To connect policy attestations to smart contract logic, you need to [register an EAS resolver](/concepts/eas-resolvers) with your schema first.
+</Info>
 
 ## Result Scaling
 
