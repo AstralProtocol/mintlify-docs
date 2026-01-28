@@ -7,57 +7,78 @@ description: "Location attestation methods"
   **Development Preview** — The SDK is under development.
 </Warning>
 
+<Note>
+  **Separate Package** — Location attestation methods are provided by `@decentralized-geo/astral-sdk`,
+  not `@decentralized-geo/astral-compute`. Install it separately:
+  ```bash
+  npm install @decentralized-geo/astral-sdk
+  ```
+</Note>
+
 # Location Methods
 
-The `astral.location` namespace provides methods for creating and querying location attestations.
+The `AstralSDK` class provides methods for creating and querying location attestations.
 
-## create()
-
-Create a new location attestation.
+## Setup
 
 ```typescript
-astral.location.create(
-  geometry: GeoJSON.Geometry | GeoJSON.Feature,
-  options?: CreateOptions
-): Promise<LocationAttestation>
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const sdk = new AstralSDK({ signer: wallet });
 ```
 
-### Options
+## createOffchainLocationAttestation()
+
+Create a new offchain location attestation.
 
 ```typescript
-interface CreateOptions {
-  submitOnchain?: boolean;    // Submit to EAS onchain (default: false)
-  storage?: 'ipfs' | 'arweave' | 'none';  // Offchain storage
-  metadata?: {
-    name?: string;
-    description?: string;
-    [key: string]: any;
-  };
-}
+sdk.createOffchainLocationAttestation(
+  params: {
+    location: GeoJSON.Geometry;
+    memo?: string;
+  }
+): Promise<LocationAttestation>
 ```
 
 ### Example
 
 ```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const sdk = new AstralSDK({ signer: wallet });
+
 // Create offchain attestation
-const location = await astral.location.create({
-  type: 'Point',
-  coordinates: [2.2945, 48.8584]
+const location = await sdk.createOffchainLocationAttestation({
+  location: { type: 'Point', coordinates: [2.2945, 48.8584] },
+  memo: 'Eiffel Tower'
 });
 
 console.log(location.uid);
 console.log(location.signature);
+```
 
-// Create onchain attestation
-const onchainLocation = await astral.location.create({
-  type: 'Point',
-  coordinates: [2.2945, 48.8584]
-}, {
-  submitOnchain: true,
-  metadata: {
-    name: "Eiffel Tower",
-    description: "Iconic Paris landmark"
+---
+
+## createOnchainLocationAttestation()
+
+Create a new onchain location attestation.
+
+```typescript
+sdk.createOnchainLocationAttestation(
+  params: {
+    location: GeoJSON.Geometry;
+    memo?: string;
   }
+): Promise<LocationAttestation>
+```
+
+### Example
+
+```typescript
+// Create onchain attestation
+const onchainLocation = await sdk.createOnchainLocationAttestation({
+  location: { type: 'Point', coordinates: [2.2945, 48.8584] },
+  memo: 'Eiffel Tower - Iconic Paris landmark'
 });
 
 console.log(onchainLocation.uid);  // Onchain UID
@@ -65,62 +86,30 @@ console.log(onchainLocation.uid);  // Onchain UID
 
 ---
 
-## get()
+## Retrieving Attestations
 
-Retrieve a location attestation by UID.
+<Note>
+  Querying existing attestations may use the Astral API client or the EAS GraphQL API directly.
+  See the [Compute API documentation](/api-reference/overview) for details on fetching attestations.
+</Note>
 
-```typescript
-astral.location.get(
-  uid: string
-): Promise<LocationAttestation>
-```
-
-### Example
+### Example: Query via EAS GraphQL
 
 ```typescript
-const location = await astral.location.get('0xabc123...');
+// Query attestations using the EAS GraphQL API
+const query = `
+  query GetAttestations($attester: String!) {
+    attestations(where: { attester: { equals: $attester } }) {
+      id
+      data
+      recipient
+      time
+    }
+  }
+`;
 
-console.log(location.geometry);   // { type: 'Point', coordinates: [...] }
-console.log(location.attester);   // Signer address
-console.log(location.timestamp);  // Creation time
-```
-
----
-
-## query()
-
-Query location attestations with filters.
-
-```typescript
-astral.location.query(
-  filters: QueryFilters
-): Promise<LocationAttestation[]>
-```
-
-### Filters
-
-```typescript
-interface QueryFilters {
-  bbox?: [number, number, number, number];  // [minLon, minLat, maxLon, maxLat]
-  attester?: string;        // Filter by attester address
-  recipient?: string;       // Filter by recipient address
-  limit?: number;           // Max results (default: 100)
-  offset?: number;          // Pagination offset
-}
-```
-
-### Example
-
-```typescript
-// Query locations in San Francisco
-const locations = await astral.location.query({
-  bbox: [-122.5, 37.7, -122.4, 37.8],
-  limit: 50
-});
-
-for (const loc of locations) {
-  console.log(loc.uid, loc.geometry);
-}
+// Use your preferred GraphQL client
+const result = await graphqlClient.query(query, { attester: '0x...' });
 ```
 
 ---

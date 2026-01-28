@@ -9,14 +9,23 @@ description: "EAS submission helpers"
 
 # EAS Methods
 
-The `astral.eas` namespace provides helpers for submitting attestations onchain using the EAS delegated attestation pattern.
+The `AstralEAS` class provides helpers for submitting attestations onchain using the EAS delegated attestation pattern.
+
+## Setup
+
+```typescript
+import { AstralCompute, AstralEAS } from '@decentralized-geo/astral-compute';
+
+const compute = new AstralCompute();
+const eas = new AstralEAS(signer);
+```
 
 ## submitDelegated()
 
 Submit a delegated attestation onchain.
 
 ```typescript
-astral.eas.submitDelegated(
+eas.submitDelegated(
   delegatedAttestation: DelegatedAttestation
 ): Promise<TransactionReceipt>
 ```
@@ -30,8 +39,13 @@ astral.eas.submitDelegated(
 ### Example
 
 ```typescript
+import { AstralCompute, AstralEAS } from '@decentralized-geo/astral-compute';
+
+const compute = new AstralCompute();
+const eas = new AstralEAS(signer);
+
 // Get policy attestation from compute operation
-const result = await astral.compute.within(
+const result = await compute.within(
   userLocationUID,
   landmarkUID,
   500,
@@ -40,7 +54,7 @@ const result = await astral.compute.within(
 
 // Submit onchain if user is nearby
 if (result.result) {
-  const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
+  const tx = await eas.submitDelegated(result.delegatedAttestation);
   await tx.wait();
 
   console.log('Attestation submitted!');
@@ -52,17 +66,44 @@ if (result.result) {
 
 ## Delegated Attestation Object
 
-The `delegatedAttestation` object is returned by all compute methods:
+The compute API returns a `delegatedAttestation` object with all compute results:
 
 ```typescript
-interface DelegatedAttestation {
-  signature: string;    // Astral's EIP-712 signature
-  attester: string;     // Astral's signer address
-  deadline: number;     // Signature expiry timestamp
-  schema: string;       // EAS schema UID
-  recipient: string;    // Attestation recipient
-  data: string;         // Encoded attestation data
+// From compute result
+result.delegatedAttestation = {
+  signature: string;   // Combined signature (r + s + v)
+  attester: string;    // Astral signer address
+  deadline: number;    // Unix timestamp for signature expiry
 }
+```
+
+<Note>
+  The EAS SDK expects a slightly different format for delegated attestations. The `AstralEAS` class
+  handles the conversion automatically, transforming the compact API response into the full structure
+  required by the EAS contract.
+</Note>
+
+---
+
+## estimateGas()
+
+Estimate gas before submitting to avoid failed transactions.
+
+```typescript
+eas.estimateGas(
+  delegatedAttestation: DelegatedAttestation
+): Promise<bigint>
+```
+
+### Example
+
+```typescript
+// Estimate gas before submitting
+const gasEstimate = await eas.estimateGas(result.delegatedAttestation);
+console.log('Estimated gas:', gasEstimate.toString());
+
+// Proceed with submission if acceptable
+const tx = await eas.submitDelegated(result.delegatedAttestation);
 ```
 
 ---
@@ -72,15 +113,15 @@ interface DelegatedAttestation {
 Delegated attestation signatures have a deadline:
 
 ```typescript
-const result = await astral.compute.within(uid1, uid2, 500, options);
+const result = await compute.within(uid1, uid2, 500, options);
 
 // Check if signature is still valid
 if (Date.now() / 1000 < result.delegatedAttestation.deadline) {
-  await astral.eas.submitDelegated(result.delegatedAttestation);
+  await eas.submitDelegated(result.delegatedAttestation);
 } else {
   // Request a new computation
-  const newResult = await astral.compute.within(uid1, uid2, 500, options);
-  await astral.eas.submitDelegated(newResult.delegatedAttestation);
+  const newResult = await compute.within(uid1, uid2, 500, options);
+  await eas.submitDelegated(newResult.delegatedAttestation);
 }
 ```
 
@@ -92,11 +133,11 @@ You pay gas when submitting:
 
 ```typescript
 // Estimate gas
-const gasEstimate = await astral.eas.estimateGas(result.delegatedAttestation);
+const gasEstimate = await eas.estimateGas(result.delegatedAttestation);
 console.log('Estimated gas:', gasEstimate.toString());
 
 // Submit with custom gas settings
-const tx = await astral.eas.submitDelegated(result.delegatedAttestation, {
+const tx = await eas.submitDelegated(result.delegatedAttestation, {
   gasLimit: 200000,
   maxFeePerGas: ethers.parseUnits('50', 'gwei')
 });
