@@ -4,12 +4,16 @@ description: "Create a token that can only be traded within a geographic region"
 ---
 
 <Warning>
-  **Development Preview** — This guide demonstrates the intended patterns.
+  **Development Preview** — Code snippets need testing against actual implementation.
 </Warning>
 
 # Build a Geofenced Token
 
 Create a local currency that can only be traded by people physically in a specific region — enabling hyperlocal economies.
+
+<Info>
+  **About location verification**: This guide uses GPS coordinates as input. GPS is spoofable. As [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) are developed, they'll replace `getCurrentLocation` for stronger verification.
+</Info>
 
 ## Concept
 
@@ -23,9 +27,9 @@ Imagine a "San Francisco Token" (SFT) that:
 ## Step 1: Define the Region
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralClient } from '@decentralized-geo/astral-compute';
 
-const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+const astral = new AstralClient({ chainId: 84532, signer: wallet });
 
 // San Francisco city boundary (simplified)
 const sfBoundary = {
@@ -201,7 +205,7 @@ contract GeofencedToken is SchemaResolver, ERC20, Ownable {
 
 ```typescript
 async function mintLocalToken(amount: bigint, wallet: Signer) {
-  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+  const astral = new AstralClient({ chainId: 84532, signer: wallet });
   const tokenContract = new Contract(TOKEN_ADDRESS, TOKEN_ABI, wallet);
 
   // 1. Request mint

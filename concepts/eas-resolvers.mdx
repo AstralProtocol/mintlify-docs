@@ -4,12 +4,16 @@ description: "Gate smart contract actions with location-based policies"
 ---
 
 <Warning>
-  **Development Preview** — This describes the target specification.
+  **Development Preview** — Under active development.
 </Warning>
 
 # EAS Resolvers
 
-EAS Resolvers are the **killer feature** for location-based smart contracts. They allow you to execute arbitrary logic whenever an attestation is created — turning location proofs into triggers for onchain actions.
+EAS Resolvers **unlock location-based smart contracts**. They allow you to execute arbitrary logic whenever an attestation is created — turning geospatial policy attestations into triggers for onchain actions.
+
+<Info>
+  For background on the Ethereum Attestation Service, see the [EAS documentation](https://docs.attest.org/).
+</Info>
 
 ## What is a Resolver?
 
@@ -25,13 +29,13 @@ In the Ethereum Attestation Service, a **resolver** is a smart contract that get
 sequenceDiagram
     participant User
     participant SDK as Astral SDK
-    participant Astral as Compute Service
+    participant Engine as Geospatial Policy Engine
     participant EAS as EAS Contracts
     participant Resolver as Your Resolver
 
     User->>SDK: compute.within(...)
-    SDK->>Astral: Request computation
-    Astral-->>SDK: Signed Policy Attestation
+    SDK->>Engine: Request computation
+    Engine-->>SDK: Signed Policy Attestation
     SDK->>EAS: Submit delegated attestation
     EAS->>Resolver: onAttest() callback
     Resolver->>Resolver: Verify + Execute logic
@@ -40,6 +44,14 @@ sequenceDiagram
 
 ## Basic Resolver Contract
 
+<Note>
+  **Code snippets need testing** — Verify against actual implementation before use.
+</Note>
+
+<Info>
+  **About the Astral signer**: The `astralSigner` address is the key that signs policy attestations inside the TEE. Signer management (multisig, key rotation, etc.) is on the roadmap. See [Security](/resources/security) for more details.
+</Info>
+
 ```solidity
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
@@ -47,7 +59,7 @@ pragma solidity ^0.8.0;
 import "@eas/contracts/resolver/SchemaResolver.sol";
 
 contract LocationGatedAction is SchemaResolver {
-    address public astralSigner;  // Updateable via multisig
+    address public astralSigner;  // Updateable via multisig (see roadmap)
 
     constructor(IEAS eas, address _astralSigner) SchemaResolver(eas) {
         astralSigner = _astralSigner;
@@ -140,6 +152,25 @@ contract LocationGate is LocationGatedAction {
         _;
     }
 }
+```
+
+### Numeric Policies (Distance-Based)
+
+Use numeric policy attestations (distance, area, length) for more sophisticated logic like [spatial demurrage](https://www.johnx.co/notes/spatial-demurrage) — where transfer fees vary based on distance from a target location.
+
+```solidity
+// Decode numeric policy attestation
+(
+    uint256 distanceCm,
+    string memory units,
+    bytes32[] memory inputRefs,
+    uint64 timestamp,
+    string memory operation
+) = abi.decode(attestation.data, (uint256, string, bytes32[], uint64, string));
+
+// Apply distance-based fee (example: 0.1% per km from target)
+uint256 distanceKm = distanceCm / 100000;
+uint256 fee = (amount * distanceKm) / 1000;
 ```
 
 ## Decoding Attestation Data

@@ -7,12 +7,12 @@
   },
   "favicon": "/favicon.svg",
   "colors": {
-    "primary": "#6366F1",
-    "light": "#818CF8",
-    "dark": "#4F46E5",
+    "primary": "#D4A63A",
+    "light": "#FEE9B3",
+    "dark": "#B8860B",
     "anchors": {
-      "from": "#6366F1",
-      "to": "#8B5CF6"
+      "from": "#D4A63A",
+      "to": "#FEE9B3"
     }
   },
   "topbarLinks": [
@@ -27,24 +27,24 @@
   },
   "tabs": [
     {
-      "name": "API Reference",
-      "url": "api-reference"
-    },
-    {
       "name": "SDK",
       "url": "sdk"
+    },
+    {
+      "name": "API Reference",
+      "url": "api-reference"
     }
   ],
   "anchors": [
     {
-      "name": "Community",
-      "icon": "discord",
-      "url": "https://discord.gg/astral"
-    },
-    {
       "name": "GitHub",
       "icon": "github",
       "url": "https://github.com/AstralProtocol"
+    },
+    {
+      "name": "Community",
+      "icon": "telegram",
+      "url": "https://t.me/+UkTOSXnDcDM5ZTBk"
     }
   ],
   "navigation": [
@@ -115,6 +115,6 @@
   "footerSocials": {
     "twitter": "https://twitter.com/AstralProtocol",
     "github": "https://github.com/AstralProtocol",
-    "discord": "https://discord.gg/astral"
+    "telegram": "https://t.me/+UkTOSXnDcDM5ZTBk"
   }
 }

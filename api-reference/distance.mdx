@@ -17,6 +17,10 @@ POST /compute/v0/distance
 
 ## Request Body
 
+<ParamField body="chainId" type="number" required>
+  Target chain ID. All UIDs must exist on this chain.
+</ParamField>
+
 <ParamField body="from" type="Input" required>
   First geometry. Can be a UID, GeoJSON, or offchain attestation reference.
 </ParamField>
@@ -41,6 +45,7 @@ POST /compute/v0/distance
 curl -X POST https://api.astral.global/compute/v0/distance \
   -H "Content-Type: application/json" \
   -d '{
+    "chainId": 84532,
     "from": "0xabc123...",
     "to": {
       "type": "Point",
@@ -56,6 +61,7 @@ const response = await fetch('https://api.astral.global/compute/v0/distance', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
+    chainId: 84532,
     from: '0xabc123...',
     to: { type: 'Point', coordinates: [2.2945, 48.8584] },
     schema: '0xschema...',

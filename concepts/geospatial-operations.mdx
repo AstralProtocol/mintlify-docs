@@ -4,12 +4,16 @@ description: "Spatial computations powered by PostGIS"
 ---
 
 <Warning>
-  **Development Preview** — This describes the target specification.
+  **Development Preview** — Under active development.
 </Warning>
 
 # Geospatial Operations
 
 Astral provides verifiable spatial computations backed by **PostGIS** — the gold standard in geospatial databases with 20+ years of production use.
+
+<Info>
+  PostGIS uses [GEOS](https://libgeos.org/) (Geometry Engine Open Source) under the hood for geometry operations. GEOS is the C++ library that powers most professional geospatial software.
+</Info>
 
 ## Available Operations
 
@@ -17,11 +21,11 @@ Astral provides verifiable spatial computations backed by **PostGIS** — the go
 
 Operations that return **numeric** results:
 
-| Operation | Description | PostGIS Function |
-|-----------|-------------|------------------|
-| `distance` | Distance between two geometries | `ST_Distance` |
-| `area` | Area of a polygon | `ST_Area` |
-| `length` | Length of a line | `ST_Length` |
+| Operation | Description | Unit | Geometry Types | PostGIS Function |
+|-----------|-------------|------|----------------|------------------|
+| `distance` | Nearest distance between two geometries | meters | Any | `ST_Distance` |
+| `area` | Area of a polygon | square meters | Polygon, MultiPolygon | `ST_Area` |
+| `length` | Length of a line | meters | LineString, MultiLineString | `ST_Length` |
 
 ### Predicates
 
@@ -29,22 +33,27 @@ Operations that return **boolean** results:
 
 | Operation | Description | PostGIS Function |
 |-----------|-------------|------------------|
-| `contains` | Is geometry B inside geometry A? | `ST_Contains` |
-| `within` | Is point within distance of target? | `ST_DWithin` |
-| `intersects` | Do geometries overlap? | `ST_Intersects` |
+| `contains` | Is geometry B **entirely** inside geometry A? | `ST_Contains` |
+| `within` | Is geometry within a specified radius of target? | `ST_DWithin` |
+| `intersects` | Do geometries share any space? | `ST_Intersects` |
 
 ## Operation Examples
 
+<Note>
+  **Code snippets need testing** — Verify against actual implementation before use.
+</Note>
+
 ### Distance
 
-Calculate the distance between two locations in meters.
+Calculate the nearest distance between two geometries in meters. For polygons, this returns the minimum distance between their boundaries.
 
 ```typescript
-const result = await astral.compute.distance(
-  userLocationUID,
-  landmarkUID,
-  { schema: SCHEMA_UID }
-);
+const result = await astral.compute.distance({
+  from: userLocationUID,
+  to: landmarkUID,
+  chainId: 84532,
+  schema: SCHEMA_UID
+});
 
 console.log(result.result);  // 523.45 (meters)
 console.log(result.units);   // "meters"
@@ -52,56 +61,60 @@ console.log(result.units);   // "meters"
 
 ### Contains
 
-Check if a point is inside a polygon.
+Check if a geometry is **entirely** inside a container geometry.
 
 ```typescript
-const result = await astral.compute.contains(
-  sfBayAreaPolygonUID,  // Container
-  userLocationUID,       // Point to check
-  { schema: SCHEMA_UID }
-);
+const result = await astral.compute.contains({
+  container: sfBayAreaPolygonUID,  // Container polygon
+  geometry: userLocationUID,        // Geometry to check
+  chainId: 84532,
+  schema: SCHEMA_UID
+});
 
 console.log(result.result);  // true or false
 ```
 
 ### Within
 
-Check if a point is within a radius of a target.
+Check if a geometry is within a specified radius of a target — essentially a **radius check**.
 
 ```typescript
-const result = await astral.compute.within(
-  userLocationUID,   // Point to check
-  landmarkUID,       // Target location
-  500,               // Radius in meters
-  { schema: SCHEMA_UID }
-);
+const result = await astral.compute.within({
+  geometry: userLocationUID,   // Geometry to check
+  target: landmarkUID,         // Target location
+  radius: 500,                 // Radius in meters
+  chainId: 84532,
+  schema: SCHEMA_UID
+});
 
 console.log(result.result);  // true if within 500m
 ```
 
 ### Intersects
 
-Check if two geometries overlap.
+Check if two geometries share any space (overlap, touch, or cross).
 
 ```typescript
-const result = await astral.compute.intersects(
-  polygon1UID,
-  polygon2UID,
-  { schema: SCHEMA_UID }
-);
+const result = await astral.compute.intersects({
+  geometry1: polygon1UID,
+  geometry2: polygon2UID,
+  chainId: 84532,
+  schema: SCHEMA_UID
+});
 
-console.log(result.result);  // true if they overlap
+console.log(result.result);  // true if they share space
 ```
 
 ### Area
 
-Calculate the area of a polygon.
+Calculate the area of a polygon (must be Polygon or MultiPolygon).
 
 ```typescript
-const result = await astral.compute.area(
-  propertyBoundaryUID,
-  { schema: SCHEMA_UID }
-);
+const result = await astral.compute.area({
+  geometry: propertyBoundaryUID,
+  chainId: 84532,
+  schema: SCHEMA_UID
+});
 
 console.log(result.result);  // 5432.10 (square meters)
 console.log(result.units);   // "square_meters"
@@ -109,13 +122,14 @@ console.log(result.units);   // "square_meters"
 
 ### Length
 
-Calculate the length of a line.
+Calculate the length of a line (must be LineString or MultiLineString).
 
 ```typescript
-const result = await astral.compute.length(
-  routeUID,
-  { schema: SCHEMA_UID }
-);
+const result = await astral.compute.length({
+  geometry: routeUID,
+  chainId: 84532,
+  schema: SCHEMA_UID
+});
 
 console.log(result.result);  // 2345.67 (meters)
 console.log(result.units);   // "meters"
@@ -138,7 +152,7 @@ All measurements use **metric units only**:
 
 ## Precision
 
-Results are stored with centimeter precision:
+Results are stored with centimeter precision to enable **deterministic, reproducible** computation:
 
 | Type | Precision | Storage |
 |------|-----------|---------|
@@ -150,22 +164,29 @@ Results are stored with centimeter precision:
 1234.5678 m² → stored as 12345678 (cm²)
 ```
 
-This ensures deterministic, reproducible results across invocations.
+<Info>
+  We're actively testing the reliability of deterministic geospatial computation with this precision approach. This is an area of ongoing research in the beta implementation.
+</Info>
 
 ## Compute Options
 
-All operations accept a `ComputeOptions` object:
+All operations require these parameters:
 
 ```typescript
 interface ComputeOptions {
+  chainId: number;        // Target chain for attestation signing
   schema: string;         // EAS schema UID (required)
   recipient?: string;     // Attestation recipient address
 }
 ```
 
 <Warning>
-  The `schema` parameter is **required**. It determines which resolver the attestation can be submitted to.
+  **`chainId` is required.** The service needs to know which chain to sign the policy attestation for.
 </Warning>
+
+<Note>
+  We only support official EAS deployments on supported chains. See the SDK overview for the chain list.
+</Note>
 
 ## Future Operations
 
@@ -179,21 +200,31 @@ Post-MVP, additional operations will be added:
 | `union` | Transformation | Merge geometries |
 | `intersection` | Transformation | Overlapping area |
 
-## Turf.js Integration
+## Client-Side Operations with Turf.js
 
-Use **Turf.js** for client-side operations (instant, free, unverified) and **Astral** for verifiable operations:
+We recommend **[Turf.js](https://turfjs.org/)** for client-side geospatial operations. Use Turf.js for instant UX feedback, and Astral for verifiable attestations:
 
 ```typescript
 import * as turf from '@turf/turf';
 
-// Client-side: instant UX feedback
+// Client-side: instant UX feedback (unverified, but instant)
 const localDistance = turf.distance(point1, point2);
 showUI(`${localDistance}km away`);
 
 // Verifiable: signed attestation for onchain use
-const attestedResult = await astral.compute.distance(uid1, uid2, options);
-await submitToContract(attestedResult);
+const attestedResult = await astral.compute.distance({
+  from: uid1,
+  to: uid2,
+  chainId: 84532,
+  schema: SCHEMA_UID
+});
+await astral.eas.submitDelegated(attestedResult.delegatedAttestation);
 ```
+
+| Use Case | Tool | Why |
+|----------|------|-----|
+| Real-time UI feedback | Turf.js | Instant, free, runs client-side |
+| Verifiable computation | Astral | Signed attestation for onchain actions |
 
 <Card title="Next: Policy Attestations" icon="file-signature" href="/concepts/policy-attestations">
   Learn about the signed outputs of geospatial operations

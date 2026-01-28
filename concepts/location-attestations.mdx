@@ -4,12 +4,12 @@ description: "Signed spatial records that serve as inputs to geospatial operatio
 ---
 
 <Warning>
-  **Development Preview** — This describes the target specification.
+  **Development Preview** — Under active development.
 </Warning>
 
 # Location Attestations
 
-Location Attestations are **signed spatial records** that conform to the [Location Protocol](https://easierdata.org/updates/2025/2025-05-19-location-protocol-spec) schema. They can represent points, polygons, routes, or any GeoJSON geometry.
+Location Attestations are **signed spatial records** that conform to the [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) schema. They can represent points, polygons, routes, or any geospatial data.
 
 ## What is a Location Attestation?
 
@@ -19,12 +19,17 @@ A Location Attestation is an EAS attestation containing:
 - **Metadata**: Optional descriptive information
 - **Signature**: Cryptographic proof of the attester's identity
 
+<Note>
+  **Code snippets need testing** — Verify against actual implementation before use.
+</Note>
+
 ```typescript
 // Creating a location attestation
 const landmark = await astral.location.create({
   type: 'Point',
   coordinates: [2.2945, 48.8584]
 }, {
+  chainId: 84532,
   submitOnchain: true,
   metadata: {
     name: "Eiffel Tower",
@@ -84,13 +89,17 @@ await astral.compute.distance(
 
 ## Schema
 
-Location Attestations follow the Location Protocol schema, inspired by PostGIS geometry tables:
+Location Attestations follow the [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) schema:
+
+<Warning>
+  **Schema fields need verification** — The fields below are illustrative. Reference the v0.2 spec for the current schema definition.
+</Warning>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `geometry` | bytes | Encoded GeoJSON geometry |
-| `geometryType` | string | "Point", "Polygon", "LineString", etc. |
-| `srs` | string | Spatial reference system (default: EPSG:4326) |
+| `locationType` | string | The type of location data (e.g., "GeoJSON") |
+| `location` | bytes | Encoded location data |
+| `srs` | string | Spatial reference system as OGC URI |
 | `properties` | bytes | Optional metadata (JSON encoded) |
 
 ## Using Location Attestations
@@ -134,7 +143,7 @@ const result = await astral.compute.contains(
 ```
 
 <Warning>
-  Raw GeoJSON is **not verified**. The Policy Attestation proves "Astral computed the relationship between inputs A and B" but does NOT prove where those geometries came from. Use raw GeoJSON for reference geometries (official boundaries) or prototyping.
+  Raw GeoJSON is **not attested**. The Policy Attestation proves "Astral computed the relationship between inputs A and B" but does NOT prove **who signed** those geometries. Use raw GeoJSON for reference geometries (official boundaries) or prototyping.
 </Warning>
 
 ## Fetching Location Attestations
@@ -153,10 +162,10 @@ const locations = await astral.location.query({
 
 ## Coordinate System
 
-Location Attestations honor the `srs` field:
+Location Attestations honor the `srs` field, using OGC URIs per [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft):
 
-- **Default**: WGS84 (EPSG:4326) — standard GPS coordinates
-- **Custom**: Any EPSG code supported by PostGIS
+- **Default**: `http://www.opengis.net/def/crs/OGC/1.3/CRS84` (WGS84, lon/lat order)
+- **Custom**: Any OGC CRS URI supported by PostGIS
 
 Coordinates should be in **[longitude, latitude]** order (GeoJSON standard).
 

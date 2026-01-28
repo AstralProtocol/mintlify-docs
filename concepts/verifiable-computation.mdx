@@ -4,12 +4,28 @@ description: "How EigenCompute provides trust in geospatial operations"
 ---
 
 <Warning>
-  **Development Preview** — This describes the target specification.
+  **Development Preview** — Under active development.
 </Warning>
 
 # Verifiable Computation
 
 Astral Location Services runs in a **Trusted Execution Environment (TEE)** via EigenCompute, providing cryptographic guarantees that computations were performed correctly.
+
+## The Verification Pipeline
+
+Building trustworthy location-based smart contracts requires verification at multiple stages:
+
+```
+1. Location Verification    →    2. Geospatial Computation    →    3. Onchain Verification
+   (Where is the user?)           (Policy evaluation)               (Smart contract logic)
+      In development               ✓ ASTRAL LOCATION SERVICES           ✓ EAS Resolvers
+```
+
+**Astral Location Services solves the middle step** — verifiable geospatial computation. Given location inputs, we can provably check spatial relationships and produce signed attestations for onchain use.
+
+<Info>
+  **What about step 1?** Verifying *where* a user actually is remains an open problem. GPS is spoofable. We're developing the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) to address this. Location proofs will plug into Astral Location Services to complete the pipeline.
+</Info>
 
 ## Why Verification Matters
 
@@ -25,7 +41,7 @@ With verifiable computation:
 User Location → TEE (attested code) → Signed proof of computation
 ```
 
-The difference is **trust**. Smart contracts can verify that Astral performed the computation correctly, not just that Astral *claims* it did.
+The difference is **trust**. Smart contracts can verify that the Astral signing key performed the computation correctly, not just that someone *claims* it did.
 
 ## EigenCompute
 
@@ -48,33 +64,31 @@ The difference is **trust**. Smart contracts can verify that Astral performed th
 
 ## The Execution Model
 
+```mermaid
+flowchart TB
+    subgraph TEE["EigenCompute TEE Environment"]
+        subgraph Container["Docker Container"]
+            subgraph Engine["Astral Geospatial Policy Engine"]
+                E1["Validates input attestations"]
+                E2["Executes PostGIS queries"]
+                E3["Signs results with TEE-held key"]
+            end
+            subgraph DB["PostgreSQL + PostGIS"]
+                D1["All spatial computations"]
+                D2["Ephemeral, no persistent state"]
+            end
+            Engine --> DB
+        end
+        G1["TEE guarantees:"]
+        G2["• Code hasn't been modified"]
+        G3["• Inputs weren't tampered with"]
+        G4["• Outputs came from executing that code"]
+    end
 ```
-┌─────────────────────────────────────────────────────┐
-│           EigenCompute TEE Environment              │
-│  ┌───────────────────────────────────────────────┐  │
-│  │         Docker Container                      │  │
-│  │                                               │  │
-│  │  ┌─────────────────────────────────────────┐  │  │
-│  │  │  Astral Compute Service                 │  │  │
-│  │  │  - Validates input attestations         │  │  │
-│  │  │  - Executes PostGIS queries             │  │  │
-│  │  │  - Signs results with TEE-held key      │  │  │
-│  │  └─────────────────────────────────────────┘  │  │
-│  │                                               │  │
-│  │  ┌─────────────────────────────────────────┐  │  │
-│  │  │  PostgreSQL + PostGIS                   │  │  │
-│  │  │  - All spatial computations happen here │  │  │
-│  │  │  - Ephemeral, no persistent state       │  │  │
-│  │  └─────────────────────────────────────────┘  │  │
-│  │                                               │  │
-│  └───────────────────────────────────────────────┘  │
-│                                                     │
-│  TEE guarantees:                                    │
-│  - Code hasn't been modified                        │
-│  - Inputs weren't tampered with                     │
-│  - Outputs came from executing that code            │
-└─────────────────────────────────────────────────────┘
-```
+
+<Note>
+  Verify EigenCompute details against the [official EigenCompute documentation](https://blog.eigencloud.xyz/eigencloud-brings-verifiable-ai-to-mass-market-with-eigenai-and-eigencompute-launches/). Hardware attestation (remote attestation) specifics may vary.
+</Note>
 
 ## Verifiability Properties
 
@@ -85,14 +99,14 @@ The difference is **trust**. Smart contracts can verify that Astral performed th
 | **Output Authenticity** | Signing key held inside TEE, can't be extracted |
 | **Determinism** | Stateless model + fixed precision = same inputs → same outputs |
 
-## The Signing Key
+## The Astral Signing Key
 
 The service holds a signing key **inside** the TEE:
 
 - Key is generated within the TEE or securely provisioned
 - Cannot be extracted by the operator
 - All Policy Attestations are signed with this key
-- Resolver contracts verify `attestation.attester` matches the known signer
+- Resolver contracts verify `attestation.attester` matches the known Astral signer
 
 ```solidity
 // In your resolver
@@ -103,15 +117,15 @@ require(attestation.attester == ASTRAL_SIGNER, "Not from Astral");
 
 ### Current (MVP)
 
-The MVP uses a **centralized trust model**:
+Trust is anchored in the TEE boundary:
 
-- Single service with known signer
-- TEE provides execution attestation
-- Deterministic operations ensure reproducibility
-- Trust assumption: Astral operates the service honestly
+- **Open source code**: The compute service code is public and auditable
+- **TEE execution**: Code runs inside EigenCompute's trusted execution environment
+- **Remote attestation**: EigenCompute provides hardware attestation that the expected code is running
+- **Deterministic operations**: Same inputs always produce same outputs, enabling verification
 
 ```
-Trust = TEE guarantees + Astral reputation
+Trust = TEE boundary + Remote attestation + Open source code
 ```
 
 ### Future Enhancements
@@ -130,32 +144,31 @@ Trust = TEE guarantees + Astral reputation
 
 ## Why This Matters
 
-Consider a location-gated NFT:
+Consider a location-gated NFT. The question is: how do we check "is the user within 500m of the Eiffel Tower?" in a way that smart contracts can trust?
 
-**Without verification:**
-```
-User claims "I'm at the Eiffel Tower" → Mint NFT
-```
-*Problem: User can lie*
+**The computation problem (what Astral Location Services solves):**
 
-**With Astral:**
-```
-User submits location → Astral verifies in TEE → Signs attestation → Contract mints
-```
-*Guarantee: Astral performed the computation correctly. If the result says "within 500m", the computation was actually performed.*
+If we have location data for the user and the Eiffel Tower, how do we verifiably check if they're close enough? The geospatial policy engine runs the computation in a TEE and produces a signed attestation:
 
-## Limitations
+```
+Location A + Location B → TEE (PostGIS) → Signed attestation: "distance = 450m"
+```
+
+**The input problem (location proofs, still being developed):**
+
+Even with verifiable computation, users can lie about their location. GPS is spoofable. The attestation proves the *computation* was correct, not that the *inputs* were honest.
+
+This is why we're developing the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) — to provide evidence-based location claims that can feed into Astral Location Services for a fully verifiable pipeline.
 
 <Warning>
-  Verifiable computation proves **correct execution**, not **correct inputs**.
+  **Be upfront with your users**: Until location proof plugins are integrated, location verification relies on trusting the user's GPS. Astral Location Services provides verifiable *computation*, not verifiable *location*.
 </Warning>
 
-Astral can prove that it correctly computed "distance between A and B = 500m". It cannot prove:
+## Why Build the Geospatial Layer First?
 
-- That location A is where the user actually is
-- That the user didn't spoof their GPS
+Location proofs become useful when they can trigger onchain actions through geospatial policies. Astral Location Services applies those policies — checking if a location is inside a boundary, within range of a target, or satisfies other spatial constraints.
 
-For input verification, see [Location Proofs](/guides/location-proofs) (future feature).
+By building the geospatial policy infrastructure now, we can experiment with use cases and iterate while developing the [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323). As proof mechanisms mature, they plug directly into the existing pipeline.
 
 ## Determinism Guarantees
 
