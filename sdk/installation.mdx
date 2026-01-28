@@ -9,7 +9,34 @@ description: "Install and configure the Astral SDK"
 
 # Installation
 
+Astral provides two SDK packages for different use cases:
+
+| Package | Use Case |
+|---------|----------|
+| `@decentralized-geo/astral-sdk` | Location attestations (create, query, manage) |
+| `@decentralized-geo/astral-compute` | Geospatial computations and EAS submission |
+
 ## Package Manager
+
+### For Location Attestations
+
+<CodeGroup>
+
+```bash npm
+npm install @decentralized-geo/astral-sdk
+```
+
+```bash yarn
+yarn add @decentralized-geo/astral-sdk
+```
+
+```bash pnpm
+pnpm add @decentralized-geo/astral-sdk
+```
+
+</CodeGroup>
+
+### For Geospatial Computations
 
 <CodeGroup>
 
@@ -27,9 +54,17 @@ pnpm add @decentralized-geo/astral-compute
 
 </CodeGroup>
 
+### Install Both
+
+If you need both location attestations and geospatial computations:
+
+```bash
+npm install @decentralized-geo/astral-sdk @decentralized-geo/astral-compute
+```
+
 ## Peer Dependencies
 
-The SDK has the following peer dependencies:
+Both SDKs have the following peer dependency:
 
 ```bash
 npm install ethers@^6.0.0
@@ -37,60 +72,90 @@ npm install ethers@^6.0.0
 
 ## Basic Initialization
 
+### Geospatial Computations
+
 ```typescript
-import { AstralClient } from '@decentralized-geo/astral-compute';
+import { AstralCompute } from '@decentralized-geo/astral-compute';
 
 // Minimal configuration
-const astral = new AstralClient({
+const compute = new AstralCompute({
   chainId: 84532  // Base Sepolia
 });
 
 // Now use the SDK
-const result = await astral.compute.distance(uid1, uid2, { schema });
+const result = await compute.distance(uid1, uid2, { schema });
 ```
 
-## With Signer
-
-For authenticated requests and onchain submissions:
+### Location Attestations
 
 ```typescript
-import { AstralClient } from '@decentralized-geo/astral-compute';
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { ethers } from 'ethers';
+
+// Requires a signer
+const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+const sdk = new AstralSDK({ signer: wallet });
+
+// Create location attestations
+const location = await sdk.location.create(geojson, { submitOnchain: true });
+```
+
+## With EAS Submission
+
+For submitting delegated attestations onchain:
+
+```typescript
+import { AstralCompute, AstralEAS } from '@decentralized-geo/astral-compute';
 import { ethers } from 'ethers';
 
 // Create wallet
 const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-// Initialize with signer
-const astral = new AstralClient({
-  chainId: 84532,
-  signer: wallet
-});
+// Initialize clients
+const compute = new AstralCompute({ chainId: 84532 });
+const eas = new AstralEAS(wallet, 84532);
 
-// Can now create attestations and submit onchain
-const location = await astral.location.create(geojson, { submitOnchain: true });
+// Compute and submit
+const result = await compute.within(uid1, uid2, 500, { schema });
+if (result.result) {
+  await eas.submitDelegated(result.delegatedAttestation);
+}
 ```
 
 ## With Browser Wallet
 
 ```typescript
-import { AstralClient } from '@decentralized-geo/astral-compute';
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralCompute, AstralEAS } from '@decentralized-geo/astral-compute';
 import { ethers } from 'ethers';
 
 // Connect to browser wallet
 const provider = new ethers.BrowserProvider(window.ethereum);
 const signer = await provider.getSigner();
 
-const astral = new AstralClient({
-  chainId: 84532,
-  signer
-});
+// Initialize both SDKs
+const sdk = new AstralSDK({ signer });
+const compute = new AstralCompute({ chainId: 84532 });
+const eas = new AstralEAS(signer, 84532);
 ```
 
 ## Configuration Options
 
 ```typescript
-interface AstralClientConfig {
+// AstralSDK configuration
+interface AstralSDKConfig {
+  /**
+   * Ethers signer for signing attestations.
+   * Required.
+   */
+  signer: ethers.Signer;
+}
+
+// AstralCompute configuration
+interface AstralComputeConfig {
   /**
    * Target chain ID. All operations are scoped to this chain.
    * Required.
@@ -98,17 +163,14 @@ interface AstralClientConfig {
   chainId: number;
 
   /**
-   * Ethers signer for authenticated requests and onchain submissions.
-   * Optional for read-only operations.
-   */
-  signer?: ethers.Signer;
-
-  /**
    * API base URL.
    * Defaults to 'https://api.astral.global'
    */
   apiUrl?: string;
 }
+
+// AstralEAS constructor
+// new AstralEAS(signer: ethers.Signer, chainId: number)
 ```
 
 ## Supported Chains
@@ -122,23 +184,25 @@ interface AstralClientConfig {
 
 ## TypeScript Support
 
-The SDK is written in TypeScript and ships with full type definitions:
+Both SDKs are written in TypeScript and ship with full type definitions:
 
 ```typescript
 import {
-  AstralClient,
-  PolicyAttestationResult,
+  AstralCompute,
+  AstralEAS,
+  NumericComputeResult,
+  BooleanComputeResult,
   ComputeOptions,
   Input
 } from '@decentralized-geo/astral-compute';
 
 const options: ComputeOptions = {
   schema: '0x...',
-  recipient: '0x...'
+  recipient: '0x...'  // optional
 };
 
-const result: PolicyAttestationResult<boolean> =
-  await astral.compute.within(uid1, uid2, 500, options);
+const compute = new AstralCompute({ chainId: 84532 });
+const result: BooleanComputeResult = await compute.within(uid1, uid2, 500, options);
 ```
 
 <Card title="Next: Compute Methods" icon="calculator" href="/sdk/compute">
