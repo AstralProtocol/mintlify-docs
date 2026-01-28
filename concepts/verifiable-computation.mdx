@@ -18,7 +18,7 @@ Building trustworthy location-based smart contracts requires verification at mul
 ```
 1. Location Verification    →    2. Geospatial Computation    →    3. Onchain Verification
    (Where is the user?)           (Policy evaluation)               (Smart contract logic)
-         ???                        ✓ ASTRAL SOLVES THIS                 ✓ EAS Resolvers
+      In development               ✓ ASTRAL LOCATION SERVICES           ✓ EAS Resolvers
 ```
 
 **Astral Location Services solves the middle step** — verifiable geospatial computation. Given location inputs, we can provably check spatial relationships and produce signed attestations for onchain use.
@@ -117,7 +117,7 @@ require(attestation.attester == ASTRAL_SIGNER, "Not from Astral");
 
 ### Current (MVP)
 
-The trust assumption is **not** that Astral operates honestly — it's that the TEE operates correctly:
+Trust is anchored in the TEE boundary:
 
 - **Open source code**: The compute service code is public and auditable
 - **TEE execution**: Code runs inside EigenCompute's trusted execution environment
@@ -127,8 +127,6 @@ The trust assumption is **not** that Astral operates honestly — it's that the 
 ```
 Trust = TEE boundary + Remote attestation + Open source code
 ```
-
-You don't need to trust Astral — you need to trust that the TEE is running the published code.
 
 ### Future Enhancements
 
@@ -148,9 +146,9 @@ You don't need to trust Astral — you need to trust that the TEE is running the
 
 Consider a location-gated NFT. The question is: how do we check "is the user within 500m of the Eiffel Tower?" in a way that smart contracts can trust?
 
-**The computation problem (what Astral solves):**
+**The computation problem (what Astral Location Services solves):**
 
-If we have location data for the user and the Eiffel Tower, how do we verifiably check if they're close enough? Astral runs the geospatial computation in a TEE and produces a signed attestation:
+If we have location data for the user and the Eiffel Tower, how do we verifiably check if they're close enough? The geospatial policy engine runs the computation in a TEE and produces a signed attestation:
 
 ```
 Location A + Location B → TEE (PostGIS) → Signed attestation: "distance = 450m"
@@ -163,14 +161,14 @@ Even with verifiable computation, users can lie about their location. GPS is spo
 This is why we're developing the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) — to provide evidence-based location claims that can feed into Astral Location Services for a fully verifiable pipeline.
 
 <Warning>
-  **Be upfront with your users**: Until location proof plugins are integrated, location verification relies on trusting the user's GPS. Astral provides verifiable *computation*, not verifiable *location*.
+  **Be upfront with your users**: Until location proof plugins are integrated, location verification relies on trusting the user's GPS. Astral Location Services provides verifiable *computation*, not verifiable *location*.
 </Warning>
 
-## What Makes Location Proofs Useful
+## Why Build the Geospatial Layer First?
 
-The value of the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) is that it connects location claims to onchain actions with sophisticated geospatial policies. Astral Location Services provides that geospatial policy layer.
+Location proofs become useful when they can trigger onchain actions through geospatial policies. Astral Location Services applies those policies — checking if a location is inside a boundary, within range of a target, or satisfies other spatial constraints.
 
-We've done significant research on location proofs and have good designs. Now we're building the infrastructure (Astral Location Services) so we can test and iterate — starting with simpler location inputs and plugging in better location proof methods as they're developed.
+By building the geospatial policy infrastructure now, we can experiment with use cases and iterate while developing the [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323). As proof mechanisms mature, they plug directly into the existing pipeline.
 
 ## Determinism Guarantees
 

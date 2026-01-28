@@ -167,15 +167,13 @@ The delegated attestation pattern means:
 
 ### Current (MVP)
 
-The trust assumption is **not** that Astral operates honestly — it's that the TEE operates correctly:
+Trust is anchored in the TEE boundary:
 
 - **Open source code**: The compute service code is public and auditable
 - **TEE execution**: Code runs inside EigenCompute's trusted execution environment
 - **Remote attestation**: EigenCompute provides hardware attestation that the expected code is running
 - **Deterministic operations**: Same inputs always produce same outputs, enabling verification
 - **Astral signing key**: Signs attestations inside the TEE
-
-You don't need to trust Astral — you need to trust the TEE boundary and that the published code matches what's running.
 
 ### Future
 
