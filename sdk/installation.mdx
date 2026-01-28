@@ -14,15 +14,15 @@ description: "Install and configure the Astral SDK"
 <CodeGroup>
 
 ```bash npm
-npm install @decentralized-geo/astral-sdk
+npm install @decentralized-geo/astral-compute
 ```
 
 ```bash yarn
-yarn add @decentralized-geo/astral-sdk
+yarn add @decentralized-geo/astral-compute
 ```
 
 ```bash pnpm
-pnpm add @decentralized-geo/astral-sdk
+pnpm add @decentralized-geo/astral-compute
 ```
 
 </CodeGroup>
@@ -38,10 +38,10 @@ npm install ethers@^6.0.0
 ## Basic Initialization
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralClient } from '@decentralized-geo/astral-compute';
 
 // Minimal configuration
-const astral = new AstralSDK({
+const astral = new AstralClient({
   chainId: 84532  // Base Sepolia
 });
 
@@ -54,7 +54,7 @@ const result = await astral.compute.distance(uid1, uid2, { schema });
 For authenticated requests and onchain submissions:
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralClient } from '@decentralized-geo/astral-compute';
 import { ethers } from 'ethers';
 
 // Create wallet
@@ -62,7 +62,7 @@ const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 // Initialize with signer
-const astral = new AstralSDK({
+const astral = new AstralClient({
   chainId: 84532,
   signer: wallet
 });
@@ -74,14 +74,14 @@ const location = await astral.location.create(geojson, { submitOnchain: true });
 ## With Browser Wallet
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralClient } from '@decentralized-geo/astral-compute';
 import { ethers } from 'ethers';
 
 // Connect to browser wallet
 const provider = new ethers.BrowserProvider(window.ethereum);
 const signer = await provider.getSigner();
 
-const astral = new AstralSDK({
+const astral = new AstralClient({
   chainId: 84532,
   signer
 });
@@ -90,7 +90,7 @@ const astral = new AstralSDK({
 ## Configuration Options
 
 ```typescript
-interface AstralSDKConfig {
+interface AstralClientConfig {
   /**
    * Target chain ID. All operations are scoped to this chain.
    * Required.
@@ -126,11 +126,11 @@ The SDK is written in TypeScript and ships with full type definitions:
 
 ```typescript
 import {
-  AstralSDK,
+  AstralClient,
   PolicyAttestationResult,
   ComputeOptions,
   Input
-} from '@decentralized-geo/astral-sdk';
+} from '@decentralized-geo/astral-compute';
 
 const options: ComputeOptions = {
   schema: '0x...',

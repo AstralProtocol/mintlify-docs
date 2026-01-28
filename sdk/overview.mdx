@@ -9,7 +9,7 @@ description: "TypeScript SDK for Astral Location Services"
 
 # SDK Overview
 
-The Astral SDK (`@decentralized-geo/astral-sdk`) is the official TypeScript client for Astral Location Services.
+The Astral SDK (`@decentralized-geo/astral-compute`) is the official TypeScript client for Astral Location Services.
 
 ## Design Philosophy
 
@@ -20,9 +20,9 @@ The Astral SDK (`@decentralized-geo/astral-sdk`) is the official TypeScript clie
 ## Namespace Structure
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralClient } from '@decentralized-geo/astral-compute';
 
-const astral = new AstralSDK({ chainId: 84532 });
+const astral = new AstralClient({ chainId: 84532 });
 
 // Location attestation operations
 astral.location.create(geojson);
@@ -44,12 +44,12 @@ astral.eas.submitDelegated(attestation);
 ## Quick Start
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralClient } from '@decentralized-geo/astral-compute';
 import { ethers } from 'ethers';
 
 // Initialize with signer
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY);
-const astral = new AstralSDK({
+const astral = new AstralClient({
   chainId: 84532,
   signer: wallet
 });
@@ -96,7 +96,7 @@ if (result.result) {
 ## Configuration
 
 ```typescript
-interface AstralSDKConfig {
+interface AstralClientConfig {
   chainId: number;              // Required: target chain
   signer?: Signer;              // Optional: for authenticated requests
   apiUrl?: string;              // Optional: defaults to api.astral.global
