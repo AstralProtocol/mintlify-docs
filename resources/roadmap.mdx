@@ -9,7 +9,7 @@ description: "What's built, what's coming, and what's missing"
 
 # Roadmap
 
-Astral Location Services is being built as part of the EigenLayer Open Innovation Program. This page tracks what's done, what we're working on, and what's planned.
+Astral Location Services is infrastructure for location-based smart contracts. This page tracks what's done, what we're working on, and what's planned.
 
 ## Current Status
 
@@ -86,12 +86,15 @@ Astral Location Services is being built as part of the EigenLayer Open Innovatio
 - [ ] `intersection` - Overlapping area
 - [ ] `disjoint` - Geometries don't touch
 
-### Phase 4: Location Proofs
+### Phase 4: Location Proofs (Research in Progress)
 
-- [ ] Multi-stamp location verification
-- [ ] GPS time series analysis
-- [ ] Accelerometer pattern matching
-- [ ] NFC/QR physical proof integration
+We're actively researching location proof mechanisms. See the [Location Proof framework design](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323).
+
+- [x] Framework design and specification
+- [ ] First plugin implementation (GPS time series)
+- [ ] Multi-stamp verification
+- [ ] Sensor fusion (accelerometer, barometer)
+- [ ] Physical proof integration (NFC/QR)
 
 ### Phase 5: Decentralization
 
@@ -133,25 +136,10 @@ These are open questions being investigated:
    - Validate performance in TEE environment
    - Benchmark spatial operations
 
----
-
-## Grant Milestones
-
-This project is part of the **EigenLayer Open Innovation Program**.
-
-### Milestone 1: MVP + EigenCloud Integration
-- Technical specification
-- GitHub repository
-- Basic implementation
-
-### Milestone 2: Internal Demo
-- Video walkthrough
-- Working demonstration
-
-### Milestone 3: Final Product
-- Architecture documentation
-- Public announcement
-- Production deployment
+4. **Deterministic Geocompute**
+   - Ensuring identical results across runs
+   - Floating point precision handling
+   - GEOS version pinning
 
 ---
 
