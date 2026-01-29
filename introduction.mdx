@@ -24,8 +24,8 @@ We provide spatial operations (distance, containment, intersection) that run in 
   <Card title="PostGIS Powered" icon="globe">
     Industrial-strength spatial operations backed by PostGIS — the gold standard in geospatial databases
   </Card>
-  <Card title="SDK First" icon="code">
-    Clean, intuitive TypeScript SDK designed for developers building location-based dApps
+  <Card title="Unified SDK" icon="code">
+    Single TypeScript SDK for location attestations and geospatial computations
   </Card>
 </CardGroup>
 
@@ -45,30 +45,33 @@ graph LR
 
 ## Quick Example
 
-<Note>
-  **Code snippets need testing** — Examples show the intended API. Verify against the actual implementation before use.
-</Note>
-
 ```typescript
-import { AstralClient } from '@decentralized-geo/astral-compute';
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
 
-const astral = new AstralClient({ chainId: 84532 });
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+// Create a location attestation
+const location = await astral.location.onchain.create({
+  location: { type: 'Point', coordinates: [2.2951, 48.8580] }
+});
 
 // Check if user is within 500m of a landmark
-const result = await astral.compute.within({
-  geometry: userLocationUID,
-  target: landmarkUID,
-  radius: 500,  // meters
-  chainId: 84532,
-  schema: RESOLVER_SCHEMA,
-  recipient: userAddress
-});
+const result = await astral.compute.within(
+  location.uid,
+  landmarkUID,
+  500,  // meters
+  { schema: RESOLVER_SCHEMA_UID, recipient: userAddress }
+);
 
 console.log(`Nearby: ${result.result}`);
 
 // Submit onchain (developer pays gas, Astral is attester)
 if (result.result) {
-  const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
+  await astral.compute.submit(result.delegatedAttestation);
 }
 ```
 
@@ -107,6 +110,28 @@ Astral provides the **geospatial computation layer** — the middle piece of the
     Escrow that releases when packages arrive
   </Card>
 </CardGroup>
+
+## SDK v0.2.0
+
+The Astral SDK v0.2.0 introduces a unified, namespaced API:
+
+```typescript
+// Location attestations
+astral.location.offchain.create(input);
+astral.location.offchain.verify(attestation);
+astral.location.onchain.create(input);
+astral.location.onchain.revoke(attestation);
+
+// Geospatial computations
+astral.compute.distance(from, to, options);
+astral.compute.contains(container, containee, options);
+astral.compute.within(geometry, target, radius, options);
+astral.compute.submit(delegatedAttestation);
+```
+
+<Card title="Migration Guide" icon="arrow-right" href="/sdk/migration">
+  Upgrading from v0.1.x? See the migration guide.
+</Card>
 
 ## Architecture Overview
 
