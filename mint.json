@@ -109,6 +109,7 @@
     {
       "group": "Resources",
       "pages": [
+        "resources/playground",
         "resources/staging",
         "resources/schemas",
         "resources/security",
