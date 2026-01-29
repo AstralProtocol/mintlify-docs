@@ -3,7 +3,7 @@ import Map, { Marker, Source, Layer, NavigationControl, useControl } from 'react
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import * as turf from '@turf/turf';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import './App.css';
@@ -257,11 +257,23 @@ function App() {
   const [schemaUid, setSchemaUid] = useState<string>('');
 
   // Wallet connection
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chain: connectedChain } = useAccount();
+  const { switchChain } = useSwitchChain();
 
   // Contract write for publishing attestation
   const { writeContract, data: txHash, isPending: isPublishing, error: publishError, reset: resetPublish } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
+
+  // Check if wallet is on correct chain
+  const isWrongChain = isConnected && connectedChain?.id !== chainId;
+
+  // Schema UID validation
+  const isSchemaValid = schemaUid.length === 66 && schemaUid.startsWith('0x');
+
+  // Reset publish state when mode changes
+  useEffect(() => {
+    resetPublish();
+  }, [mode, resetPublish]);
 
   // Convert point state for markers
   const pointA: Point = geometryA.type === 'Point'
@@ -954,9 +966,15 @@ console.log(result.attestation); // EAS attestation data`;
                 </ConnectButton.Custom>
               </div>
 
-              {isConnected && !schemaUid && (
+              {isConnected && !isSchemaValid && schemaUid && (
                 <div className="policy-warning">
-                  Enter a Schema UID to enable attestation publishing
+                  Schema UID must be 66 characters (0x + 64 hex chars)
+                </div>
+              )}
+
+              {isConnected && isWrongChain && (
+                <div className="policy-warning">
+                  Switch wallet to {SUPPORTED_CHAINS.find(c => c.id === chainId)?.name} to publish
                 </div>
               )}
             </>
@@ -1037,18 +1055,30 @@ console.log(result.attestation); // EAS attestation data`;
                 <div className="publish-section">
                   {!txHash ? (
                     <>
-                      <button
-                        className="publish-button"
-                        onClick={publishAttestation}
-                        disabled={!isConnected || !schemaUid || isPublishing}
-                      >
-                        {isPublishing ? 'Confirm in Wallet...' : 'Publish to Chain'}
-                      </button>
+                      {isWrongChain ? (
+                        <button
+                          className="switch-chain-button"
+                          onClick={() => switchChain({ chainId })}
+                        >
+                          Switch to {SUPPORTED_CHAINS.find(c => c.id === chainId)?.name}
+                        </button>
+                      ) : (
+                        <button
+                          className="publish-button"
+                          onClick={publishAttestation}
+                          disabled={!isConnected || !isSchemaValid || isPublishing}
+                        >
+                          {isPublishing ? 'Confirm in Wallet...' : 'Publish to Chain'}
+                        </button>
+                      )}
                       {!isConnected && (
                         <p className="publish-hint">Connect wallet to publish</p>
                       )}
                       {isConnected && !schemaUid && (
                         <p className="publish-hint">Enter schema UID to publish</p>
+                      )}
+                      {isConnected && schemaUid && !isSchemaValid && (
+                        <p className="publish-hint">Schema UID must be 66 characters starting with 0x</p>
                       )}
                     </>
                   ) : (

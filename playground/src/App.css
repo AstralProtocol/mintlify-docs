@@ -278,6 +278,24 @@ body {
   cursor: not-allowed;
 }
 
+.switch-chain-button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.switch-chain-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(234, 179, 8, 0.3);
+}
+
 .publish-hint {
   margin: 0.5rem 0 0 0;
   font-size: 0.7rem;
