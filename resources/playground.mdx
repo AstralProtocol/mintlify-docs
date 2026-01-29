@@ -1,0 +1,71 @@
+---
+title: "Playground"
+description: "Interactive tool for exploring geospatial operations"
+---
+
+The [Astral Playground](https://playground.astral.global) lets you experiment with geospatial operations before integrating them into your application.
+
+## Modes
+
+### Preview Mode
+
+Test operations with instant visual feedback. Results are computed locally using Turf.js for a quick approximation.
+
+1. Select an operation from the dropdown
+2. Drag markers or draw shapes on the map
+3. See the preview result update in real-time
+4. Click **Get Verified Result** to compute via PostGIS
+
+### Policy Builder Mode
+
+Create and publish attestations onchain.
+
+1. Switch to **Policy Builder** tab
+2. Connect your wallet
+3. Select your target chain (Base Sepolia, Sepolia, Base, or Ethereum)
+4. Enter a schema UID (defaults provided for numeric/boolean operations)
+5. Configure your geometries
+6. Click **Get Verified Result** to compute
+7. Click **Publish to Chain** to submit the attestation via EAS
+
+## Operations
+
+| Operation | What it does | Inputs |
+|-----------|--------------|--------|
+| **Distance** | Meters between two points | 2 points |
+| **Within** | Is point A within radius of point B? | 2 points + radius (m) |
+| **Contains** | Is the point inside the polygon? | polygon + point |
+| **Intersects** | Do geometries overlap? | 2 geometries |
+| **Area** | Square meters of a polygon | polygon |
+| **Length** | Meters of a line | linestring |
+
+## Working with the Map
+
+**Points** — Drag markers directly on the map.
+
+**Polygons & Lines** — Enable **map editing** to use drawing tools:
+- Click the polygon/line tool in the top-left
+- Click to place vertices
+- Double-click to finish
+- Click vertices to edit, drag to move
+
+## GeoJSON Editor
+
+The **GeoJSON** tab lets you paste or edit geometries directly:
+
+```json
+{
+  "type": "Point",
+  "coordinates": [-122.4194, 37.7749]
+}
+```
+
+Supported types: `Point`, `Polygon`, `LineString`.
+
+## Code Snippets
+
+The **SDK** and **cURL** tabs show integration code that updates as you configure your operation. Copy these directly into your project.
+
+<Card title="Quickstart" icon="rocket" href="/quickstart">
+  Ready to integrate? Follow the quickstart guide.
+</Card>
