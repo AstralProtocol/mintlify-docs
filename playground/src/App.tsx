@@ -712,11 +712,9 @@ console.log(result.attestation); // EAS attestation data`;
             <img src="/astral-logo-wide.svg" alt="Astral" className="header-logo-wide" />
             <p className="header-subtitle">Explore geospatial operations with instant preview and verifiable attestations</p>
           </div>
-          {mode === 'policy' && (
-            <div className="header-right">
-              <ConnectButton />
-            </div>
-          )}
+          <div className="header-right">
+            <ConnectButton />
+          </div>
         </div>
       </header>
 
@@ -902,8 +900,8 @@ console.log(result.attestation); // EAS attestation data`;
 
               <div className="control-group">
                 <label>
-                  Schema UID
-                  <InfoIcon tooltip="The EAS schema UID for your attestation. Create schemas at easscan.org" />
+                  Policy Schema UID
+                  <InfoIcon tooltip="Must match one of the Astral policy attestation schemas (Boolean, Numeric, or Geometry). Find schemas at easscan.org" />
                 </label>
                 <input
                   type="text"
@@ -912,6 +910,7 @@ console.log(result.attestation); // EAS attestation data`;
                   value={schemaUid}
                   onChange={(e) => setSchemaUid(e.target.value)}
                 />
+                <p className="schema-hint">Must match the operation's result type (boolean/numeric/geometry)</p>
               </div>
 
               <div className="geometry-summary">

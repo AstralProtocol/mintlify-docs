@@ -157,6 +157,12 @@ body {
   color: #555;
 }
 
+.schema-hint {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.7rem;
+  color: #555;
+}
+
 /* Policy info */
 .policy-info {
   background: rgba(212, 166, 58, 0.08);
