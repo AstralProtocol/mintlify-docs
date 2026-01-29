@@ -1,134 +1,439 @@
 ---
-title: "Location"
-description: "Location attestation methods"
+title: "Location Module"
+description: "Offchain and onchain location attestation workflows"
 ---
 
 <Warning>
   **Development Preview** — The SDK is under development.
 </Warning>
 
-<Note>
-  **Separate Package** — Location attestation methods are provided by `@decentralized-geo/astral-sdk`,
-  not `@decentralized-geo/astral-compute`. Install it separately:
-  ```bash
-  npm install @decentralized-geo/astral-sdk
-  ```
-</Note>
+# Location Module
 
-# Location Methods
-
-The `AstralSDK` class provides methods for creating and querying location attestations.
-
-## Setup
+The `LocationModule` provides operations for creating, signing, and verifying location attestations using the Ethereum Attestation Service (EAS).
 
 ```typescript
 import { AstralSDK } from '@decentralized-geo/astral-sdk';
 
-const sdk = new AstralSDK({ signer: wallet });
-```
-
-## createOffchainLocationAttestation()
-
-Create a new offchain location attestation.
-
-```typescript
-sdk.createOffchainLocationAttestation(
-  params: {
-    location: GeoJSON.Geometry;
-    memo?: string;
-  }
-): Promise<LocationAttestation>
-```
-
-### Example
-
-```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
-
-const sdk = new AstralSDK({ signer: wallet });
-
-// Create offchain attestation
-const location = await sdk.createOffchainLocationAttestation({
-  location: { type: 'Point', coordinates: [2.2945, 48.8584] },
-  memo: 'Eiffel Tower'
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet
 });
 
-console.log(location.uid);
-console.log(location.signature);
+// Access via astral.location
+astral.location.offchain.*   // Offchain workflow
+astral.location.onchain.*    // Onchain workflow
+astral.location.build()      // Common operations
+astral.location.encode()
+astral.location.decode()
 ```
 
 ---
 
-## createOnchainLocationAttestation()
+## Common Operations
 
-Create a new onchain location attestation.
+### build()
+
+Build an unsigned location attestation from input data.
 
 ```typescript
-sdk.createOnchainLocationAttestation(
-  params: {
-    location: GeoJSON.Geometry;
-    memo?: string;
-  }
-): Promise<LocationAttestation>
+astral.location.build(
+  input: LocationAttestationInput
+): Promise<UnsignedLocationAttestation>
 ```
 
-### Example
+#### Example
 
 ```typescript
-// Create onchain attestation
-const onchainLocation = await sdk.createOnchainLocationAttestation({
-  location: { type: 'Point', coordinates: [2.2945, 48.8584] },
-  memo: 'Eiffel Tower - Iconic Paris landmark'
+const unsigned = await astral.location.build({
+  location: {
+    type: 'Point',
+    coordinates: [2.2945, 48.8584]
+  },
+  locationType: 'geojson-point',  // Optional - auto-detected
+  memo: 'Eiffel Tower visit'
 });
 
-console.log(onchainLocation.uid);  // Onchain UID
+console.log(unsigned.eventTimestamp);
+console.log(unsigned.location);  // Stringified GeoJSON
+console.log(unsigned.locationType);  // 'geojson-point'
 ```
 
 ---
 
-## Retrieving Attestations
+### encode()
+
+Encode an unsigned attestation for EAS.
+
+```typescript
+astral.location.encode(
+  attestation: UnsignedLocationAttestation,
+  schemaType?: string  // Defaults to 'location'
+): string
+```
+
+#### Example
+
+```typescript
+const unsigned = await astral.location.build({ location: geojson });
+const encoded = astral.location.encode(unsigned);
+
+// Use encoded data with EAS directly if needed
+console.log('Encoded:', encoded);
+```
+
+---
+
+### decode()
+
+Decode EAS-encoded data back to attestation fields.
+
+```typescript
+astral.location.decode(
+  encodedData: string,
+  schemaType?: string  // Defaults to 'location'
+): Record<string, SchemaValue>
+```
+
+#### Example
+
+```typescript
+// Decode from EAS attestation data
+const decoded = astral.location.decode(attestation.data);
+
+console.log(decoded.eventTimestamp);
+console.log(decoded.locationType);
+console.log(decoded.location);
+```
+
+---
+
+## Offchain Workflow
+
+The offchain workflow creates EIP-712 signed attestations that can be verified without blockchain transactions.
+
+### offchain.create()
+
+Build and sign an attestation in one step.
+
+```typescript
+astral.location.offchain.create(
+  input: LocationAttestationInput,
+  options?: OffchainAttestationOptions
+): Promise<OffchainLocationAttestation>
+```
+
+#### Example
+
+```typescript
+const attestation = await astral.location.offchain.create({
+  location: {
+    type: 'Point',
+    coordinates: [2.2945, 48.8584]
+  },
+  memo: 'Eiffel Tower',
+  timestamp: new Date()
+});
+
+console.log('UID:', attestation.uid);
+console.log('Signer:', attestation.signer);
+console.log('Signature:', attestation.signature);
+```
+
+---
+
+### offchain.sign()
+
+Sign a pre-built unsigned attestation.
+
+```typescript
+astral.location.offchain.sign(
+  unsigned: UnsignedLocationAttestation,
+  options?: OffchainAttestationOptions
+): Promise<OffchainLocationAttestation>
+```
+
+#### Example
+
+```typescript
+// Build first
+const unsigned = await astral.location.build({
+  location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  memo: 'San Francisco'
+});
+
+// Sign separately
+const signed = await astral.location.offchain.sign(unsigned);
+
+console.log('UID:', signed.uid);
+```
+
+---
+
+### offchain.verify()
+
+Verify an offchain attestation's signature.
+
+```typescript
+astral.location.offchain.verify(
+  attestation: OffchainLocationAttestation,
+  options?: OffchainAttestationOptions
+): Promise<VerificationResult>
+```
+
+#### Example
+
+```typescript
+const result = await astral.location.offchain.verify(attestation);
+
+if (result.isValid) {
+  console.log('Valid! Signed by:', result.signerAddress);
+} else {
+  console.log('Invalid:', result.reason);
+}
+```
+
+---
+
+### offchain.publish()
+
+Publish an offchain attestation to storage (IPFS, etc.).
+
+```typescript
+astral.location.offchain.publish(
+  attestation: OffchainLocationAttestation
+): Promise<OffchainLocationAttestation>
+```
+
+#### Example
+
+```typescript
+const published = await astral.location.offchain.publish(attestation);
+
+console.log('Publications:', published.publications);
+// [{ storageType: 'ipfs', reference: 'Qm...', publishedAt: 1234567890 }]
+```
+
+---
+
+## Onchain Workflow
+
+The onchain workflow registers attestations directly on a blockchain via EAS.
+
+### onchain.create()
+
+Build and register an attestation in one step.
+
+```typescript
+astral.location.onchain.create(
+  input: LocationAttestationInput,
+  options?: OnchainAttestationOptions
+): Promise<OnchainLocationAttestation>
+```
+
+#### Example
+
+```typescript
+const attestation = await astral.location.onchain.create({
+  location: {
+    type: 'Polygon',
+    coordinates: [[[
+      [-122.42, 37.77],
+      [-122.41, 37.77],
+      [-122.41, 37.78],
+      [-122.42, 37.78],
+      [-122.42, 37.77]
+    ]]]
+  },
+  memo: 'Property boundary'
+});
+
+console.log('UID:', attestation.uid);
+console.log('Chain:', attestation.chain);
+console.log('Tx Hash:', attestation.txHash);
+console.log('Block:', attestation.blockNumber);
+```
+
+---
+
+### onchain.register()
+
+Register a pre-built unsigned attestation.
+
+```typescript
+astral.location.onchain.register(
+  unsigned: UnsignedLocationAttestation,
+  options?: OnchainAttestationOptions
+): Promise<OnchainLocationAttestation>
+```
+
+#### Example
+
+```typescript
+// Build first
+const unsigned = await astral.location.build({
+  location: geojson,
+  memo: 'My location'
+});
+
+// Register separately
+const onchain = await astral.location.onchain.register(unsigned);
+
+console.log('Tx Hash:', onchain.txHash);
+```
+
+---
+
+### onchain.verify()
+
+Verify an onchain attestation exists and is not revoked.
+
+```typescript
+astral.location.onchain.verify(
+  attestation: OnchainLocationAttestation,
+  options?: OnchainAttestationOptions
+): Promise<VerificationResult>
+```
+
+#### Example
+
+```typescript
+const result = await astral.location.onchain.verify(attestation);
+
+if (result.isValid) {
+  console.log('Valid onchain attestation');
+  console.log('Revoked:', result.revoked);
+} else {
+  console.log('Invalid:', result.reason);
+}
+```
+
+---
+
+### onchain.revoke()
+
+Revoke an onchain attestation.
+
+```typescript
+astral.location.onchain.revoke(
+  attestation: OnchainLocationAttestation,
+  options?: OnchainAttestationOptions
+): Promise<unknown>
+```
+
+#### Example
+
+```typescript
+// Only works if attestation was created with revocable: true
+if (attestation.revocable && !attestation.revoked) {
+  await astral.location.onchain.revoke(attestation);
+  console.log('Attestation revoked');
+}
+```
+
+---
+
+## Input Types
+
+### LocationAttestationInput
+
+```typescript
+interface LocationAttestationInput {
+  // Location data - flexible format
+  location: unknown;  // GeoJSON, WKT, coordinate pair, H3 index
+
+  // Optional format hints
+  locationType?: string;        // e.g., 'geojson-point', 'wkt-polygon', 'h3'
+  targetLocationFormat?: string; // Convert to this format
+
+  // Timing
+  timestamp?: Date;  // Defaults to now
+
+  // Media attachments
+  media?: MediaInput[];
+
+  // Additional fields
+  memo?: string;
+  recipient?: string;  // Ethereum address
+}
+```
+
+### Supported Location Formats
+
+| Format | locationType | Example |
+|--------|--------------|---------|
+| GeoJSON Point | `geojson-point` | `{ type: 'Point', coordinates: [lon, lat] }` |
+| GeoJSON Polygon | `geojson-polygon` | `{ type: 'Polygon', coordinates: [...] }` |
+| GeoJSON LineString | `geojson-linestring` | `{ type: 'LineString', coordinates: [...] }` |
+| WKT | `wkt-*` | `'POINT(-122.4194 37.7749)'` |
+| Coordinate Pair | `coordinates-decimal+lon-lat` | `[-122.4194, 37.7749]` |
+| H3 Index | `h3` | `'8928308280fffff'` |
 
 <Note>
-  Querying existing attestations may use the Astral API client or the EAS GraphQL API directly.
-  See the [Compute API documentation](/api-reference/overview) for details on fetching attestations.
+  Location format is auto-detected when `locationType` is not specified.
 </Note>
-
-### Example: Query via EAS GraphQL
-
-```typescript
-// Query attestations using the EAS GraphQL API
-const query = `
-  query GetAttestations($attester: String!) {
-    attestations(where: { attester: { equals: $attester } }) {
-      id
-      data
-      recipient
-      time
-    }
-  }
-`;
-
-// Use your preferred GraphQL client
-const result = await graphqlClient.query(query, { attester: '0x...' });
-```
 
 ---
 
-## Return Type
+## Output Types
+
+### OffchainLocationAttestation
 
 ```typescript
-interface LocationAttestation {
+interface OffchainLocationAttestation {
+  // From UnsignedLocationAttestation
+  eventTimestamp: number;
+  srs: string;
+  locationType: string;
+  location: string;
+  recipeType: string[];
+  recipePayload: string[];
+  mediaType: string[];
+  mediaData: string[];
+  memo?: string;
+
+  // Signature fields
   uid: string;
-  geometry: GeoJSON.Geometry;
-  geometryType: string;
-  srs: string;                // Spatial reference (default: EPSG:4326)
-  properties?: Record<string, any>;
-  attester: string;
-  recipient: string;
-  timestamp: number;
   signature: string;
-  onchain: boolean;
-  uri?: string;               // For offchain attestations
+  signer: string;
+  version: string;
+
+  // Storage
+  publications?: PublicationRecord[];
+}
+```
+
+### OnchainLocationAttestation
+
+```typescript
+interface OnchainLocationAttestation {
+  // From UnsignedLocationAttestation
+  eventTimestamp: number;
+  srs: string;
+  locationType: string;
+  location: string;
+  // ... other fields
+
+  // Blockchain fields
+  uid: string;
+  attester: string;
+  chain: string;
+  chainId: number;
+  txHash: string;
+  blockNumber: number;
+  revocable: boolean;
+  revoked: boolean;
+}
+```
+
+### VerificationResult
+
+```typescript
+interface VerificationResult {
+  isValid: boolean;
+  revoked?: boolean;
+  signerAddress?: string;
+  attestation?: LocationAttestation;
+  reason?: string;
 }
 ```
 
@@ -136,7 +441,7 @@ interface LocationAttestation {
 
 ## Coordinate Format
 
-Coordinates use GeoJSON standard: **[longitude, latitude]**
+Coordinates use the GeoJSON standard: **[longitude, latitude]**
 
 ```typescript
 // San Francisco
@@ -145,7 +450,7 @@ const sf = {
   coordinates: [-122.4194, 37.7749]  // [lon, lat]
 };
 
-// Polygon (counterclockwise, closed)
+// Polygon (counterclockwise, closed ring)
 const area = {
   type: 'Polygon',
   coordinates: [[[
@@ -158,6 +463,6 @@ const area = {
 };
 ```
 
-<Card title="Next: EAS Methods" icon="signature" href="/sdk/eas">
-  Learn about EAS submission methods
+<Card title="Next: Compute Module" icon="calculator" href="/sdk/compute">
+  Learn about geospatial computation methods
 </Card>

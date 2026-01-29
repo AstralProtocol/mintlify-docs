@@ -1,6 +1,6 @@
 ---
 title: "SDK Overview"
-description: "TypeScript SDK for Astral Location Services"
+description: "Unified TypeScript SDK for Astral Location Services v0.2.0"
 ---
 
 <Warning>
@@ -8,98 +8,112 @@ description: "TypeScript SDK for Astral Location Services"
 </Warning>
 
 <Note>
-  **Two SDK Packages** — Location attestations use `@decentralized-geo/astral-sdk`.
-  Geospatial computations use `@decentralized-geo/astral-compute`.
-  We plan to unify these into a single SDK in a future release.
+  **v0.2.0 Unified SDK** — The SDK now provides a unified API with namespaced modules.
+  Location attestations and geospatial computations are now in a single package: `@decentralized-geo/astral-sdk`.
 </Note>
 
 # SDK Overview
 
-The Astral SDKs are the official TypeScript clients for Astral Location Services.
+The Astral SDK is the official TypeScript client for Astral Location Services, providing a unified interface for location attestations and verifiable geospatial computations.
 
 ## Design Philosophy
 
-- **Developer experience first**: Intuitive API that feels natural
+- **Namespaced API**: Clear separation between location and compute operations
+- **Workflow-oriented**: Distinct offchain and onchain workflows for location attestations
 - **Type-safe**: Full TypeScript support with comprehensive types
 - **Batteries included**: Handles signing, encoding, and EAS integration
 
 ## Package Structure
 
 ```typescript
-// Location attestations (separate package)
 import { AstralSDK } from '@decentralized-geo/astral-sdk';
 
-// Geospatial computations
-import { AstralCompute, AstralEAS } from '@decentralized-geo/astral-compute';
+// Initialize with unified configuration
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
 
-// Initialize clients
-const sdk = new AstralSDK({ signer: wallet });
-const compute = new AstralCompute({ chainId: 84532 });
-const eas = new AstralEAS(signer, 84532);
+// Location module - offchain workflow
+astral.location.offchain.create(input);
+astral.location.offchain.sign(unsigned);
+astral.location.offchain.verify(attestation);
+astral.location.offchain.publish(attestation);
 
-// Location attestation operations (astral-sdk)
-sdk.location.create(geojson);
-sdk.location.get(uid);
-sdk.location.query(filters);
+// Location module - onchain workflow
+astral.location.onchain.create(input);
+astral.location.onchain.register(unsigned);
+astral.location.onchain.verify(attestation);
+astral.location.onchain.revoke(attestation);
 
-// Geospatial computation operations (astral-compute)
-compute.distance(input1, input2, options);
-compute.contains(container, geometry, options);
-compute.within(geometry, target, radius, options);
-compute.intersects(geom1, geom2, options);
-compute.area(geometry, options);
-compute.length(geometry, options);
+// Location module - common operations
+astral.location.build(input);
+astral.location.encode(attestation);
+astral.location.decode(data);
 
-// EAS submission helpers (astral-compute)
-eas.submitDelegated(attestation);
+// Compute module - spatial operations
+astral.compute.distance(from, to, options);
+astral.compute.area(geometry, options);
+astral.compute.length(geometry, options);
+astral.compute.contains(container, containee, options);
+astral.compute.within(geometry, target, radius, options);
+astral.compute.intersects(a, b, options);
+
+// Compute module - submission
+astral.compute.submit(delegatedAttestation);
+astral.compute.estimate(delegatedAttestation);
+astral.compute.health();
 ```
 
 ## Quick Start
 
 ```typescript
 import { AstralSDK } from '@decentralized-geo/astral-sdk';
-import { AstralCompute, AstralEAS } from '@decentralized-geo/astral-compute';
 import { ethers } from 'ethers';
 
 // Initialize with signer
 const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-// Initialize clients
-const sdk = new AstralSDK({ signer: wallet });
-const compute = new AstralCompute({ chainId: 84532 });
-const eas = new AstralEAS(wallet, 84532);
-
-// Create a location attestation
-const location = await sdk.location.create({
-  type: 'Point',
-  coordinates: [2.2945, 48.8584]
-}, {
-  submitOnchain: true
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
 });
 
-// Compute relationship
-const result = await compute.within(
-  location.uid,
+// Create an offchain location attestation
+const attestation = await astral.location.offchain.create({
+  location: {
+    type: 'Point',
+    coordinates: [2.2945, 48.8584]
+  },
+  memo: 'Eiffel Tower'
+});
+
+console.log('Attestation UID:', attestation.uid);
+
+// Compute distance between two locations
+const distance = await astral.compute.distance(
+  attestation.uid,
   landmarkUID,
-  500,
   { schema: SCHEMA_UID }
 );
 
-// Submit onchain
-if (result.result) {
-  await eas.submitDelegated(result.delegatedAttestation);
-}
+console.log('Distance:', distance.result, distance.units);
+
+// Submit computation result onchain
+await astral.compute.submit(distance.delegatedAttestation);
 ```
 
 ## Key Concepts
 
 <CardGroup cols={2}>
-  <Card title="Chain Scope" icon="link">
-    All operations are scoped to the configured `chainId`. Input UIDs must exist on that chain.
+  <Card title="Namespaced Modules" icon="folder-tree">
+    Clear separation: `location.offchain.*`, `location.onchain.*`, and `compute.*`
   </Card>
   <Card title="Flexible Inputs" icon="shuffle">
-    Accept UIDs, raw GeoJSON, or offchain attestations interchangeably.
+    Accept UIDs, raw GeoJSON, or attestation objects interchangeably.
   </Card>
   <Card title="Delegated Attestations" icon="signature">
     SDK handles the delegated attestation pattern — you pay gas, Astral is attester.
@@ -112,19 +126,21 @@ if (result.result) {
 ## Configuration
 
 ```typescript
-// AstralSDK configuration (for location attestations)
-interface AstralSDKConfig {
-  signer: Signer;               // Required: for signing attestations
-}
+interface AstralConfig {
+  // Required
+  chainId: number;              // Target chain ID (e.g., 84532 for Base Sepolia)
 
-// AstralCompute configuration (for geospatial computations)
-interface AstralComputeConfig {
-  chainId: number;              // Required: target chain
-  apiUrl?: string;              // Optional: defaults to api.astral.global
-}
+  // Recommended
+  signer?: Signer;              // For signing attestations and transactions
+  provider?: Provider;          // For read-only blockchain operations
+  apiUrl?: string;              // Defaults to 'https://api.astral.global'
 
-// AstralEAS configuration (for onchain submission)
-// Constructor: new AstralEAS(signer: Signer, chainId: number)
+  // Advanced
+  debug?: boolean;              // Enable debug logging
+  schemas?: RuntimeSchemaConfig[];  // Pre-register custom schemas
+  defaultSchema?: RuntimeSchemaConfig;  // Override default schema
+  strictSchemaValidation?: boolean;     // Throw on schema validation errors
+}
 ```
 
 | Chain | Chain ID |
@@ -133,6 +149,39 @@ interface AstralComputeConfig {
 | Base Mainnet | 8453 |
 | Ethereum Sepolia | 11155111 |
 | Ethereum Mainnet | 1 |
+| Celo | 42220 |
+| Arbitrum | 42161 |
+| Optimism | 10 |
+
+## Module Architecture
+
+```
+AstralSDK
+├── location: LocationModule
+│   ├── offchain: OffchainWorkflow
+│   │   ├── create()    - Build + sign in one step
+│   │   ├── sign()      - Sign unsigned attestation
+│   │   ├── verify()    - Verify signature
+│   │   └── publish()   - Store to IPFS/storage
+│   ├── onchain: OnchainWorkflow
+│   │   ├── create()    - Build + register in one step
+│   │   ├── register()  - Register unsigned attestation
+│   │   ├── verify()    - Verify onchain attestation
+│   │   └── revoke()    - Revoke attestation
+│   ├── build()         - Build unsigned attestation
+│   ├── encode()        - Encode for EAS
+│   └── decode()        - Decode from EAS
+└── compute: ComputeModule
+    ├── distance()      - Distance between geometries
+    ├── area()          - Area of polygon
+    ├── length()        - Length of line
+    ├── contains()      - Containment check
+    ├── within()        - Proximity check
+    ├── intersects()    - Intersection check
+    ├── submit()        - Submit delegated attestation
+    ├── estimate()      - Estimate gas
+    └── health()        - Service health check
+```
 
 ## Pages
 
@@ -140,13 +189,13 @@ interface AstralComputeConfig {
   <Card title="Installation" icon="download" href="/sdk/installation">
     Install and configure the SDK
   </Card>
-  <Card title="Compute" icon="calculator" href="/sdk/compute">
+  <Card title="Location Module" icon="location-dot" href="/sdk/location">
+    Offchain and onchain attestation workflows
+  </Card>
+  <Card title="Compute Module" icon="calculator" href="/sdk/compute">
     Geospatial computation methods
   </Card>
-  <Card title="Location" icon="location-dot" href="/sdk/location">
-    Location attestation methods
-  </Card>
-  <Card title="EAS" icon="signature" href="/sdk/eas">
-    EAS submission helpers
+  <Card title="Migration Guide" icon="arrow-right" href="/sdk/migration">
+    Migrate from v0.1.x to v0.2.0
   </Card>
 </CardGroup>
