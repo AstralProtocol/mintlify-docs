@@ -708,8 +708,15 @@ console.log(result.attestation); // EAS attestation data`;
     <div className="playground">
       <header className="header">
         <div className="header-content">
-          <img src="/astral-logo-wide.svg" alt="Astral" className="header-logo-wide" />
-          <p className="header-subtitle">Explore geospatial operations with instant preview and verifiable attestations</p>
+          <div className="header-left">
+            <img src="/astral-logo-wide.svg" alt="Astral" className="header-logo-wide" />
+            <p className="header-subtitle">Explore geospatial operations with instant preview and verifiable attestations</p>
+          </div>
+          {mode === 'policy' && (
+            <div className="header-right">
+              <ConnectButton />
+            </div>
+          )}
         </div>
       </header>
 
@@ -907,66 +914,24 @@ console.log(result.attestation); // EAS attestation data`;
                 />
               </div>
 
-              <div className="wallet-section">
-                <label>Wallet</label>
-                <ConnectButton.Custom>
-                  {({
-                    account,
-                    chain,
-                    openAccountModal,
-                    openChainModal,
-                    openConnectModal,
-                    mounted,
-                  }) => {
-                    const ready = mounted;
-                    const connected = ready && account && chain;
-
-                    return (
-                      <div
-                        {...(!ready && {
-                          'aria-hidden': true,
-                          style: {
-                            opacity: 0,
-                            pointerEvents: 'none',
-                            userSelect: 'none',
-                          },
-                        })}
-                      >
-                        {(() => {
-                          if (!connected) {
-                            return (
-                              <button className="connect-wallet-btn" onClick={openConnectModal}>
-                                Connect Wallet
-                              </button>
-                            );
-                          }
-
-                          if (chain.unsupported) {
-                            return (
-                              <button className="connect-wallet-btn error" onClick={openChainModal}>
-                                Wrong Network
-                              </button>
-                            );
-                          }
-
-                          return (
-                            <div className="wallet-connected">
-                              <button className="wallet-chain-btn" onClick={openChainModal}>
-                                {chain.name}
-                              </button>
-                              <button className="wallet-address-btn" onClick={openAccountModal}>
-                                {account.displayName}
-                              </button>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    );
-                  }}
-                </ConnectButton.Custom>
+              <div className="geometry-summary">
+                <label>Geometries</label>
+                <div className="geometry-cards">
+                  <div className="geometry-card">
+                    <span className="geometry-card-label">A</span>
+                    <span className="geometry-card-type">{geometryA.type}</span>
+                  </div>
+                  {['distance', 'within', 'contains', 'intersects'].includes(operation) && (
+                    <div className="geometry-card">
+                      <span className="geometry-card-label">B</span>
+                      <span className="geometry-card-type">{geometryB.type}</span>
+                    </div>
+                  )}
+                </div>
+                <p className="geometry-hint">Edit geometries in the GeoJSON tab below</p>
               </div>
 
-              {isConnected && !isSchemaValid && schemaUid && (
+              {schemaUid && !isSchemaValid && (
                 <div className="policy-warning">
                   Schema UID must be 66 characters (0x + 64 hex chars)
                 </div>
@@ -975,6 +940,12 @@ console.log(result.attestation); // EAS attestation data`;
               {isConnected && isWrongChain && (
                 <div className="policy-warning">
                   Switch wallet to {SUPPORTED_CHAINS.find(c => c.id === chainId)?.name} to publish
+                </div>
+              )}
+
+              {!isConnected && (
+                <div className="policy-info">
+                  Connect wallet to publish attestations on-chain
                 </div>
               )}
             </>
