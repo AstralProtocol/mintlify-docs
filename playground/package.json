@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@mapbox/mapbox-gl-draw": "^1.5.1",
+    "@rainbow-me/rainbowkit": "^2.2.10",
+    "@tanstack/react-query": "^5.90.20",
     "@turf/circle": "^7.3.3",
     "@turf/distance": "^7.3.3",
     "@turf/helpers": "^7.3.3",
@@ -18,7 +20,9 @@
     "mapbox-gl": "^3.18.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-map-gl": "^7.1.9"
+    "react-map-gl": "^7.1.9",
+    "viem": "^2.45.0",
+    "wagmi": "^2.19.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

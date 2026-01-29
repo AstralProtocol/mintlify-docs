@@ -172,6 +172,82 @@ body {
   border-radius: 4px;
 }
 
+/* Wallet section */
+.wallet-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.wallet-section label {
+  font-size: 0.7rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+.connect-wallet-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #D4A63A 0%, #B8860B 100%);
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.connect-wallet-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(212, 166, 58, 0.25);
+}
+
+.connect-wallet-btn.error {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+}
+
+.wallet-connected {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.wallet-chain-btn,
+.wallet-address-btn {
+  flex: 1;
+  padding: 0.625rem 0.75rem;
+  background: #0f0f0f;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #e5e5e5;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.wallet-chain-btn:hover,
+.wallet-address-btn:hover {
+  border-color: #555;
+  background: #1a1a1a;
+}
+
+.wallet-address-btn {
+  font-family: 'SF Mono', Monaco, monospace;
+  color: #D4A63A;
+}
+
+.policy-warning {
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: 6px;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.75rem;
+  color: #eab308;
+}
+
 @media (max-width: 900px) {
   .controls-section {
     border-top: 1px solid #2a2a2a;

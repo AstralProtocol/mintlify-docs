@@ -2,6 +2,8 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import Map, { Marker, Source, Layer, NavigationControl, useControl } from 'react-map-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import * as turf from '@turf/turf';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useAccount } from 'wagmi';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import './App.css';
@@ -209,6 +211,9 @@ function App() {
   const [chainId, setChainId] = useState<number>(84532); // Default to Base Sepolia
   const [schemaUid, setSchemaUid] = useState<string>('');
 
+  // Wallet connection
+  const { address, isConnected } = useAccount();
+
   // Convert point state for markers
   const pointA: Point = geometryA.type === 'Point'
     ? { lng: geometryA.coordinates[0], lat: geometryA.coordinates[1] }
@@ -376,6 +381,7 @@ function App() {
     const geomBStr = JSON.stringify(geometryB);
     const displayChainId = mode === 'policy' ? chainId : 84532;
     const displaySchema = mode === 'policy' && schemaUid ? `"${schemaUid}"` : 'YOUR_SCHEMA_UID';
+    const displayRecipient = mode === 'policy' && address ? address : '0x...';
 
     const sdkParams = operation === 'within' ? `\n  ${radius}, // radius in meters` : '';
     const needsGeomB = ['distance', 'within', 'contains', 'intersects'].includes(operation);
@@ -386,7 +392,7 @@ const astral = createAstralCompute({ chainId: ${displayChainId} });
 
 const result = await astral.${operation}(
   ${geomAStr},${needsGeomB ? `\n  ${geomBStr},` : ''}${sdkParams}
-  { schema: ${displaySchema}, recipient: userAddress }
+  { schema: ${displaySchema}, recipient: "${displayRecipient}" }
 );
 
 console.log(result.result); // ${typeof preview.value === 'boolean' ? 'boolean' : 'number'}
@@ -418,19 +424,19 @@ console.log(result.attestation); // EAS attestation data`;
   -d '{
     "chainId": ${displayChainId},
     "schema": ${displaySchema},
-    "recipient": "0x...",
+    "recipient": "${displayRecipient}",
     ${curlBody}
   }'`;
 
     return { sdk, curl };
-  }, [operation, geometryA, geometryB, radius, preview.value, mode, chainId, schemaUid]);
+  }, [operation, geometryA, geometryB, radius, preview.value, mode, chainId, schemaUid, address]);
 
   // Build request body based on operation
   const buildRequestBody = useCallback(() => {
     const base = {
       chainId: mode === 'policy' ? chainId : 84532,
       schema: mode === 'policy' && schemaUid ? schemaUid : '0x0000000000000000000000000000000000000000000000000000000000000000',
-      recipient: '0x0000000000000000000000000000000000000000', // Will be updated in Phase 2 with wallet
+      recipient: mode === 'policy' && address ? address : '0x0000000000000000000000000000000000000000',
     };
 
     switch (operation) {
@@ -448,7 +454,7 @@ console.log(result.attestation); // EAS attestation data`;
       default:
         return base;
     }
-  }, [operation, geometryA, geometryB, radius, mode, chainId, schemaUid]);
+  }, [operation, geometryA, geometryB, radius, mode, chainId, schemaUid, address]);
 
   // Call Astral API
   const computeVerified = useCallback(async () => {
@@ -795,10 +801,70 @@ console.log(result.attestation); // EAS attestation data`;
                 />
               </div>
 
-              <div className="policy-info">
-                <span className="policy-badge">Coming Soon</span>
-                <p>Connect wallet to publish attestations on-chain</p>
+              <div className="wallet-section">
+                <label>Wallet</label>
+                <ConnectButton.Custom>
+                  {({
+                    account,
+                    chain,
+                    openAccountModal,
+                    openChainModal,
+                    openConnectModal,
+                    mounted,
+                  }) => {
+                    const ready = mounted;
+                    const connected = ready && account && chain;
+
+                    return (
+                      <div
+                        {...(!ready && {
+                          'aria-hidden': true,
+                          style: {
+                            opacity: 0,
+                            pointerEvents: 'none',
+                            userSelect: 'none',
+                          },
+                        })}
+                      >
+                        {(() => {
+                          if (!connected) {
+                            return (
+                              <button className="connect-wallet-btn" onClick={openConnectModal}>
+                                Connect Wallet
+                              </button>
+                            );
+                          }
+
+                          if (chain.unsupported) {
+                            return (
+                              <button className="connect-wallet-btn error" onClick={openChainModal}>
+                                Wrong Network
+                              </button>
+                            );
+                          }
+
+                          return (
+                            <div className="wallet-connected">
+                              <button className="wallet-chain-btn" onClick={openChainModal}>
+                                {chain.name}
+                              </button>
+                              <button className="wallet-address-btn" onClick={openAccountModal}>
+                                {account.displayName}
+                              </button>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    );
+                  }}
+                </ConnectButton.Custom>
               </div>
+
+              {isConnected && !schemaUid && (
+                <div className="policy-warning">
+                  Enter a Schema UID to enable attestation publishing
+                </div>
+              )}
             </>
           )}
 
