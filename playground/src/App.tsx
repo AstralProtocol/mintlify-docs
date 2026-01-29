@@ -19,6 +19,14 @@ const SUPPORTED_CHAINS = [
   { id: 1, name: 'Ethereum', explorer: 'https://etherscan.io', easScan: 'https://easscan.org' },
 ] as const;
 
+// Default Astral Policy Schema UIDs (Base Sepolia - no resolver)
+const DEFAULT_SCHEMA_UIDS = {
+  // For distance, area, length operations
+  numeric: '0x26294bed9838f59e73f11582bcd16703bf8cf3820d91b1cacda94db726cf5c8e',
+  // For contains, within, intersects operations
+  boolean: '0x128e991560d62a7b2d7ea16c82aa31345ac917097d550526780b30050674486f',
+} as const;
+
 // EAS contract addresses (same across most chains)
 const EAS_CONTRACT_ADDRESS = '0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587' as const;
 
@@ -254,7 +262,13 @@ function App() {
   // Policy Builder state
   const [mode, setMode] = useState<PlaygroundMode>('preview');
   const [chainId, setChainId] = useState<number>(84532); // Default to Base Sepolia
-  const [schemaUid, setSchemaUid] = useState<string>('');
+  const [schemaUid, setSchemaUid] = useState<string>(DEFAULT_SCHEMA_UIDS.numeric);
+
+  // Get the appropriate default schema for the current operation
+  const getDefaultSchemaForOperation = useCallback((op: Operation) => {
+    const numericOps = ['distance', 'area', 'length'];
+    return numericOps.includes(op) ? DEFAULT_SCHEMA_UIDS.numeric : DEFAULT_SCHEMA_UIDS.boolean;
+  }, []);
 
   // Wallet connection
   const { address, isConnected, chain: connectedChain } = useAccount();
@@ -330,11 +344,18 @@ function App() {
     }
   };
 
-  // Auto-switch geometry when operation changes
+  // Auto-switch geometry and schema when operation changes
   const handleOperationChange = (newOp: Operation) => {
     setOperation(newOp);
     setVerifiedResult(null);
     setError(null);
+
+    // Update schema UID if using a default schema
+    const currentDefault = getDefaultSchemaForOperation(operation);
+    const newDefault = getDefaultSchemaForOperation(newOp);
+    if (schemaUid === currentDefault || schemaUid === '') {
+      setSchemaUid(newDefault);
+    }
 
     const neededType = getGeometryTypeForOperation(newOp);
 
@@ -901,7 +922,7 @@ console.log(result.attestation); // EAS attestation data`;
               <div className="control-group">
                 <label>
                   Policy Schema UID
-                  <InfoIcon tooltip="Must match one of the Astral policy attestation schemas (Boolean, Numeric, or Geometry). Find schemas at easscan.org" />
+                  <InfoIcon tooltip="Must match one of the Astral policy attestation schemas. Numeric for distance/area/length, Boolean for contains/within/intersects." />
                 </label>
                 <input
                   type="text"
@@ -910,7 +931,10 @@ console.log(result.attestation); // EAS attestation data`;
                   value={schemaUid}
                   onChange={(e) => setSchemaUid(e.target.value)}
                 />
-                <p className="schema-hint">Must match the operation's result type (boolean/numeric/geometry)</p>
+                <p className="schema-hint">
+                  {['distance', 'area', 'length'].includes(operation) ? 'Numeric' : 'Boolean'} schema required for {operation}
+                  {schemaUid === getDefaultSchemaForOperation(operation) && ' (using default)'}
+                </p>
               </div>
 
               <div className="geometry-summary">
