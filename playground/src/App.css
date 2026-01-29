@@ -353,3 +353,94 @@ body {
 .mapboxgl-marker:active {
   cursor: grabbing;
 }
+
+/* Checkbox label */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  text-transform: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #D4A63A;
+  cursor: pointer;
+}
+
+/* GeoJSON Editor */
+.geojson-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.geojson-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.geojson-controls label {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.geojson-controls select {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem;
+  color: #e5e5e5;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.geojson-input {
+  width: 100%;
+  min-height: 200px;
+  padding: 1rem;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #e5e5e5;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.geojson-input:focus {
+  outline: none;
+  border-color: #D4A63A;
+}
+
+.geojson-input.error {
+  border-color: #ef4444;
+}
+
+.geojson-error {
+  color: #ef4444;
+  font-size: 0.8rem;
+}
+
+.geojson-hint {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+/* Mapbox Draw overrides */
+.mapbox-gl-draw_ctrl-draw-btn {
+  background-color: #1a1a1a !important;
+  border: 1px solid #333 !important;
+}
+
+.mapbox-gl-draw_ctrl-draw-btn:hover {
+  background-color: #2a2a2a !important;
+}
+
+.mapbox-gl-draw_ctrl-draw-btn.active {
+  background-color: #D4A63A !important;
+}
