@@ -7,6 +7,15 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import './App.css';
 
 type Operation = 'distance' | 'within' | 'contains' | 'intersects' | 'area' | 'length';
+type PlaygroundMode = 'preview' | 'policy';
+
+// Supported chains for attestations
+const SUPPORTED_CHAINS = [
+  { id: 84532, name: 'Base Sepolia', explorer: 'https://sepolia.basescan.org' },
+  { id: 11155111, name: 'Sepolia', explorer: 'https://sepolia.etherscan.io' },
+  { id: 8453, name: 'Base', explorer: 'https://basescan.org' },
+  { id: 1, name: 'Ethereum', explorer: 'https://etherscan.io' },
+] as const;
 
 // Info icon component
 function InfoIcon({ tooltip }: { tooltip: string }) {
@@ -195,6 +204,11 @@ function App() {
   const [useDrawMode, setUseDrawMode] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Policy Builder state
+  const [mode, setMode] = useState<PlaygroundMode>('preview');
+  const [chainId, setChainId] = useState<number>(84532); // Default to Base Sepolia
+  const [schemaUid, setSchemaUid] = useState<string>('');
+
   // Convert point state for markers
   const pointA: Point = geometryA.type === 'Point'
     ? { lng: geometryA.coordinates[0], lat: geometryA.coordinates[1] }
@@ -360,17 +374,19 @@ function App() {
   const codeSnippets = useMemo(() => {
     const geomAStr = JSON.stringify(geometryA);
     const geomBStr = JSON.stringify(geometryB);
+    const displayChainId = mode === 'policy' ? chainId : 84532;
+    const displaySchema = mode === 'policy' && schemaUid ? `"${schemaUid}"` : 'YOUR_SCHEMA_UID';
 
     const sdkParams = operation === 'within' ? `\n  ${radius}, // radius in meters` : '';
     const needsGeomB = ['distance', 'within', 'contains', 'intersects'].includes(operation);
 
     const sdk = `import { createAstralCompute } from '@decentralized-geo/astral-compute';
 
-const astral = createAstralCompute({ chainId: 84532 });
+const astral = createAstralCompute({ chainId: ${displayChainId} });
 
 const result = await astral.${operation}(
   ${geomAStr},${needsGeomB ? `\n  ${geomBStr},` : ''}${sdkParams}
-  { schema: YOUR_SCHEMA_UID, recipient: userAddress }
+  { schema: ${displaySchema}, recipient: userAddress }
 );
 
 console.log(result.result); // ${typeof preview.value === 'boolean' ? 'boolean' : 'number'}
@@ -400,21 +416,21 @@ console.log(result.attestation); // EAS attestation data`;
     const curl = `curl -X POST ${API_URL}/compute/v0/${operation} \\
   -H "Content-Type: application/json" \\
   -d '{
-    "chainId": 84532,
-    "schema": "YOUR_SCHEMA_UID",
+    "chainId": ${displayChainId},
+    "schema": ${displaySchema},
     "recipient": "0x...",
     ${curlBody}
   }'`;
 
     return { sdk, curl };
-  }, [operation, geometryA, geometryB, radius, preview.value]);
+  }, [operation, geometryA, geometryB, radius, preview.value, mode, chainId, schemaUid]);
 
   // Build request body based on operation
   const buildRequestBody = useCallback(() => {
     const base = {
-      chainId: 84532, // Base Sepolia
-      schema: '0x0000000000000000000000000000000000000000000000000000000000000000',
-      recipient: '0x0000000000000000000000000000000000000000',
+      chainId: mode === 'policy' ? chainId : 84532,
+      schema: mode === 'policy' && schemaUid ? schemaUid : '0x0000000000000000000000000000000000000000000000000000000000000000',
+      recipient: '0x0000000000000000000000000000000000000000', // Will be updated in Phase 2 with wallet
     };
 
     switch (operation) {
@@ -432,7 +448,7 @@ console.log(result.attestation); // EAS attestation data`;
       default:
         return base;
     }
-  }, [operation, geometryA, geometryB, radius]);
+  }, [operation, geometryA, geometryB, radius, mode, chainId, schemaUid]);
 
   // Call Astral API
   const computeVerified = useCallback(async () => {
@@ -713,6 +729,22 @@ console.log(result.attestation); // EAS attestation data`;
         </div>
 
         <div className="controls-section">
+          {/* Mode Toggle */}
+          <div className="mode-toggle">
+            <button
+              className={`mode-btn ${mode === 'preview' ? 'active' : ''}`}
+              onClick={() => setMode('preview')}
+            >
+              Preview
+            </button>
+            <button
+              className={`mode-btn ${mode === 'policy' ? 'active' : ''}`}
+              onClick={() => setMode('policy')}
+            >
+              Policy Builder
+            </button>
+          </div>
+
           <div className="control-group">
             <label>Operation</label>
             <select
@@ -731,6 +763,44 @@ console.log(result.attestation); // EAS attestation data`;
               </optgroup>
             </select>
           </div>
+
+          {/* Policy Builder Controls */}
+          {mode === 'policy' && (
+            <>
+              <div className="control-group">
+                <label>Chain</label>
+                <select
+                  value={chainId}
+                  onChange={(e) => setChainId(Number(e.target.value))}
+                >
+                  {SUPPORTED_CHAINS.map((chain) => (
+                    <option key={chain.id} value={chain.id}>
+                      {chain.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="control-group">
+                <label>
+                  Schema UID
+                  <InfoIcon tooltip="The EAS schema UID for your attestation. Create schemas at easscan.org" />
+                </label>
+                <input
+                  type="text"
+                  className="schema-input"
+                  placeholder="0x..."
+                  value={schemaUid}
+                  onChange={(e) => setSchemaUid(e.target.value)}
+                />
+              </div>
+
+              <div className="policy-info">
+                <span className="policy-badge">Coming Soon</span>
+                <p>Connect wallet to publish attestations on-chain</p>
+              </div>
+            </>
+          )}
 
           {showDrawControls && (
             <div className="control-group">
