@@ -6,17 +6,17 @@ description: "Test against the staging API on Base Sepolia"
 ## Base URL
 
 ```
-https://astral-location-services-production.up.railway.app
+https://staging-api.astral.global
 ```
 
 ## Endpoints
 
 ```bash
 # Health check
-curl https://astral-location-services-production.up.railway.app/health
+curl https://staging-api.astral.global/health
 
 # API info
-curl https://astral-location-services-production.up.railway.app/
+curl https://staging-api.astral.global/
 ```
 
 ## Configuration
@@ -29,7 +29,7 @@ curl https://astral-location-services-production.up.railway.app/
 ## Example Request
 
 ```bash
-curl -X POST https://astral-location-services-production.up.railway.app/compute/v0/distance \
+curl -X POST https://staging-api.astral.global/compute/v0/distance \
   -H "Content-Type: application/json" \
   -d '{
     "chainId": 84532,
