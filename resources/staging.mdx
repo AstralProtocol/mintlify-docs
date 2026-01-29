@@ -1,0 +1,46 @@
+---
+title: "Staging Environment"
+description: "Test against the staging API on Base Sepolia"
+---
+
+## Base URL
+
+```
+https://staging-api.astral.global
+```
+
+## Endpoints
+
+```bash
+# Health check
+curl https://staging-api.astral.global/health
+
+# API info
+curl https://staging-api.astral.global/
+```
+
+## Configuration
+
+| Setting | Value |
+|---------|-------|
+| Chain | Base Sepolia (84532) |
+| EAS Contract | `0x4200000000000000000000000000000000000021` |
+| Attester Address | `0x590fdb53ed3f0B52694876d42367192a5336700F` |
+
+## Example Request
+
+```bash
+curl -X POST https://staging-api.astral.global/compute/v0/distance \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chainId": 84532,
+    "from": {"type": "Point", "coordinates": [-122.4194, 37.7749]},
+    "to": {"type": "Point", "coordinates": [-73.9352, 40.7128]}
+  }'
+```
+
+## Notes
+
+- No authentication required
+- Rate limited to 100 requests/hour per IP
+- Attestations are signed but use a staging key (not production)

@@ -17,6 +17,10 @@
   },
   "topbarLinks": [
     {
+      "name": "Playground",
+      "url": "https://playground.astral.global"
+    },
+    {
       "name": "GitHub",
       "url": "https://github.com/AstralProtocol/astral-location-services"
     }
@@ -105,6 +109,7 @@
     {
       "group": "Resources",
       "pages": [
+        "resources/staging",
         "resources/schemas",
         "resources/security",
         "resources/roadmap",
