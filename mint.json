@@ -88,12 +88,27 @@
       "group": "API Reference",
       "pages": [
         "api-reference/overview",
-        "api-reference/distance",
-        "api-reference/contains",
-        "api-reference/within",
-        "api-reference/intersects",
-        "api-reference/area",
-        "api-reference/length"
+        {
+          "group": "Compute API",
+          "pages": [
+            "api-reference/distance",
+            "api-reference/contains",
+            "api-reference/within",
+            "api-reference/intersects",
+            "api-reference/area",
+            "api-reference/length"
+          ]
+        },
+        {
+          "group": "Records API",
+          "pages": [
+            "api-reference/records/overview",
+            "api-reference/records/list",
+            "api-reference/records/get",
+            "api-reference/records/stats",
+            "api-reference/records/config"
+          ]
+        }
       ]
     },
     {
@@ -101,9 +116,10 @@
       "pages": [
         "sdk/overview",
         "sdk/installation",
-        "sdk/compute",
         "sdk/location",
-        "sdk/eas"
+        "sdk/compute",
+        "sdk/eas",
+        "sdk/migration"
       ]
     },
     {

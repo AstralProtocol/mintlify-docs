@@ -1,0 +1,68 @@
+---
+title: "Location Records Stats"
+description: "Aggregated statistics across chains"
+---
+
+# Location Records Statistics
+
+```
+GET /api/v0/location-records/stats
+```
+
+Returns aggregated statistics about location attestations across all supported chains.
+
+## Example
+
+```bash
+curl "https://api.astral.global/api/v0/location-records/stats"
+```
+
+## Response
+
+```json
+{
+  "total": 1250,
+  "by_chain": {
+    "base-sepolia": 450,
+    "sepolia": 320,
+    "arbitrum": 300,
+    "celo": 180
+  },
+  "by_time": {
+    "last_24_hours": 50,
+    "last_7_days": 210,
+    "last_30_days": 480
+  },
+  "revoked": 15
+}
+```
+
+## Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total` | number | Total attestations across all chains |
+| `by_chain` | object | Count per blockchain |
+| `by_time` | object | Counts for recent time windows |
+| `revoked` | number | Total revoked attestations |
+
+## Use Cases
+
+### Dashboard Metrics
+
+```typescript
+const stats = await fetch('https://api.astral.global/api/v0/location-records/stats')
+  .then(r => r.json());
+
+console.log(`Total records: ${stats.total}`);
+console.log(`New today: ${stats.by_time.last_24_hours}`);
+```
+
+### Chain Activity Monitoring
+
+```typescript
+const mostActive = Object.entries(stats.by_chain)
+  .sort(([,a], [,b]) => b - a)[0];
+
+console.log(`Most active chain: ${mostActive[0]} (${mostActive[1]} records)`);
+```

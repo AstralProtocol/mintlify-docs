@@ -1,0 +1,62 @@
+---
+title: "API Configuration"
+description: "Supported chains and schema information"
+---
+
+# API Configuration
+
+```
+GET /api/v0/config
+```
+
+Returns the API configuration including supported chains and the EAS schema used for location attestations.
+
+## Example
+
+```bash
+curl "https://api.astral.global/api/v0/config"
+```
+
+## Response
+
+```json
+{
+  "chains": {
+    "base-sepolia": true,
+    "sepolia": true,
+    "arbitrum": true,
+    "celo": true,
+    "base": false
+  },
+  "schema": "0xba4171c92572b1e4f241d044c32cdf083be9fd946b8766977558ca6378c824e2",
+  "schema_fields": "uint256 eventTimestamp,string srs,string locationType,string location,string[] recipeType,bytes[] recipePayload,string[] mediaType,string[] mediaData,string memo",
+  "version": "v0"
+}
+```
+
+## Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `chains` | object | Supported chains and their active status |
+| `schema` | string | EAS schema UID for location attestations |
+| `schema_fields` | string | Schema field definitions |
+| `version` | string | API version |
+
+## Schema Fields Explained
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `eventTimestamp` | uint256 | Unix timestamp of the location event |
+| `srs` | string | Spatial reference system (e.g., "EPSG:4326") |
+| `locationType` | string | Format identifier (e.g., "geojson-point") |
+| `location` | string | Stringified location data |
+| `recipeType` | string[] | Location derivation methods |
+| `recipePayload` | bytes[] | Method-specific data |
+| `mediaType` | string[] | MIME types of attached media |
+| `mediaData` | string[] | Base64-encoded media |
+| `memo` | string | Optional description |
+
+<Note>
+  This schema follows the [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) specification.
+</Note>
