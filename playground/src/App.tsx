@@ -3,7 +3,7 @@ import Map, { Marker, Source, Layer, NavigationControl, useControl } from 'react
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import * as turf from '@turf/turf';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import './App.css';
@@ -13,10 +13,55 @@ type PlaygroundMode = 'preview' | 'policy';
 
 // Supported chains for attestations
 const SUPPORTED_CHAINS = [
-  { id: 84532, name: 'Base Sepolia', explorer: 'https://sepolia.basescan.org' },
-  { id: 11155111, name: 'Sepolia', explorer: 'https://sepolia.etherscan.io' },
-  { id: 8453, name: 'Base', explorer: 'https://basescan.org' },
-  { id: 1, name: 'Ethereum', explorer: 'https://etherscan.io' },
+  { id: 84532, name: 'Base Sepolia', explorer: 'https://sepolia.basescan.org', easScan: 'https://base-sepolia.easscan.org' },
+  { id: 11155111, name: 'Sepolia', explorer: 'https://sepolia.etherscan.io', easScan: 'https://sepolia.easscan.org' },
+  { id: 8453, name: 'Base', explorer: 'https://basescan.org', easScan: 'https://base.easscan.org' },
+  { id: 1, name: 'Ethereum', explorer: 'https://etherscan.io', easScan: 'https://easscan.org' },
+] as const;
+
+// EAS contract addresses (same across most chains)
+const EAS_CONTRACT_ADDRESS = '0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587' as const;
+
+// EAS attestByDelegation ABI (minimal for our needs)
+const EAS_ABI = [
+  {
+    name: 'attestByDelegation',
+    type: 'function',
+    stateMutability: 'payable',
+    inputs: [
+      {
+        name: 'delegatedRequest',
+        type: 'tuple',
+        components: [
+          { name: 'schema', type: 'bytes32' },
+          {
+            name: 'data',
+            type: 'tuple',
+            components: [
+              { name: 'recipient', type: 'address' },
+              { name: 'expirationTime', type: 'uint64' },
+              { name: 'revocable', type: 'bool' },
+              { name: 'refUID', type: 'bytes32' },
+              { name: 'data', type: 'bytes' },
+              { name: 'value', type: 'uint256' },
+            ],
+          },
+          {
+            name: 'signature',
+            type: 'tuple',
+            components: [
+              { name: 'v', type: 'uint8' },
+              { name: 'r', type: 'bytes32' },
+              { name: 's', type: 'bytes32' },
+            ],
+          },
+          { name: 'attester', type: 'address' },
+          { name: 'deadline', type: 'uint64' },
+        ],
+      },
+    ],
+    outputs: [{ name: '', type: 'bytes32' }],
+  },
 ] as const;
 
 // Info icon component
@@ -213,6 +258,10 @@ function App() {
 
   // Wallet connection
   const { address, isConnected } = useAccount();
+
+  // Contract write for publishing attestation
+  const { writeContract, data: txHash, isPending: isPublishing, error: publishError, reset: resetPublish } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
 
   // Convert point state for markers
   const pointA: Point = geometryA.type === 'Point'
@@ -460,6 +509,7 @@ console.log(result.attestation); // EAS attestation data`;
   const computeVerified = useCallback(async () => {
     setLoading(true);
     setError(null);
+    resetPublish(); // Reset any previous publish state
 
     try {
       const body = buildRequestBody();
@@ -481,7 +531,51 @@ console.log(result.attestation); // EAS attestation data`;
     } finally {
       setLoading(false);
     }
-  }, [operation, buildRequestBody]);
+  }, [operation, buildRequestBody, resetPublish]);
+
+  // Publish delegated attestation on-chain
+  const publishAttestation = useCallback(() => {
+    if (!verifiedResult?.delegatedAttestation || !address) return;
+
+    const delegated = verifiedResult.delegatedAttestation;
+
+    writeContract({
+      address: EAS_CONTRACT_ADDRESS,
+      abi: EAS_ABI,
+      functionName: 'attestByDelegation',
+      args: [
+        {
+          schema: delegated.message.schema as `0x${string}`,
+          data: {
+            recipient: delegated.message.recipient as `0x${string}`,
+            expirationTime: BigInt(delegated.message.expirationTime || 0),
+            revocable: delegated.message.revocable ?? true,
+            refUID: (delegated.message.refUID || '0x0000000000000000000000000000000000000000000000000000000000000000') as `0x${string}`,
+            data: delegated.message.data as `0x${string}`,
+            value: BigInt(delegated.message.value || 0),
+          },
+          signature: {
+            v: delegated.signature.v,
+            r: delegated.signature.r as `0x${string}`,
+            s: delegated.signature.s as `0x${string}`,
+          },
+          attester: delegated.message.attester as `0x${string}`,
+          deadline: BigInt(delegated.message.deadline || 0),
+        },
+      ],
+    });
+  }, [verifiedResult, address, writeContract]);
+
+  // Get explorer links
+  const getExplorerLink = useCallback((hash: string) => {
+    const chain = SUPPORTED_CHAINS.find(c => c.id === chainId);
+    return chain ? `${chain.explorer}/tx/${hash}` : `https://etherscan.io/tx/${hash}`;
+  }, [chainId]);
+
+  const getEasScanLink = useCallback(() => {
+    const chain = SUPPORTED_CHAINS.find(c => c.id === chainId);
+    return chain?.easScan || 'https://easscan.org';
+  }, [chainId]);
 
   // Marker drag handlers - update in real-time
   const handleMarkerDrag = useCallback((marker: 'A' | 'B', e: { lngLat: { lng: number; lat: number } }) => {
@@ -937,9 +1031,61 @@ console.log(result.attestation); // EAS attestation data`;
                     : `${verifiedResult.result?.toLocaleString()} ${verifiedResult.units}`}
                 </span>
               </div>
+
+              {/* Publish to Chain section - only in policy mode */}
+              {mode === 'policy' && verifiedResult.delegatedAttestation && (
+                <div className="publish-section">
+                  {!txHash ? (
+                    <>
+                      <button
+                        className="publish-button"
+                        onClick={publishAttestation}
+                        disabled={!isConnected || !schemaUid || isPublishing}
+                      >
+                        {isPublishing ? 'Confirm in Wallet...' : 'Publish to Chain'}
+                      </button>
+                      {!isConnected && (
+                        <p className="publish-hint">Connect wallet to publish</p>
+                      )}
+                      {isConnected && !schemaUid && (
+                        <p className="publish-hint">Enter schema UID to publish</p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="tx-status">
+                      {isConfirming && (
+                        <p className="tx-pending">
+                          <span className="spinner" /> Confirming transaction...
+                        </p>
+                      )}
+                      {isConfirmed && (
+                        <p className="tx-success">
+                          Attestation published!
+                        </p>
+                      )}
+                      <div className="tx-links">
+                        <a href={getExplorerLink(txHash)} target="_blank" rel="noopener noreferrer">
+                          View Transaction
+                        </a>
+                        <a href={getEasScanLink()} target="_blank" rel="noopener noreferrer">
+                          View on EASScan
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  {publishError && (
+                    <p className="publish-error">
+                      {publishError.message.includes('User rejected')
+                        ? 'Transaction rejected'
+                        : 'Publishing failed. Check console for details.'}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <details className="attestation-details">
                 <summary>View Attestation Data</summary>
-                <pre>{JSON.stringify(verifiedResult.attestation, null, 2)}</pre>
+                <pre>{JSON.stringify(verifiedResult.delegatedAttestation || verifiedResult.attestation, null, 2)}</pre>
               </details>
             </div>
           )}
