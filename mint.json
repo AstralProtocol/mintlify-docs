@@ -109,6 +109,7 @@
     {
       "group": "Resources",
       "pages": [
+        "resources/staging",
         "resources/schemas",
         "resources/security",
         "resources/roadmap",
