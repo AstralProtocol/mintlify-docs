@@ -8,6 +8,26 @@ import './App.css';
 
 type Operation = 'distance' | 'within' | 'contains' | 'intersects' | 'area' | 'length';
 
+// Info icon component
+function InfoIcon({ tooltip }: { tooltip: string }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  return (
+    <span
+      className="info-icon"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 16v-4"/>
+        <path d="M12 8h.01"/>
+      </svg>
+      {showTooltip && <span className="tooltip">{tooltip}</span>}
+    </span>
+  );
+}
+
 // Demo values - in production these would come from config
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.astral.global';
@@ -34,7 +54,8 @@ function DrawControl({
 }) {
   const drawRef = useRef<MapboxDraw | null>(null);
 
-  useControl<MapboxDraw>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  useControl<any>(
     () => {
       const draw = new MapboxDraw({
         displayControlsDefault: false,
@@ -172,6 +193,7 @@ function App() {
   const [geojsonError, setGeojsonError] = useState<string | null>(null);
   const [editingGeometry, setEditingGeometry] = useState<'A' | 'B'>('A');
   const [useDrawMode, setUseDrawMode] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Convert point state for markers
   const pointA: Point = geometryA.type === 'Point'
@@ -180,16 +202,6 @@ function App() {
   const pointB: Point = geometryB.type === 'Point'
     ? { lng: geometryB.coordinates[0], lat: geometryB.coordinates[1] }
     : { lng: -0.1156, lat: 51.5194 };
-
-  // Get polygon points for legacy compatibility
-  const polygon: Point[] = geometryA.type === 'Polygon'
-    ? geometryA.coordinates[0].slice(0, -1).map(c => ({ lng: c[0], lat: c[1] }))
-    : [
-        { lng: -0.13, lat: 51.51 },
-        { lng: -0.12, lat: 51.515 },
-        { lng: -0.11, lat: 51.51 },
-        { lng: -0.12, lat: 51.505 },
-      ];
 
   // Sync GeoJSON input with current geometry
   useEffect(() => {
@@ -327,10 +339,22 @@ function App() {
         default:
           return { value: null, unit: '', label: '' };
       }
-    } catch (err) {
+    } catch {
       return { value: null, unit: '', label: 'Error calculating' };
     }
   }, [geometryA, geometryB, operation, radius]);
+
+  // Determine if point A is "inside" (within radius or polygon)
+  const isPointAInside = useMemo(() => {
+    if (operation === 'within' && geometryA.type === 'Point' && geometryB.type === 'Point') {
+      const dist = turf.distance(turf.point(geometryA.coordinates), turf.point(geometryB.coordinates), { units: 'meters' });
+      return dist <= radius;
+    }
+    if ((operation === 'contains' || operation === 'intersects') && geometryA.type === 'Polygon' && geometryB.type === 'Point') {
+      return turf.booleanPointInPolygon(turf.point(geometryB.coordinates), turf.polygon(geometryA.coordinates));
+    }
+    return null;
+  }, [operation, geometryA, geometryB, radius]);
 
   // Generate code snippets
   const codeSnippets = useMemo(() => {
@@ -437,7 +461,7 @@ console.log(result.attestation); // EAS attestation data`;
     }
   }, [operation, buildRequestBody]);
 
-  // Marker drag handlers
+  // Marker drag handlers - update in real-time
   const handleMarkerDrag = useCallback((marker: 'A' | 'B', e: { lngLat: { lng: number; lat: number } }) => {
     const newGeom: GeoJSON.Point = {
       type: 'Point',
@@ -450,6 +474,15 @@ console.log(result.attestation); // EAS attestation data`;
     }
     setVerifiedResult(null);
   }, []);
+
+  const handleDragStart = useCallback(() => {
+    setIsDragging(true);
+  }, []);
+
+  const handleDragEnd = useCallback((marker: 'A' | 'B', e: { lngLat: { lng: number; lat: number } }) => {
+    setIsDragging(false);
+    handleMarkerDrag(marker, e);
+  }, [handleMarkerDrag]);
 
   // Draw event handlers
   const handleDrawCreate = useCallback((e: { features: GeoJSON.Feature[] }) => {
@@ -517,9 +550,10 @@ console.log(result.attestation); // EAS attestation data`;
   }, [operation, geometryB, radius]);
 
   const distanceLine = useMemo(() => {
+    if (isDragging) return null; // Hide line while dragging
     if ((operation !== 'distance' && operation !== 'within') || geometryA.type !== 'Point' || geometryB.type !== 'Point') return null;
     return turf.lineString([geometryA.coordinates, geometryB.coordinates]);
-  }, [operation, geometryA, geometryB]);
+  }, [operation, geometryA, geometryB, isDragging]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -527,12 +561,27 @@ console.log(result.attestation); // EAS attestation data`;
 
   const showDrawControls = ['area', 'length', 'contains', 'intersects'].includes(operation);
 
+  // Determine marker colors based on containment state
+  const getMarkerAColor = () => {
+    if (operation === 'within') {
+      return isPointAInside ? '#10b981' : '#ef4444'; // green if inside, red if outside
+    }
+    return '#6366f1'; // default indigo
+  };
+
+  const getMarkerBColor = () => {
+    if (operation === 'contains' || operation === 'intersects') {
+      return isPointAInside ? '#10b981' : '#ef4444'; // green if inside polygon, red if outside
+    }
+    return '#10b981'; // default green
+  };
+
   return (
     <div className="playground">
       <header className="header">
         <div className="header-content">
-          <h1>Astral Playground</h1>
-          <p>Explore geospatial operations with instant Turf.js preview and verifiable Astral attestations</p>
+          <img src="/astral-logo-wide.svg" alt="Astral" className="header-logo-wide" />
+          <p className="header-subtitle">Explore geospatial operations with instant preview and verifiable attestations</p>
         </div>
       </header>
 
@@ -546,7 +595,7 @@ console.log(result.attestation); // EAS attestation data`;
               zoom: 13,
             }}
             style={{ width: '100%', height: '100%' }}
-            mapStyle="mapbox://styles/mapbox/light-v11"
+            mapStyle="mapbox://styles/mapbox/dark-v11"
           >
             <NavigationControl position="top-right" />
 
@@ -567,14 +616,18 @@ console.log(result.attestation); // EAS attestation data`;
                   longitude={pointA.lng}
                   latitude={pointA.lat}
                   draggable
-                  onDragEnd={(e) => handleMarkerDrag('A', e)}
-                  color="#6366f1"
+                  onDragStart={handleDragStart}
+                  onDrag={(e) => handleMarkerDrag('A', e)}
+                  onDragEnd={(e) => handleDragEnd('A', e)}
+                  color={getMarkerAColor()}
                 />
                 <Marker
                   longitude={pointB.lng}
                   latitude={pointB.lat}
                   draggable
-                  onDragEnd={(e) => handleMarkerDrag('B', e)}
+                  onDragStart={handleDragStart}
+                  onDrag={(e) => handleMarkerDrag('B', e)}
+                  onDragEnd={(e) => handleDragEnd('B', e)}
                   color="#10b981"
                 />
               </>
@@ -586,8 +639,10 @@ console.log(result.attestation); // EAS attestation data`;
                 longitude={pointB.lng}
                 latitude={pointB.lat}
                 draggable
-                onDragEnd={(e) => handleMarkerDrag('B', e)}
-                color="#6366f1"
+                onDragStart={handleDragStart}
+                onDrag={(e) => handleMarkerDrag('B', e)}
+                onDragEnd={(e) => handleDragEnd('B', e)}
+                color={getMarkerBColor()}
               />
             )}
 
@@ -607,7 +662,7 @@ console.log(result.attestation); // EAS attestation data`;
               </Source>
             )}
 
-            {/* Distance line */}
+            {/* Distance line - hidden while dragging */}
             {distanceLine && (
               <Source type="geojson" data={distanceLine}>
                 <Layer
@@ -709,7 +764,10 @@ console.log(result.attestation); // EAS attestation data`;
 
           <div className="results-card">
             <div className="result-row">
-              <span className="result-label">Preview (Turf.js)</span>
+              <span className="result-label">
+                Preview (Turf.js)
+                <InfoIcon tooltip="Turf.js uses spherical approximations for speed. Astral uses PostGIS with geodetic calculations for higher precision. Results may differ slightly." />
+              </span>
               <span className={`result-value ${typeof preview.value === 'boolean' ? (preview.value ? 'true' : 'false') : ''}`}>
                 {preview.value === null
                   ? '—'
@@ -721,6 +779,7 @@ console.log(result.attestation); // EAS attestation data`;
             {operation === 'within' && preview.distance !== undefined && (
               <div className="result-detail">Actual distance: {preview.distance}m</div>
             )}
+            <div className="result-approximate">Approximate preview</div>
           </div>
 
           <button className="verify-button" onClick={computeVerified} disabled={loading}>
@@ -732,7 +791,10 @@ console.log(result.attestation); // EAS attestation data`;
           {verifiedResult && (
             <div className="verified-result">
               <div className="result-row">
-                <span className="result-label">Verified (Astral)</span>
+                <span className="result-label">
+                  Verified (PostGIS)
+                  <InfoIcon tooltip="Computed in a Trusted Execution Environment using PostGIS. This result can be attested on-chain via EAS." />
+                </span>
                 <span className={`result-value ${typeof verifiedResult.result === 'boolean' ? (verifiedResult.result ? 'true' : 'false') : ''}`}>
                   {typeof verifiedResult.result === 'boolean'
                     ? verifiedResult.result ? 'TRUE' : 'FALSE'
@@ -798,18 +860,6 @@ console.log(result.attestation); // EAS attestation data`;
           </div>
         )}
       </div>
-
-      <footer className="footer">
-        <p>
-          <a href="https://docs.astral.global" target="_blank" rel="noopener noreferrer">
-            Documentation
-          </a>
-          {' · '}
-          <a href="https://github.com/AstralProtocol/astral-location-services" target="_blank" rel="noopener noreferrer">
-            GitHub
-          </a>
-        </p>
-      </footer>
     </div>
   );
 }
