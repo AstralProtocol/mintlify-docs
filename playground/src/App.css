@@ -1,0 +1,355 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #0f0f0f;
+  color: #e5e5e5;
+}
+
+.playground {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%);
+  border-bottom: 1px solid #2a2a2a;
+  padding: 1.5rem 2rem;
+}
+
+.header-content h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #D4A63A 0%, #FEE9B3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header-content p {
+  margin: 0;
+  color: #888;
+  font-size: 0.9rem;
+}
+
+/* Main content */
+.main-content {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 0;
+  flex: 1;
+  min-height: 400px;
+}
+
+@media (max-width: 900px) {
+  .main-content {
+    grid-template-columns: 1fr;
+    grid-template-rows: 300px auto;
+  }
+}
+
+/* Map section */
+.map-section {
+  position: relative;
+  background: #1a1a1a;
+}
+
+.map-hint {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+/* Controls section */
+.controls-section {
+  background: #1a1a1a;
+  border-left: 1px solid #2a2a2a;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .controls-section {
+    border-left: none;
+    border-top: 1px solid #2a2a2a;
+  }
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.control-group label {
+  font-size: 0.8rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.control-group select {
+  background: #0f0f0f;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 0.75rem;
+  color: #e5e5e5;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.control-group select:focus {
+  outline: none;
+  border-color: #D4A63A;
+}
+
+.control-group input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #333;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.control-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #D4A63A;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* Results card */
+.results-card {
+  background: #0f0f0f;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.result-label {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.result-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+.result-value.true {
+  color: #10b981;
+}
+
+.result-value.false {
+  color: #ef4444;
+}
+
+.result-detail {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+/* Verify button */
+.verify-button {
+  background: linear-gradient(135deg, #D4A63A 0%, #B8860B 100%);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.2s;
+}
+
+.verify-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.verify-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Error message */
+.error-message {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  color: #ef4444;
+}
+
+/* Verified result */
+.verified-result {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.attestation-details {
+  margin-top: 0.75rem;
+}
+
+.attestation-details summary {
+  font-size: 0.8rem;
+  color: #888;
+  cursor: pointer;
+}
+
+.attestation-details pre {
+  margin: 0.5rem 0 0 0;
+  padding: 0.75rem;
+  background: #0f0f0f;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  overflow-x: auto;
+  color: #888;
+}
+
+/* Code section */
+.code-section {
+  background: #0f0f0f;
+  border-top: 1px solid #2a2a2a;
+  padding: 1.5rem 2rem;
+}
+
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.code-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tab-buttons button {
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-buttons button:hover {
+  border-color: #555;
+  color: #e5e5e5;
+}
+
+.tab-buttons button.active {
+  background: #D4A63A;
+  border-color: #D4A63A;
+  color: #000;
+}
+
+.code-content {
+  position: relative;
+}
+
+.code-content pre {
+  margin: 0;
+  padding: 1.25rem;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #e5e5e5;
+}
+
+.copy-button {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: #333;
+  border: none;
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-button:hover {
+  background: #444;
+  color: #e5e5e5;
+}
+
+/* Footer */
+.footer {
+  background: #0f0f0f;
+  border-top: 1px solid #2a2a2a;
+  padding: 1rem 2rem;
+  text-align: center;
+}
+
+.footer p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.footer a {
+  color: #D4A63A;
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
+/* Mapbox overrides */
+.mapboxgl-ctrl-attrib {
+  display: none !important;
+}
+
+.mapboxgl-marker {
+  cursor: grab;
+}
+
+.mapboxgl-marker:active {
+  cursor: grabbing;
+}
