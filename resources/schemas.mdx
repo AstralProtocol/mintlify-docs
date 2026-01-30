@@ -45,7 +45,7 @@ bool result, bytes32[] inputRefs, uint64 timestamp, string operation
 | `result` | bool | The boolean computation result |
 | `inputRefs` | bytes32[] | References to inputs (UIDs or hashes) |
 | `timestamp` | uint64 | Unix timestamp of computation |
-| `operation` | string | Operation name ("contains", "within", "intersects") |
+| `operation` | string | Operation with parameters (e.g., "within:500", "contains") |
 
 ### NumericPolicyAttestation
 
@@ -61,7 +61,7 @@ uint256 result, string units, bytes32[] inputRefs, uint64 timestamp, string oper
 | `units` | string | Base unit ("meters" or "square_meters") |
 | `inputRefs` | bytes32[] | References to inputs |
 | `timestamp` | uint64 | Unix timestamp of computation |
-| `operation` | string | Operation name ("distance", "length", "area") |
+| `operation` | string | Operation with parameters (e.g., "distance", "area") |
 
 ### GeometryPolicyAttestation (Future)
 
@@ -70,6 +70,28 @@ For transformation operations (`buffer`, `centroid`, `union`).
 ```
 bytes geometry, string geometryType, bytes32[] inputRefs, uint64 timestamp, string operation
 ```
+
+<Note>
+  **Operation strings include parameters** — For example, the `within` operation returns `"within:500"` (including the radius), not just `"within"`. Resolver contracts should use prefix matching when validating operations.
+</Note>
+
+---
+
+## Default Schema UIDs
+
+Astral provides pre-registered schemas without resolver contracts for general use. Use these when you don't need custom validation logic.
+
+### Base Sepolia (84532)
+
+| Schema | UID | Use For |
+|--------|-----|---------|
+| BooleanPolicyAttestation | *Coming soon* | `contains`, `within`, `intersects` |
+| NumericPolicyAttestation | *Coming soon* | `distance`, `length`, `area` |
+| Location | *Coming soon* | Location attestations |
+
+<Info>
+  **Custom schemas**: If you need a resolver contract for custom validation (like the Location-Gated NFT), register your own schema with the same field types. The schema UID will be different, but the data encoding is identical.
+</Info>
 
 ---
 
@@ -153,10 +175,11 @@ import { SchemaRegistry } from '@ethereum-attestation-service/eas-sdk';
 const registry = new SchemaRegistry(REGISTRY_ADDRESS);
 
 // Register schema with your resolver
+// IMPORTANT: Use revocable: true - Astral signs with revocable=true
 const tx = await registry.connect(signer).register({
   schema: "bool result,bytes32[] inputRefs,uint64 timestamp,string operation",
   resolverAddress: yourResolver.address,
-  revocable: false
+  revocable: true
 });
 
 const receipt = await tx.wait();
