@@ -189,7 +189,7 @@ const schema = "bool result,bytes32[] inputRefs,uint64 timestamp,string operatio
 const tx = await schemaRegistry.connect(signer).register({
   schema,
   resolverAddress: nftContract.address,
-  revocable: false
+  revocable: true  // IMPORTANT: Must be true - Astral signs with revocable=true
 });
 
 const receipt = await tx.wait();
@@ -197,6 +197,10 @@ const SCHEMA_UID = receipt.logs[0].args.uid;
 
 console.log('Schema UID:', SCHEMA_UID);
 ```
+
+<Warning>
+  **Schema must use `revocable: true`** — Astral's TEE signs delegated attestations with `revocable: true`. If your schema is registered with `revocable: false`, EAS will reject the attestation with an `Irrevocable()` or `InvalidSignature()` error.
+</Warning>
 
 ---
 
