@@ -345,6 +345,34 @@ function MintButton() {
 
 ---
 
+## Understanding inputRefs
+
+The `inputRefs` array in policy attestations identifies the inputs used for the computation. The format depends on how inputs were provided:
+
+| Input Type | inputRef Value |
+|------------|----------------|
+| Onchain attestation UID | The attestation UID directly |
+| Raw GeoJSON | `keccak256(abi.encode(geojsonString))` — a content hash |
+
+<Info>
+  If your contract checks `inputRefs[1] == landmarkUID`, it will only work when the landmark was passed as an attestation UID, not as raw GeoJSON. For raw GeoJSON, you'd need to compute the expected content hash.
+</Info>
+
+---
+
+## Common Errors
+
+| Error | Selector | Cause | Solution |
+|-------|----------|-------|----------|
+| `InvalidSignature()` | `0x8baa579f` | `revocable` mismatch between signed data and submission | Ensure you submit with `revocable: true` |
+| `Irrevocable()` | `0x157bd4c3` | Schema registered with `revocable: false` but attestation has `revocable: true` | Re-register schema with `revocable: true` |
+| `WrongOperation()` | Custom | Checking `operation == "within"` but API returns `within:500` | Use prefix matching with `_startsWith()` |
+| `WrongLocation()` | Custom | `inputRefs[1]` doesn't match expected landmark | Verify landmark UID; check if using raw GeoJSON (content hashes differ) |
+| `NotFromAstral()` | Custom | Attestation not signed by Astral's TEE | Check `astralSigner` matches chain's TEE address |
+| `AttestationTooOld()` | Custom | Timestamp older than 1 hour | User needs to generate a fresh attestation |
+
+---
+
 ## Security Considerations
 
 1. **Timestamp validation**: Contract requires attestation < 1 hour old
