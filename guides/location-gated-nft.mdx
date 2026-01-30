@@ -71,6 +71,15 @@ contract LocationGatedNFT is SchemaResolver, ERC721, Ownable {
     mapping(address => bool) public hasMinted;
     mapping(bytes32 => bool) public usedAttestations;
 
+    error NotFromAstral();
+    error AlreadyUsed();
+    error WrongOperation();
+    error InvalidInputs();
+    error WrongLocation();
+    error AttestationTooOld();
+    error NotCloseEnough();
+    error AlreadyMinted();
+
     event NFTMinted(address indexed recipient, uint256 tokenId, bytes32 attestationUID);
 
     constructor(
@@ -88,15 +97,27 @@ contract LocationGatedNFT is SchemaResolver, ERC721, Ownable {
         radius = _radiusMeters * 100;  // Convert to cm
     }
 
+    /// @dev Check if a string starts with a given prefix
+    /// @notice Operation strings include parameters (e.g., "within:500" not "within")
+    function _startsWith(string memory str, string memory prefix) internal pure returns (bool) {
+        bytes memory strBytes = bytes(str);
+        bytes memory prefixBytes = bytes(prefix);
+        if (strBytes.length < prefixBytes.length) return false;
+        for (uint256 i = 0; i < prefixBytes.length; i++) {
+            if (strBytes[i] != prefixBytes[i]) return false;
+        }
+        return true;
+    }
+
     function onAttest(
         Attestation calldata attestation,
         uint256 /*value*/
     ) internal override returns (bool) {
-        // 1. Verify from Astral
-        require(attestation.attester == astralSigner, "Not from Astral");
+        // 1. Verify from Astral's TEE signer
+        if (attestation.attester != astralSigner) revert NotFromAstral();
 
         // 2. Prevent replay
-        require(!usedAttestations[attestation.uid], "Already used");
+        if (usedAttestations[attestation.uid]) revert AlreadyUsed();
         usedAttestations[attestation.uid] = true;
 
         // 3. Decode policy attestation (BooleanPolicy for 'within')
@@ -110,24 +131,22 @@ contract LocationGatedNFT is SchemaResolver, ERC721, Ownable {
             (bool, bytes32[], uint64, string)
         );
 
-        // 4. Verify correct operation
-        require(
-            keccak256(bytes(operation)) == keccak256(bytes("within")),
-            "Wrong operation"
-        );
+        // 4. Verify correct operation (uses prefix match - operation is "within:RADIUS")
+        if (!_startsWith(operation, "within")) revert WrongOperation();
 
         // 5. Verify correct landmark was checked
-        require(inputRefs.length >= 2, "Invalid inputs");
-        require(inputRefs[1] == landmarkUID, "Wrong location");
+        // Note: inputRefs are content hashes when using raw GeoJSON, or UIDs when using attestations
+        if (inputRefs.length < 2) revert InvalidInputs();
+        if (inputRefs[1] != landmarkUID) revert WrongLocation();
 
         // 6. Verify timestamp is recent (within 1 hour)
-        require(timestamp > block.timestamp - 1 hours, "Attestation too old");
+        if (timestamp < block.timestamp - 1 hours) revert AttestationTooOld();
 
         // 7. Verify policy passed (user is within radius)
-        require(policyPassed, "Not close enough to location");
+        if (!policyPassed) revert NotCloseEnough();
 
         // 8. One mint per address
-        require(!hasMinted[attestation.recipient], "Already minted");
+        if (hasMinted[attestation.recipient]) revert AlreadyMinted();
         hasMinted[attestation.recipient] = true;
 
         // 9. Mint NFT
@@ -170,7 +189,7 @@ const schema = "bool result,bytes32[] inputRefs,uint64 timestamp,string operatio
 const tx = await schemaRegistry.connect(signer).register({
   schema,
   resolverAddress: nftContract.address,
-  revocable: false
+  revocable: true  // IMPORTANT: Must be true - Astral signs with revocable=true
 });
 
 const receipt = await tx.wait();
@@ -178,6 +197,10 @@ const SCHEMA_UID = receipt.logs[0].args.uid;
 
 console.log('Schema UID:', SCHEMA_UID);
 ```
+
+<Warning>
+  **Schema must use `revocable: true`** — Astral signs delegated attestations with `revocable: true`. If your schema is registered with `revocable: false`, EAS will reject the attestation with an `Irrevocable()` or `InvalidSignature()` error. See [#9](https://github.com/AstralProtocol/mintlify-docs/issues/9) for discussion on this behavior.
+</Warning>
 
 ---
 
@@ -319,6 +342,34 @@ function MintButton() {
   );
 }
 ```
+
+---
+
+## Understanding inputRefs
+
+The `inputRefs` array in policy attestations identifies the inputs used for the computation. The format depends on how inputs were provided:
+
+| Input Type | inputRef Value |
+|------------|----------------|
+| Onchain attestation UID | The attestation UID directly |
+| Raw GeoJSON | `keccak256(abi.encode(geojsonString))` — a content hash |
+
+<Info>
+  If your contract checks `inputRefs[1] == landmarkUID`, it will only work when the landmark was passed as an attestation UID, not as raw GeoJSON. For raw GeoJSON, you'd need to compute the expected content hash.
+</Info>
+
+---
+
+## Common Errors
+
+| Error | Selector | Cause | Solution |
+|-------|----------|-------|----------|
+| `InvalidSignature()` | `0x8baa579f` | `revocable` mismatch between signed data and submission | Ensure you submit with `revocable: true` |
+| `Irrevocable()` | `0x157bd4c3` | Schema registered with `revocable: false` but attestation has `revocable: true` | Re-register schema with `revocable: true` |
+| `WrongOperation()` | Custom | Checking `operation == "within"` but API returns `within:500` | Use prefix matching with `_startsWith()` |
+| `WrongLocation()` | Custom | `inputRefs[1]` doesn't match expected landmark | Verify landmark UID; check if using raw GeoJSON (content hashes differ) |
+| `NotFromAstral()` | Custom | Attestation not signed by Astral's TEE | Check `astralSigner` matches chain's TEE address |
+| `AttestationTooOld()` | Custom | Timestamp older than 1 hour | User needs to generate a fresh attestation |
 
 ---
 
