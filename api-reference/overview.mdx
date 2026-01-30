@@ -106,8 +106,21 @@ Errors follow [RFC 7807](https://tools.ietf.org/html/rfc7807) (Problem Details f
 
 | Auth Level | Limit |
 |------------|-------|
-| Unauthenticated | 100 requests/hour |
+| Unauthenticated | 100 requests/hour per IP |
 | Wallet authenticated | 1000 requests/hour |
+
+<Note>
+During development and testing, you may hit rate limits quickly. Consider caching results or using a test wallet for higher limits.
+</Note>
+
+## Chain Configuration
+
+The following table shows addresses for supported chains. The **Astral Signer** is the TEE address that signs delegated attestations—resolver contracts must verify attestations come from this address.
+
+| Chain | Chain ID | EAS | Schema Registry | Astral Signer |
+|-------|----------|-----|-----------------|---------------|
+| Base Sepolia | 84532 | `0x4200000000000000000000000000000000000021` | `0x4200000000000000000000000000000000000020` | `0x2376192D7F1B50130f1aC3995Ad610251a06067C` |
+| Base | 8453 | `0x4200000000000000000000000000000000000021` | `0x4200000000000000000000000000000000000020` | *Coming soon* |
 
 ## Available Endpoints
 
