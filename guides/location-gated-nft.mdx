@@ -71,6 +71,15 @@ contract LocationGatedNFT is SchemaResolver, ERC721, Ownable {
     mapping(address => bool) public hasMinted;
     mapping(bytes32 => bool) public usedAttestations;
 
+    error NotFromAstral();
+    error AlreadyUsed();
+    error WrongOperation();
+    error InvalidInputs();
+    error WrongLocation();
+    error AttestationTooOld();
+    error NotCloseEnough();
+    error AlreadyMinted();
+
     event NFTMinted(address indexed recipient, uint256 tokenId, bytes32 attestationUID);
 
     constructor(
@@ -88,15 +97,27 @@ contract LocationGatedNFT is SchemaResolver, ERC721, Ownable {
         radius = _radiusMeters * 100;  // Convert to cm
     }
 
+    /// @dev Check if a string starts with a given prefix
+    /// @notice Operation strings include parameters (e.g., "within:500" not "within")
+    function _startsWith(string memory str, string memory prefix) internal pure returns (bool) {
+        bytes memory strBytes = bytes(str);
+        bytes memory prefixBytes = bytes(prefix);
+        if (strBytes.length < prefixBytes.length) return false;
+        for (uint256 i = 0; i < prefixBytes.length; i++) {
+            if (strBytes[i] != prefixBytes[i]) return false;
+        }
+        return true;
+    }
+
     function onAttest(
         Attestation calldata attestation,
         uint256 /*value*/
     ) internal override returns (bool) {
-        // 1. Verify from Astral
-        require(attestation.attester == astralSigner, "Not from Astral");
+        // 1. Verify from Astral's TEE signer
+        if (attestation.attester != astralSigner) revert NotFromAstral();
 
         // 2. Prevent replay
-        require(!usedAttestations[attestation.uid], "Already used");
+        if (usedAttestations[attestation.uid]) revert AlreadyUsed();
         usedAttestations[attestation.uid] = true;
 
         // 3. Decode policy attestation (BooleanPolicy for 'within')
@@ -110,24 +131,22 @@ contract LocationGatedNFT is SchemaResolver, ERC721, Ownable {
             (bool, bytes32[], uint64, string)
         );
 
-        // 4. Verify correct operation
-        require(
-            keccak256(bytes(operation)) == keccak256(bytes("within")),
-            "Wrong operation"
-        );
+        // 4. Verify correct operation (uses prefix match - operation is "within:RADIUS")
+        if (!_startsWith(operation, "within")) revert WrongOperation();
 
         // 5. Verify correct landmark was checked
-        require(inputRefs.length >= 2, "Invalid inputs");
-        require(inputRefs[1] == landmarkUID, "Wrong location");
+        // Note: inputRefs are content hashes when using raw GeoJSON, or UIDs when using attestations
+        if (inputRefs.length < 2) revert InvalidInputs();
+        if (inputRefs[1] != landmarkUID) revert WrongLocation();
 
         // 6. Verify timestamp is recent (within 1 hour)
-        require(timestamp > block.timestamp - 1 hours, "Attestation too old");
+        if (timestamp < block.timestamp - 1 hours) revert AttestationTooOld();
 
         // 7. Verify policy passed (user is within radius)
-        require(policyPassed, "Not close enough to location");
+        if (!policyPassed) revert NotCloseEnough();
 
         // 8. One mint per address
-        require(!hasMinted[attestation.recipient], "Already minted");
+        if (hasMinted[attestation.recipient]) revert AlreadyMinted();
         hasMinted[attestation.recipient] = true;
 
         // 9. Mint NFT
