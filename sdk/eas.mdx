@@ -4,7 +4,7 @@ description: "Ethereum Attestation Service integration"
 ---
 
 <Warning>
-  **Development Preview** — The SDK is under development.
+  **Research Preview** — The SDK is under development.
 </Warning>
 
 # EAS Integration
@@ -26,11 +26,22 @@ The compute module uses the EAS delegated attestation pattern for submitting res
 
 ### How It Works
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Developer  │────>│ Astral API  │────>│  Developer  │────>│    EAS      │
-│  (compute)  │     │  (sign)     │     │  (submit)   │     │  (record)   │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant API as Astral API (TEE)
+    participant EAS as EAS Contract
+    participant Resolver as Your Resolver
+
+    Dev->>API: compute.within(location, landmark, radius)
+    API->>API: Run PostGIS computation
+    API->>API: Sign attestation with TEE key
+    API-->>Dev: delegatedAttestation
+    Dev->>EAS: compute.submit() (pays gas)
+    EAS->>EAS: Verify signature
+    EAS->>Resolver: onAttest(attestation)
+    Resolver->>Resolver: Check attester == astralSigner
+    Resolver->>Resolver: Execute business logic
 ```
 
 | Step | Who | Action |

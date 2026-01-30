@@ -4,12 +4,14 @@ description: "Spatial computations powered by PostGIS"
 ---
 
 <Warning>
-  **Development Preview** — Under active development.
+  **Research Preview** — Under active development.
 </Warning>
 
 # Geospatial Operations
 
 Astral provides verifiable spatial computations backed by **PostGIS** — the gold standard in geospatial databases with 20+ years of production use.
+
+All operations return [Policy Attestations](/concepts/policy-attestations) — signed results that can be used offchain or submitted onchain to trigger smart contract logic.
 
 <Info>
   PostGIS uses [GEOS](https://libgeos.org/) (Geometry Engine Open Source) under the hood for geometry operations. GEOS is the C++ library that powers most professional geospatial software.
@@ -19,7 +21,7 @@ Astral provides verifiable spatial computations backed by **PostGIS** — the go
 
 ### Measurements
 
-Operations that return **numeric** results:
+Operations that return **numeric** results (as [NumericPolicyAttestations](/concepts/policy-attestations#numericpolicyattestation)):
 
 | Operation | Description | Unit | Geometry Types | PostGIS Function |
 |-----------|-------------|------|----------------|------------------|
@@ -29,7 +31,7 @@ Operations that return **numeric** results:
 
 ### Predicates
 
-Operations that return **boolean** results:
+Operations that return **boolean** results (as [BooleanPolicyAttestations](/concepts/policy-attestations#booleanpolicyattestation)):
 
 | Operation | Description | PostGIS Function |
 |-----------|-------------|------------------|
@@ -190,7 +192,7 @@ interface ComputeOptions {
 
 ## Future Operations
 
-Post-MVP, additional operations will be added:
+Post-MVP, we plan to add:
 
 | Operation | Type | Description |
 |-----------|------|-------------|
@@ -199,6 +201,8 @@ Post-MVP, additional operations will be added:
 | `centroid` | Transformation | Find center point |
 | `union` | Transformation | Merge geometries |
 | `intersection` | Transformation | Overlapping area |
+
+We're also exploring **nested/composable operations** — combining multiple predicates in a single attestation, such as "is inside region A AND within 500m of landmark B".
 
 ## Client-Side Operations with Turf.js
 

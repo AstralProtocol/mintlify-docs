@@ -4,7 +4,7 @@ description: "Gate smart contract actions with location-based policies"
 ---
 
 <Warning>
-  **Development Preview** — Under active development.
+  **Research Preview** — Under active development.
 </Warning>
 
 # EAS Resolvers
@@ -57,9 +57,10 @@ sequenceDiagram
 pragma solidity ^0.8.0;
 
 import "@eas/contracts/resolver/SchemaResolver.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract LocationGatedAction is SchemaResolver {
-    address public astralSigner;  // Updateable via multisig (see roadmap)
+contract LocationGatedAction is SchemaResolver, Ownable {
+    address public astralSigner;
 
     constructor(IEAS eas, address _astralSigner) SchemaResolver(eas) {
         astralSigner = _astralSigner;
@@ -100,8 +101,8 @@ contract LocationGatedAction is SchemaResolver {
         // Override in child contracts
     }
 
-    // Multisig-controlled signer update for key rotation
-    function updateAstralSigner(address newSigner) external onlyMultisig {
+    // Owner-controlled signer update for key rotation
+    function updateAstralSigner(address newSigner) external onlyOwner {
         astralSigner = newSigner;
     }
 }
@@ -264,21 +265,18 @@ const schemaUID = receipt.logs[0].args.uid;
 
 ## Key Rotation
 
-Resolver contracts should support updating the Astral signer address:
+Resolver contracts should support updating the Astral signer address. For the research preview, we recommend a simple owner-controlled approach:
 
 ```solidity
-address public multisig;
-
-modifier onlyMultisig() {
-    require(msg.sender == multisig, "Not multisig");
-    _;
-}
-
-function updateAstralSigner(address newSigner) external onlyMultisig {
+function updateAstralSigner(address newSigner) external onlyOwner {
     emit SignerUpdated(astralSigner, newSigner);
     astralSigner = newSigner;
 }
 ```
+
+<Note>
+  For production deployments, you may want the owner to be a multisig. We plan to provide more graceful key rotation mechanisms in future releases.
+</Note>
 
 <Card title="Next: Verifiable Computation" icon="microchip" href="/concepts/verifiable-computation">
   Learn how EigenCompute provides trust

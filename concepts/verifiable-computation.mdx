@@ -4,24 +4,24 @@ description: "How EigenCompute provides trust in geospatial operations"
 ---
 
 <Warning>
-  **Development Preview** — Under active development.
+  **Research Preview** — Under active development.
 </Warning>
 
 # Verifiable Computation
 
-Astral Location Services runs in a **Trusted Execution Environment (TEE)** via EigenCompute, providing cryptographic guarantees that computations were performed correctly.
+Astral Location Services run in a **Trusted Execution Environment (TEE)** via EigenCompute, providing cryptographic guarantees that computations were performed correctly.
 
 ## The Verification Pipeline
 
 Building trustworthy location-based smart contracts requires verification at multiple stages:
 
-```
-1. Location Verification    →    2. Geospatial Computation    →    3. Onchain Verification
-   (Where is the user?)           (Policy evaluation)               (Smart contract logic)
-      In development               ✓ ASTRAL LOCATION SERVICES           ✓ EAS Resolvers
+```mermaid
+graph LR
+    A["1. Location Verification<br/>(Where is the user?)<br/><i>In development</i>"] --> B["2. Geospatial Computation<br/>(Policy evaluation)<br/><b>✓ Astral Location Services</b>"]
+    B --> C["3. Onchain Verification<br/>(Smart contract logic)<br/><b>✓ EAS Resolvers</b>"]
 ```
 
-**Astral Location Services solves the middle step** — verifiable geospatial computation. Given location inputs, we can provably check spatial relationships and produce signed attestations for onchain use.
+**Astral Location Services solve the middle step** — verifiable geospatial computation. Given location inputs, we can provably check spatial relationships and produce signed attestations for onchain use.
 
 <Info>
   **What about step 1?** Verifying *where* a user actually is remains an open problem. GPS is spoofable. We're developing the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) to address this. Location proofs will plug into Astral Location Services to complete the pipeline.
@@ -29,19 +29,9 @@ Building trustworthy location-based smart contracts requires verification at mul
 
 ## Why Verification Matters
 
-Without verification, you're trusting a black box:
+Without verification, you're trusting a black box. Anyone could claim "the user is nearby" without proof.
 
-```
-User Location → ??? → "Yes, they're nearby"
-```
-
-With verifiable computation:
-
-```
-User Location → TEE (attested code) → Signed proof of computation
-```
-
-The difference is **trust**. Smart contracts can verify that the Astral signing key performed the computation correctly, not just that someone *claims* it did.
+With verifiable computation, the signed attestation proves the result came from executing specific code on specific inputs inside a TEE. Smart contracts can verify that the Astral signing key performed the computation correctly, not just that someone *claims* it did.
 
 ## EigenCompute
 
@@ -117,16 +107,12 @@ require(attestation.attester == ASTRAL_SIGNER, "Not from Astral");
 
 ### Current (MVP)
 
-Trust is anchored in the TEE boundary:
+Why can you trust the computation results?
 
 - **Open source code**: The compute service code is public and auditable
 - **TEE execution**: Code runs inside EigenCompute's trusted execution environment
 - **Remote attestation**: EigenCompute provides hardware attestation that the expected code is running
-- **Deterministic operations**: Same inputs always produce same outputs, enabling verification
-
-```
-Trust = TEE boundary + Remote attestation + Open source code
-```
+- **Deterministic operations**: Same inputs always produce same outputs (additional testing in progress)
 
 ### Future Enhancements
 
@@ -146,7 +132,7 @@ Trust = TEE boundary + Remote attestation + Open source code
 
 Consider a location-gated NFT. The question is: how do we check "is the user within 500m of the Eiffel Tower?" in a way that smart contracts can trust?
 
-**The computation problem (what Astral Location Services solves):**
+**The computation problem (what Astral Location Services solve):**
 
 If we have location data for the user and the Eiffel Tower, how do we verifiably check if they're close enough? The geospatial policy engine runs the computation in a TEE and produces a signed attestation:
 
@@ -166,7 +152,7 @@ This is why we're developing the [Location Proof framework](https://collective.f
 
 ## Why Build the Geospatial Layer First?
 
-Location proofs become useful when they can trigger onchain actions through geospatial policies. Astral Location Services applies those policies — checking if a location is inside a boundary, within range of a target, or satisfies other spatial constraints.
+Location proofs become useful when they can trigger onchain actions through geospatial policies. Astral Location Services apply those policies — checking if a location is inside a boundary, within range of a target, or satisfies other spatial constraints.
 
 By building the geospatial policy infrastructure now, we can experiment with use cases and iterate while developing the [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323). As proof mechanisms mature, they plug directly into the existing pipeline.
 

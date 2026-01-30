@@ -4,12 +4,12 @@ description: "Signed computation results for offchain and onchain use"
 ---
 
 <Warning>
-  **Development Preview** — Under active development.
+  **Research Preview** — Under active development.
 </Warning>
 
 # Policy Attestations
 
-Policy Attestations are the **signed outputs** of geospatial operations. They contain the computation result and can be used offchain or submitted onchain to trigger smart contract logic.
+Policy Attestations are the **signed outputs** of geospatial operations. They are signed by the Astral signing key, which is held exclusively inside the TEE (trusted execution environment). This is how you know the computation was performed correctly — only code running inside the TEE can produce valid signatures.
 
 <Info>
   When submitted onchain via EAS resolvers, policy attestations can trigger any smart contract logic on EVM-compatible chains.

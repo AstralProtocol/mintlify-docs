@@ -4,7 +4,7 @@ description: "Migrate from Astral SDK v0.1.x to v0.2.0"
 ---
 
 <Warning>
-  **Development Preview** — The SDK is under development.
+  **Research Preview** — The SDK is under development.
 </Warning>
 
 # Migration Guide: v0.1.x to v0.2.0
@@ -15,10 +15,9 @@ This guide covers the breaking changes and migration steps for upgrading from As
 
 ### What Changed
 
-1. **Unified Package**: Location attestations and geospatial computations are now in a single package
-2. **Namespaced API**: Methods are organized under `location.offchain.*`, `location.onchain.*`, and `compute.*`
-3. **New Configuration**: Unified `AstralConfig` replaces separate configurations
-4. **New Compute Module**: Integrated `ComputeModule` replaces `@decentralized-geo/astral-compute`
+1. **Namespaced API**: Methods are organized under `location.offchain.*`, `location.onchain.*`, and `compute.*`
+2. **New Compute Module**: The `compute.*` namespace provides verifiable geospatial operations
+3. **Simplified Configuration**: Single `AstralConfig` for initialization
 
 ### What Stayed the Same
 

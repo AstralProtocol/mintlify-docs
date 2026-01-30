@@ -1,55 +1,54 @@
 ---
-title: "Geofenced Token"
+title: "Local Currency"
 description: "Create a token that can only be traded within a geographic region"
 ---
 
 <Warning>
-  **Development Preview** — Code snippets need testing against actual implementation.
+  **Research Preview** — Code snippets need testing against actual implementation.
 </Warning>
 
-# Build a Geofenced Token
+# Build a Local Currency
 
 Create a local currency that can only be traded by people physically in a specific region — enabling hyperlocal economies.
 
 <Info>
-  **About location verification**: This guide uses GPS coordinates as input. GPS is spoofable. As [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) are developed, they'll replace `getCurrentLocation` for stronger verification.
+  **About location verification**: This guide uses GPS coordinates as input. GPS is spoofable. We're working on [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) that will replace `getCurrentLocation` for stronger verification — these are still in development.
 </Info>
 
 ## Concept
 
-Imagine a "San Francisco Token" (SFT) that:
-- Can only be minted by SF residents
-- Can only be transferred to people currently in SF
-- Creates a true local currency for the Bay Area
+Imagine a "Berlin Token" (BLN) that:
+- Can only be minted by people present in Berlin
+- Can only be transferred to people currently in Berlin
+- Creates a true local currency for the city
+
+For more on the economic theory behind spatially-restricted currencies, see [Spatial Demurrage](https://www.johnx.co/notes/spatial-demurrage).
 
 ---
 
 ## Step 1: Define the Region
 
 ```typescript
-import { AstralClient } from '@decentralized-geo/astral-compute';
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
 
-const astral = new AstralClient({ chainId: 84532, signer: wallet });
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
 
-// San Francisco city boundary (simplified)
-const sfBoundary = {
+// Berlin city boundary (simplified)
+const berlinBoundary = {
   type: 'Polygon',
   coordinates: [[[
-    [-122.517, 37.708],
-    [-122.358, 37.708],
-    [-122.358, 37.812],
-    [-122.517, 37.812],
-    [-122.517, 37.708]
+    [13.088, 52.338],
+    [13.761, 52.338],
+    [13.761, 52.675],
+    [13.088, 52.675],
+    [13.088, 52.338]
   ]]]
 };
 
 // Create region attestation
-const region = await astral.location.create(sfBoundary, {
-  submitOnchain: true,
-  metadata: {
-    name: "San Francisco",
-    description: "SF city boundary for local currency"
-  }
+const region = await astral.location.onchain.create({
+  location: berlinBoundary,
+  memo: "Berlin city boundary for local currency"
 });
 
 console.log('Region UID:', region.uid);
@@ -97,7 +96,7 @@ contract GeofencedToken is SchemaResolver, ERC20, Ownable {
         bytes32 _regionUID
     )
         SchemaResolver(eas)
-        ERC20("San Francisco Token", "SFT")
+        ERC20("Berlin Token", "BLN")
         Ownable(msg.sender)
     {
         astralSigner = _astralSigner;
@@ -205,7 +204,7 @@ contract GeofencedToken is SchemaResolver, ERC20, Ownable {
 
 ```typescript
 async function mintLocalToken(amount: bigint, wallet: Signer) {
-  const astral = new AstralClient({ chainId: 84532, signer: wallet });
+  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
   const tokenContract = new Contract(TOKEN_ADDRESS, TOKEN_ABI, wallet);
 
   // 1. Request mint
@@ -217,10 +216,9 @@ async function mintLocalToken(amount: bigint, wallet: Signer) {
   const coords = await getCurrentLocation();
 
   // 3. Create location attestation
-  const userLocation = await astral.location.create({
-    type: 'Point',
-    coordinates: coords
-  }, { submitOnchain: true });
+  const userLocation = await astral.location.onchain.create({
+    location: { type: 'Point', coordinates: coords }
+  });
 
   // 4. Prove they're in the region
   const proof = await astral.compute.contains(
@@ -238,7 +236,7 @@ async function mintLocalToken(amount: bigint, wallet: Signer) {
   }
 
   // 5. Submit proof → triggers mint
-  const tx2 = await astral.eas.submitDelegated(proof.delegatedAttestation);
+  const tx2 = await astral.compute.submit(proof.delegatedAttestation);
   await tx2.wait();
 
   return { transactionHash: tx2.hash };

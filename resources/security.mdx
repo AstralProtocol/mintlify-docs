@@ -4,27 +4,31 @@ description: "Security considerations and trust model"
 ---
 
 <Warning>
-  **Development Preview** — Security audit pending.
+  **Research Preview** — Security audit pending.
 </Warning>
 
 # Security Considerations
 
 This page documents the security model, known considerations, and best practices for building with Astral Location Services.
 
+## Astral Signer Address
+
+<Info>
+  **Current Astral Signer (Base Sepolia):** `0x590fdb53ed3f0B52694876d42367192a5336700F`
+
+  Resolver contracts must verify that `attestation.attester` equals this address. See [Staging](/resources/staging) for the full configuration.
+</Info>
+
 ## Trust Model
 
 ### Current (MVP)
 
-```
-┌─────────────────────────────────────────┐
-│  Trust Assumptions                       │
-├─────────────────────────────────────────┤
-│  ✓ TEE executes code correctly          │
-│  ✓ Astral operates service honestly     │
-│  ✓ Signing key held securely in TEE     │
-│  ✗ Input locations verified (future)    │
-└─────────────────────────────────────────┘
-```
+| Trust Assumption | Status |
+|------------------|--------|
+| TEE executes code correctly | ✓ Verified |
+| Astral operates service honestly | ✓ Required |
+| Signing key held securely in TEE | ✓ Verified |
+| Input locations verified | ✗ Future work |
 
 The MVP uses a **centralized trust model**:
 - Single service with known signer
@@ -143,7 +147,7 @@ Astral can verify that a computation was correct, but cannot verify that the inp
   </Accordion>
   <Accordion title="Support key rotation" icon="rotate">
     ```solidity
-    function updateSigner(address newSigner) external onlyMultisig {
+    function updateSigner(address newSigner) external onlyOwner {
         astralSigner = newSigner;
     }
     ```
@@ -172,21 +176,19 @@ Astral can verify that a computation was correct, but cannot verify that the inp
 Resolver contracts should support key rotation:
 
 ```solidity
-address public multisig;
 address public astralSigner;
 
 event SignerUpdated(address oldSigner, address newSigner);
 
-modifier onlyMultisig() {
-    require(msg.sender == multisig, "Not multisig");
-    _;
-}
-
-function updateAstralSigner(address newSigner) external onlyMultisig {
+function updateAstralSigner(address newSigner) external onlyOwner {
     emit SignerUpdated(astralSigner, newSigner);
     astralSigner = newSigner;
 }
 ```
+
+<Note>
+  For the research preview, a simple owner-controlled update is sufficient. For production, consider making the owner a multisig.
+</Note>
 
 ---
 

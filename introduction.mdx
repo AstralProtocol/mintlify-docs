@@ -4,28 +4,28 @@ description: "Geospatial policy engine for Ethereum"
 ---
 
 <Warning>
-  **Development Preview** — Astral Location Services is under active development and not yet production-ready.
+  **Research Preview** — Astral Location Services are under active development and not yet production-ready.
   APIs may change. We're building in public and welcome your feedback!
 </Warning>
 
 # What is Astral Location Services?
 
-Astral Location Services is a **geospatial policy engine** that connects location-based logic to smart contracts on Ethereum.
+Astral Location Services is a **geospatial policy engine** that connects location-based logic to smart contracts on Ethereum. Think of it as a **geofencing oracle** for onchain applications.
 
 We provide spatial operations (distance, containment, intersection) that run in a trusted execution environment and produce signed attestations you can use to trigger onchain actions.
 
 <CardGroup cols={2}>
-  <Card title="Verifiable Computation" icon="shield-check">
-    Operations run in a TEE via EigenCompute, providing cryptographic proof that computations were performed correctly
+  <Card title="Geofencing" icon="map-location-dot">
+    Check if locations are within boundaries, enable region-based logic and territorial restrictions
   </Card>
-  <Card title="EAS Native" icon="file-signature">
-    Results are signed EAS attestations that work seamlessly with resolver contracts for onchain actions
+  <Card title="Location-Aware Smart Contracts" icon="location-crosshairs">
+    Trigger onchain actions based on real-world proximity, distance, and spatial relationships
   </Card>
-  <Card title="PostGIS Powered" icon="globe">
-    Industrial-strength spatial operations backed by PostGIS — the gold standard in geospatial databases
+  <Card title="Proof-of-Visit" icon="stamp">
+    Verify users visited specific locations and reward them with tokens, NFTs, or access rights
   </Card>
-  <Card title="Unified SDK" icon="code">
-    Single TypeScript SDK for location attestations and geospatial computations
+  <Card title="Spatial Policies" icon="shield-check">
+    Create verifiable location-based rules that execute automatically through EAS resolvers
   </Card>
 </CardGroup>
 
@@ -34,14 +34,15 @@ We provide spatial operations (distance, containment, intersection) that run in 
 ```mermaid
 graph LR
     A[Location Data] --> B[Geospatial Policy Engine]
-    B --> C[Signed Attestation]
-    C --> D[Smart Contract]
-    D --> E[Onchain Action]
+    B --> C[Policy Attestation]
+    C --> D[EAS.sol]
+    D --> E[Resolver Contract]
+    E --> F[Onchain Action]
 ```
 
-1. **Input**: Location attestations (EAS format) or raw GeoJSON
-2. **Processing**: Geospatial computations in a verifiable environment (TEE)
-3. **Output**: Signed Policy Attestations usable offchain and onchain
+1. **Input**: Location records — EAS attestations or raw GeoJSON
+2. **Processing**: Geospatial computations in a verifiable environment (TEE with PostGIS)
+3. **Output**: Signed Policy Attestations submitted to EAS, triggering resolver contracts
 
 ## Quick Example
 
@@ -79,19 +80,22 @@ if (result.result) {
 
 ### The Problem
 
-Smart contracts can't natively perform geospatial computations. Even if you have location data, there's no way to check "is this point inside this polygon?" or "how far apart are these two locations?" in a way that produces verifiable results for onchain use.
+Ethereum has no idea where things are happening. Smart contracts can't create location-aware logic or reason about real-world geography — they can't natively perform geospatial computations, verify location claims, or check spatial relationships like "is this point inside this boundary?" or "how far apart are these two locations?"
+
+Without verifiable geocomputation, any location-based policy check can't be trusted onchain. Even if you have verified location data, an attacker could simply fabricate the computation results.
 
 ### The Solution
 
-Astral provides the **geospatial computation layer** — the middle piece of the puzzle:
+Astral solves this by providing:
 
-- **Verifiable computation** — Operations run in a TEE, not a black box
-- **Composable results** — Signed attestations that any contract can verify
-- **Familiar patterns** — EAS resolvers make integration natural
-- **Complement, don't replace** — Use Turf.js for UX, Astral for verification
+1. **Verifiable Computation** — Spatial operations run in a TEE (trusted execution environment), producing cryptographically signed results
+2. **Geospatial Policy Engine** — PostGIS-powered computations for distance, containment, intersection, and more
+3. **EAS Integration** — Results are attestations that trigger resolver contracts for onchain actions
+
+This introduces **location as a new onchain primitive** — enabling smart contracts to reason about geography for the first time.
 
 <Info>
-  **What about location verification?** GPS is spoofable, and verifying *where* a user actually is remains an open problem. We're developing the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) to address this. Astral Location Services provides the geospatial policy layer that location proofs will plug into.
+  **What about location verification?** GPS is spoofable, and verifying *where* a user actually is remains an open problem. We're developing the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) to address this. Astral Location Services provide the geospatial policy layer that location proofs will plug into.
 </Info>
 
 ## What You Can Build
@@ -111,16 +115,14 @@ Astral provides the **geospatial computation layer** — the middle piece of the
   </Card>
 </CardGroup>
 
-## SDK v0.2.0
+## The SDK
 
-The Astral SDK v0.2.0 introduces a unified, namespaced API:
+The Astral SDK provides a namespaced API for location attestations and geospatial computations:
 
 ```typescript
 // Location attestations
 astral.location.offchain.create(input);
-astral.location.offchain.verify(attestation);
 astral.location.onchain.create(input);
-astral.location.onchain.revoke(attestation);
 
 // Geospatial computations
 astral.compute.distance(from, to, options);
@@ -129,20 +131,36 @@ astral.compute.within(geometry, target, radius, options);
 astral.compute.submit(delegatedAttestation);
 ```
 
-<Card title="Migration Guide" icon="arrow-right" href="/sdk/migration">
-  Upgrading from v0.1.x? See the migration guide.
+<Card title="SDK Reference" icon="code" href="/sdk/overview">
+  Full SDK documentation
 </Card>
 
 ## Architecture Overview
 
-```
-Developer App → Astral SDK → Geospatial Policy Engine (TEE) → Policy Attestation
-                                        ↓
-                                 PostGIS (in-container)
+```mermaid
+graph LR
+    subgraph Client["Developer Application"]
+        A[Astral SDK]
+    end
+
+    subgraph TEE["EigenCompute TEE"]
+        B[Geospatial Policy Engine]
+        C[PostGIS]
+        B --> C
+    end
+
+    subgraph Chain["Ethereum / Base"]
+        D[EAS Contracts]
+        E[Resolver Contract]
+    end
+
+    A --> B
+    B --> D
+    D --> E
 ```
 
-The geospatial policy engine runs inside EigenCompute's TEE environment with PostGIS embedded in the container, enabling verifiable geospatial computation with no external dependencies.
+The Geospatial Policy Engine runs inside EigenCompute's TEE with PostGIS embedded, enabling verifiable computation. Policy Attestations are submitted to EAS contracts, which trigger your resolver contracts for onchain actions.
 
 <Card title="Next: Quickstart" icon="rocket" href="/quickstart">
-  Build your first location-gated smart contract in 10 minutes
+  Build your first location-gated smart contract
 </Card>
