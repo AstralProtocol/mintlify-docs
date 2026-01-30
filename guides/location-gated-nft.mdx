@@ -199,7 +199,7 @@ console.log('Schema UID:', SCHEMA_UID);
 ```
 
 <Warning>
-  **Schema must use `revocable: true`** — Astral's TEE signs delegated attestations with `revocable: true`. If your schema is registered with `revocable: false`, EAS will reject the attestation with an `Irrevocable()` or `InvalidSignature()` error.
+  **Schema must use `revocable: true`** — Astral signs delegated attestations with `revocable: true`. If your schema is registered with `revocable: false`, EAS will reject the attestation with an `Irrevocable()` or `InvalidSignature()` error. See [#9](https://github.com/AstralProtocol/mintlify-docs/issues/9) for discussion on this behavior.
 </Warning>
 
 ---

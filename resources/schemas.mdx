@@ -72,7 +72,7 @@ bytes geometry, string geometryType, bytes32[] inputRefs, uint64 timestamp, stri
 ```
 
 <Note>
-  **Operation strings include parameters** — For example, the `within` operation returns `"within:500"` (including the radius), not just `"within"`. Resolver contracts should use prefix matching when validating operations.
+  **Operation strings include parameters** — For example, the `within` operation returns `"within:50000"` (radius in centimeters), not just `"within"`. Resolver contracts should use prefix matching when validating operations.
 </Note>
 
 ---
@@ -85,9 +85,13 @@ Astral provides pre-registered schemas without resolver contracts for general us
 
 | Schema | UID | Use For |
 |--------|-----|---------|
-| BooleanPolicyAttestation | *Coming soon* | `contains`, `within`, `intersects` |
-| NumericPolicyAttestation | *Coming soon* | `distance`, `length`, `area` |
-| Location | *Coming soon* | Location attestations |
+| BooleanPolicyAttestation | `0x4958625091a773dcfb37a1c33099a378f32a975a7fb61f33d53c4be7589898f5` | `contains`, `within`, `intersects` |
+| NumericPolicyAttestation | *Register your own* | `distance`, `length`, `area` |
+| Location | *Register your own* | Location attestations |
+
+<Note>
+  The BooleanPolicyAttestation schema UID above is the default used by the staging API. For production use or custom resolver logic, register your own schema.
+</Note>
 
 <Info>
   **Custom schemas**: If you need a resolver contract for custom validation (like the Location-Gated NFT), register your own schema with the same field types. The schema UID will be different, but the data encoding is identical.
