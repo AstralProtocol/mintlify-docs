@@ -80,7 +80,7 @@ const response = await fetch('https://api.astral.global/compute/v0/within', {
 ```json
 {
   "result": true,
-  "operation": "within",
+  "operation": "within:500",
   "timestamp": 1706400000,
   "inputRefs": [
     "0xpoint...",
@@ -106,6 +106,7 @@ const response = await fetch('https://api.astral.global/compute/v0/within', {
 - Uses PostGIS `ST_DWithin` function
 - Radius is always in **meters** (no unit conversion)
 - Returns `true` if the distance between geometries is less than or equal to the radius
+- The `operation` field includes the radius parameter: `within:RADIUS` (e.g., `within:500` for a 500m radius). Resolver contracts should use prefix matching, not exact string comparison
 
 <Card title="SDK Method" icon="code" href="/sdk/compute#within">
   See `astral.compute.within()`
