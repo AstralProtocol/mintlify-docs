@@ -4,7 +4,7 @@ description: "What's built, what's coming, and what's missing"
 ---
 
 <Warning>
-  **Development Preview** — This project is under active development.
+  **Research Preview** — This project is under active development.
 </Warning>
 
 # Roadmap
@@ -53,11 +53,11 @@ Astral Location Services is infrastructure for location-based smart contracts. T
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Compute Service API | Building | Express/Fastify service |
-| PostGIS Integration | Building | Docker container setup |
-| SDK Compute Extension | Building | TypeScript client |
-| EigenCompute Deployment | Pending | TEE environment setup |
-| Example Contracts | Building | Resolver templates |
+| Compute Service API | ✓ Deployed | Express/Fastify service |
+| PostGIS Integration | ✓ Deployed | Docker container setup |
+| SDK Compute Extension | ✓ Built | TypeScript client |
+| EigenCompute Deployment | ✓ Deployed | TEE environment setup |
+| Example Contracts | In Development | Resolver templates |
 
 ---
 
@@ -65,11 +65,11 @@ Astral Location Services is infrastructure for location-based smart contracts. T
 
 ### Phase 1: MVP
 
-- [ ] Core operations: `distance`, `contains`, `within`, `intersects`, `area`, `length`
-- [ ] PostGIS-powered computations
-- [ ] EigenCompute TEE deployment
-- [ ] Delegated attestation signing
-- [ ] SDK with compute namespace
+- [x] Core operations: `distance`, `contains`, `within`, `intersects`, `area`, `length`
+- [x] PostGIS-powered computations
+- [x] EigenCompute TEE deployment
+- [x] Delegated attestation signing
+- [x] SDK with compute namespace
 - [ ] Basic rate limiting (IP-based)
 
 ### Phase 2: Authentication
@@ -91,7 +91,7 @@ Astral Location Services is infrastructure for location-based smart contracts. T
 We're actively researching location proof mechanisms. See the [Location Proof framework design](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323).
 
 - [x] Framework design and specification
-- [ ] First plugin implementation (GPS time series)
+- [ ] First plugin implementation
 - [ ] Multi-stamp verification
 - [ ] Sensor fusion (accelerometer, barometer)
 - [ ] Physical proof integration (NFC/QR)

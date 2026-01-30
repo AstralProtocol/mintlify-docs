@@ -1,0 +1,83 @@
+---
+title: "Get Location Record"
+description: "Retrieve a specific attestation by UID"
+---
+
+# Get Location Record
+
+```
+GET /api/v0/location-records/:uid
+```
+
+Returns a specific location attestation by its unique identifier.
+
+## Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `uid` | string | The EAS attestation UID (64-character hex with 0x prefix) |
+
+## Example
+
+```bash
+curl "https://api.astral.global/api/v0/location-records/0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+```
+
+## Response
+
+```json
+{
+  "uid": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+  "chain": "base-sepolia",
+  "prover": "0xabcdef1234567890abcdef1234567890abcdef12",
+  "subject": "0xabcdef1234567890abcdef1234567890abcdef12",
+  "timestamp": "2024-01-15T12:34:56Z",
+  "event_timestamp": "2024-01-15T12:34:56Z",
+  "srs": "EPSG:4326",
+  "location_type": "geojson-point",
+  "location": "{\"type\":\"Point\",\"coordinates\":[-122.4194,37.7749]}",
+  "longitude": -122.4194,
+  "latitude": 37.7749,
+  "recipe_types": ["gps"],
+  "recipe_payloads": ["eyJhY2N1cmFjeSI6IDEwfQ=="],
+  "media_types": ["image/jpeg"],
+  "media_data": ["data:image/jpeg;base64,..."],
+  "memo": "San Francisco city center",
+  "revoked": false,
+  "created_at": "2024-01-15T12:35:00Z",
+  "updated_at": "2024-01-15T12:35:00Z"
+}
+```
+
+## Using with SDK
+
+```typescript
+// The SDK can resolve UIDs automatically
+const result = await astral.compute.distance(
+  "0x1234...abcd",  // UID from Records API
+  "0x5678...efgh",
+  { schema: SCHEMA_UID }
+);
+```
+
+## Error Responses
+
+### Not Found
+
+```json
+{
+  "status": "error",
+  "message": "Location record not found",
+  "detail": "No attestation with UID 0x1234... found"
+}
+```
+
+### Invalid UID Format
+
+```json
+{
+  "status": "error",
+  "message": "Invalid UID format",
+  "detail": "UID must be a 66-character hex string starting with 0x"
+}
+```

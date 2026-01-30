@@ -1,187 +1,310 @@
 ---
-title: "EAS"
-description: "EAS submission helpers"
+title: "EAS Integration"
+description: "Ethereum Attestation Service integration"
 ---
 
 <Warning>
-  **Development Preview** — The SDK is under development.
+  **Research Preview** — The SDK is under development.
 </Warning>
 
-# EAS Methods
+# EAS Integration
 
-The `AstralEAS` class provides helpers for submitting attestations onchain using the EAS delegated attestation pattern.
+The Astral SDK integrates deeply with the Ethereum Attestation Service (EAS) for both location attestations and geospatial computation results.
 
-## Setup
+## Overview
 
-```typescript
-import { AstralCompute, AstralEAS } from '@decentralized-geo/astral-compute';
+Astral uses EAS in two ways:
 
-const compute = new AstralCompute();
-const eas = new AstralEAS(signer);
-```
+1. **Location Attestations**: Store location data as EAS attestations (offchain or onchain)
+2. **Compute Results**: Store verified computation results via delegated attestations
 
-## submitDelegated()
+---
 
-Submit a delegated attestation onchain.
+## Delegated Attestations
 
-```typescript
-eas.submitDelegated(
-  delegatedAttestation: DelegatedAttestation
-): Promise<TransactionReceipt>
-```
+The compute module uses the EAS delegated attestation pattern for submitting results onchain.
 
 ### How It Works
 
-1. **Astral signs** the attestation data offchain
-2. **You submit** using Astral's signature (you pay gas)
-3. **EAS verifies** the signature and records Astral as attester
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant API as Astral API (TEE)
+    participant EAS as EAS Contract
+    participant Resolver as Your Resolver
 
-### Example
+    Dev->>API: compute.within(location, landmark, radius)
+    API->>API: Run PostGIS computation
+    API->>API: Sign attestation with TEE key
+    API-->>Dev: delegatedAttestation
+    Dev->>EAS: compute.submit() (pays gas)
+    EAS->>EAS: Verify signature
+    EAS->>Resolver: onAttest(attestation)
+    Resolver->>Resolver: Check attester == astralSigner
+    Resolver->>Resolver: Execute business logic
+```
+
+| Step | Who | Action |
+|------|-----|--------|
+| 1 | Developer | Calls `astral.compute.within()` or similar |
+| 2 | Astral API | Runs computation in TEE, signs attestation |
+| 3 | Developer | Receives `delegatedAttestation` |
+| 4 | Developer | Calls `astral.compute.submit()` (pays gas) |
+| 5 | EAS Contract | Verifies signature, records Astral as attester |
+| 6 | Resolver | Verifies `attester == astralSigner`, executes logic |
+
+---
+
+## Submitting Delegated Attestations
+
+### Basic Submission
 
 ```typescript
-import { AstralCompute, AstralEAS } from '@decentralized-geo/astral-compute';
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
 
-const compute = new AstralCompute();
-const eas = new AstralEAS(signer);
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
 
-// Get policy attestation from compute operation
-const result = await compute.within(
+// Compute a policy check
+const result = await astral.compute.within(
   userLocationUID,
   landmarkUID,
   500,
   { schema: SCHEMA_UID, recipient: userAddress }
 );
 
-// Submit onchain if user is nearby
+// Submit to EAS if check passed
 if (result.result) {
-  const tx = await eas.submitDelegated(result.delegatedAttestation);
-  await tx.wait();
-
-  console.log('Attestation submitted!');
-  console.log('Transaction hash:', tx.hash);
+  const submission = await astral.compute.submit(result.delegatedAttestation);
+  console.log('Attestation UID:', submission.uid);
 }
 ```
 
----
-
-## Delegated Attestation Object
-
-The compute API returns a `delegatedAttestation` object with all compute results:
-
-```typescript
-// From compute result
-result.delegatedAttestation = {
-  signature: string;   // Combined signature (r + s + v)
-  attester: string;    // Astral signer address
-  deadline: number;    // Unix timestamp for signature expiry
-}
-```
-
-<Note>
-  The EAS SDK expects a slightly different format for delegated attestations. The `AstralEAS` class
-  handles the conversion automatically, transforming the compact API response into the full structure
-  required by the EAS contract.
-</Note>
-
----
-
-## estimateGas()
-
-Estimate gas before submitting to avoid failed transactions.
-
-```typescript
-eas.estimateGas(
-  delegatedAttestation: DelegatedAttestation
-): Promise<bigint>
-```
-
-### Example
+### Gas Estimation
 
 ```typescript
 // Estimate gas before submitting
-const gasEstimate = await eas.estimateGas(result.delegatedAttestation);
-console.log('Estimated gas:', gasEstimate.toString());
+const gas = await astral.compute.estimate(result.delegatedAttestation);
+console.log('Estimated gas:', gas.toString());
 
-// Proceed with submission if acceptable
-const tx = await eas.submitDelegated(result.delegatedAttestation);
+// Submit with confidence
+if (gas < 300000n) {
+  await astral.compute.submit(result.delegatedAttestation);
+}
+```
+
+---
+
+## Delegated Attestation Structure
+
+The `delegatedAttestation` object contains everything needed for submission:
+
+```typescript
+interface DelegatedAttestation {
+  message: {
+    schema: string;         // EAS schema UID
+    recipient: string;      // Attestation recipient
+    expirationTime: bigint; // When attestation expires
+    revocable: boolean;     // Whether can be revoked
+    refUID: string;         // Reference UID (empty for new)
+    data: string;           // Encoded attestation data
+    value: bigint;          // ETH value (usually 0)
+    nonce: bigint;          // Attester nonce
+    deadline: bigint;       // Signature deadline
+  };
+  signature: {
+    v: number;
+    r: string;
+    s: string;
+  };
+  attester: string;         // Astral signer address
+}
 ```
 
 ---
 
 ## Signature Expiry
 
-Delegated attestation signatures have a deadline:
+Delegated attestation signatures have a deadline. Check before submitting:
 
 ```typescript
-const result = await compute.within(uid1, uid2, 500, options);
+const result = await astral.compute.within(uid1, uid2, 500, options);
 
-// Check if signature is still valid
-if (Date.now() / 1000 < result.delegatedAttestation.deadline) {
-  await eas.submitDelegated(result.delegatedAttestation);
+// Check deadline
+const deadline = result.delegatedAttestation.message.deadline;
+const now = BigInt(Math.floor(Date.now() / 1000));
+
+if (now < deadline) {
+  // Signature still valid
+  await astral.compute.submit(result.delegatedAttestation);
 } else {
-  // Request a new computation
-  const newResult = await compute.within(uid1, uid2, 500, options);
-  await eas.submitDelegated(newResult.delegatedAttestation);
+  // Signature expired - request new computation
+  const newResult = await astral.compute.within(uid1, uid2, 500, options);
+  await astral.compute.submit(newResult.delegatedAttestation);
 }
 ```
 
 ---
 
-## Gas Costs
+## Verifying in Smart Contracts
 
-You pay gas when submitting:
-
-```typescript
-// Estimate gas
-const gasEstimate = await eas.estimateGas(result.delegatedAttestation);
-console.log('Estimated gas:', gasEstimate.toString());
-
-// Submit with custom gas settings
-const tx = await eas.submitDelegated(result.delegatedAttestation, {
-  gasLimit: 200000,
-  maxFeePerGas: ethers.parseUnits('50', 'gwei')
-});
-```
-
----
-
-## Verifying Onchain
-
-After submission, resolvers can verify:
+Resolver contracts can verify attestations came from Astral:
 
 ```solidity
-function onAttest(
-    Attestation calldata attestation,
-    uint256 /*value*/
-) internal override returns (bool) {
-    // Verify from Astral
-    require(attestation.attester == astralSigner, "Not from Astral");
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
-    // Decode and process
-    (bool result, , , ) = abi.decode(
-        attestation.data,
-        (bool, bytes32[], uint64, string)
-    );
+import "@eas/contracts/resolver/SchemaResolver.sol";
 
-    // ... business logic
+contract MyResolver is SchemaResolver {
+    address public astralSigner;
+
+    constructor(IEAS eas, address _astralSigner)
+        SchemaResolver(eas)
+    {
+        astralSigner = _astralSigner;
+    }
+
+    function onAttest(
+        Attestation calldata attestation,
+        uint256 /*value*/
+    ) internal override returns (bool) {
+        // 1. Verify from Astral
+        require(attestation.attester == astralSigner, "Not from Astral");
+
+        // 2. Decode the result
+        (
+            bool result,
+            bytes32[] memory inputRefs,
+            uint64 timestamp,
+            string memory operation
+        ) = abi.decode(
+            attestation.data,
+            (bool, bytes32[], uint64, string)
+        );
+
+        // 3. Business logic
+        if (result) {
+            // Policy passed - execute action
+        }
+
+        return true;
+    }
+
+    function onRevoke(Attestation calldata, uint256)
+        internal pure override returns (bool)
+    {
+        return false;
+    }
 }
 ```
 
 ---
 
-## Why Delegated Attestations?
+## Location Attestation Schemas
 
-| Who | Does What |
-|-----|-----------|
-| **Astral** | Signs attestation offchain (proves computation) |
-| **Developer** | Submits onchain (pays gas) |
-| **EAS** | Records Astral as attester |
-| **Resolver** | Verifies attester = Astral, executes logic |
+Location attestations use a standard EAS schema:
 
-This pattern means:
-- Astral doesn't need to pay gas for every computation
-- Developers control when/whether to submit onchain
-- Smart contracts can verify attestations came from Astral
+```
+uint256 eventTimestamp,string srs,string locationType,string location,string[] recipeType,string[] recipePayload,string[] mediaType,string[] mediaData,string memo
+```
+
+### Encoding/Decoding
+
+```typescript
+// Build unsigned attestation
+const unsigned = await astral.location.build({
+  location: { type: 'Point', coordinates: [lon, lat] },
+  memo: 'My location'
+});
+
+// Encode for EAS
+const encoded = astral.location.encode(unsigned);
+
+// Decode from EAS data
+const decoded = astral.location.decode(encodedData);
+console.log(decoded.location);
+console.log(decoded.memo);
+```
+
+---
+
+## EAS Contract Addresses
+
+The SDK automatically uses the correct EAS contract address based on `chainId`:
+
+| Chain | Chain ID | EAS Contract |
+|-------|----------|--------------|
+| Base Sepolia | 84532 | `0x4200000000000000000000000000000000000021` |
+| Base Mainnet | 8453 | `0x4200000000000000000000000000000000000021` |
+| Ethereum Mainnet | 1 | `0xA1207F3BBa224E2c9c3c6D5aF63D0eb1582Ce587` |
+| Ethereum Sepolia | 11155111 | `0xC2679fBD37d54388Ce493F1DB75320D236e1815e` |
+| Celo | 42220 | `0x72E1d8ccf5299fb36fEfD8CC4394B8ef7e98Af92` |
+| Arbitrum | 42161 | `0xbD75f629A22Dc1ceD33dDA0b68c546A1c035c458` |
+| Optimism | 10 | `0x4200000000000000000000000000000000000021` |
+
+---
+
+## Offchain vs Onchain Attestations
+
+### Offchain (EIP-712 Signed)
+
+- No gas cost to create
+- Stored off-chain (IPFS, your server, etc.)
+- Verified by recovering signer from signature
+- Use `astral.location.offchain.*`
+
+```typescript
+const attestation = await astral.location.offchain.create({
+  location: geojson
+});
+// attestation.signature contains EIP-712 signature
+// attestation.uid is derived from content hash
+```
+
+### Onchain (Blockchain Stored)
+
+- Gas cost to create
+- Stored in EAS contract
+- Verified by querying blockchain
+- Use `astral.location.onchain.*`
+
+```typescript
+const attestation = await astral.location.onchain.create({
+  location: geojson
+});
+// attestation.txHash contains transaction hash
+// attestation.uid is from EAS contract
+```
+
+---
+
+## Custom Schemas
+
+You can use custom EAS schemas for location attestations:
+
+```typescript
+const customSchema = {
+  uid: '0x1234...abcd',  // Your schema UID
+  rawString: 'uint256 eventTimestamp,string srs,string locationType,string location,string[] recipeType,string[] recipePayload,string[] mediaType,string[] mediaData,string memo'
+};
+
+// Use at initialization
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  defaultSchema: customSchema
+});
+
+// Or per-operation
+const attestation = await astral.location.offchain.create(
+  { location: geojson },
+  { schema: customSchema }
+);
+```
 
 <Card title="Back: SDK Overview" icon="arrow-left" href="/sdk/overview">
   Return to SDK overview

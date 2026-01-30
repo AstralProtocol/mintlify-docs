@@ -1,15 +1,35 @@
 ---
 title: "API Overview"
-description: "REST API for verifiable geospatial computations"
+description: "REST APIs for geospatial operations and location records"
 ---
 
 <Warning>
-  **Development Preview** — This API specification is under development.
+  **Research Preview** — This API specification is under development.
 </Warning>
 
 # API Reference
 
-The Astral Compute API provides REST endpoints for verifiable geospatial operations.
+Astral provides two REST APIs:
+
+| API | Purpose | Base URL |
+|-----|---------|----------|
+| **Compute API** | Verifiable geospatial operations | `/compute/v0` |
+| **Records API** | Query location attestations | `/api/v0` |
+
+<CardGroup cols={2}>
+  <Card title="Compute API" icon="calculator" href="#compute-api">
+    Distance, containment, proximity checks with signed attestations
+  </Card>
+  <Card title="Records API" icon="database" href="/api-reference/records/overview">
+    Query existing location attestations across chains
+  </Card>
+</CardGroup>
+
+---
+
+# Compute API
+
+The Compute API performs verifiable geospatial operations and returns signed attestations.
 
 ## Base URL
 

@@ -4,7 +4,7 @@ description: "Build an NFT that requires physical presence to mint"
 ---
 
 <Warning>
-  **Development Preview** — Code snippets need testing against actual implementation.
+  **Research Preview** — Code snippets need testing against actual implementation.
 </Warning>
 
 # Build a Location-Gated NFT
@@ -12,7 +12,7 @@ description: "Build an NFT that requires physical presence to mint"
 Create an NFT collection where minting requires passing a geospatial policy check — verifying the user is within range of a target location.
 
 <Info>
-  **About location verification**: This guide uses GPS coordinates as input. GPS is spoofable. As [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) are developed, they'll replace `navigator.geolocation` for stronger verification.
+  **About location verification**: This guide uses GPS coordinates as input. GPS is spoofable. We're working on [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) that will replace `navigator.geolocation` for stronger verification — these are still in development.
 </Info>
 
 ## Overview
@@ -30,9 +30,9 @@ This guide walks through:
 First, create a location attestation for the target location. This could be a permanent landmark, or a dynamic location that changes.
 
 ```typescript
-import { AstralClient } from '@decentralized-geo/astral-compute';
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
 
-const astral = new AstralClient({ chainId: 84532, signer: wallet });
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
 
 // Create the landmark location
 const landmark = await astral.location.create({
@@ -188,7 +188,7 @@ console.log('Schema UID:', SCHEMA_UID);
 </Warning>
 
 ```typescript
-import { AstralClient } from '@decentralized-geo/astral-compute';
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
 import * as turf from '@turf/turf';
 
 const LANDMARK_UID = '0x...';  // Your reference location
@@ -196,7 +196,7 @@ const SCHEMA_UID = '0x...';    // Your schema
 const RADIUS_METERS = 500;
 
 async function checkEligibility(userCoords: [number, number]) {
-  const astral = new AstralClient({ chainId: 84532 });
+  const astral = new AstralSDK({ chainId: 84532 });
 
   // Quick local check first (UX)
   const landmark = await astral.location.get(LANDMARK_UID);
@@ -221,7 +221,7 @@ async function checkEligibility(userCoords: [number, number]) {
 }
 
 async function mintNFT(userCoords: [number, number], wallet: Signer) {
-  const astral = new AstralClient({ chainId: 84532, signer: wallet });
+  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
 
   // Create user's location attestation
   const userLocation = await astral.location.create({

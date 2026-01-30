@@ -4,7 +4,7 @@ description: "Build an escrow that releases when delivery arrives at the right l
 ---
 
 <Warning>
-  **Development Preview** — Code snippets need testing against actual implementation.
+  **Research Preview** — Code snippets need testing against actual implementation.
 </Warning>
 
 # Delivery Verification
@@ -12,7 +12,7 @@ description: "Build an escrow that releases when delivery arrives at the right l
 Build an escrow contract that releases payment only when the delivery is confirmed at the correct location.
 
 <Info>
-  **About location verification**: This guide uses GPS coordinates as input. GPS is spoofable. As [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) are developed, they'll replace `Geolocation.getCurrentPosition` for stronger verification.
+  **About location verification**: This guide uses GPS coordinates as input. GPS is spoofable. We're working on [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) that will replace `Geolocation.getCurrentPosition` for stronger verification — these are still in development.
 </Info>
 
 ## Concept
@@ -166,8 +166,10 @@ contract DeliveryEscrow is SchemaResolver, ReentrancyGuard {
 
 ## Step 2: Buyer Flow
 
+This code runs on the **buyer's client** (web app or mobile app) when they create a delivery order.
+
 ```typescript
-import { AstralClient } from '@decentralized-geo/astral-compute';
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
 import { ethers } from 'ethers';
 
 async function createDeliveryOrder(
@@ -176,19 +178,13 @@ async function createDeliveryOrder(
   paymentAmount: bigint,
   wallet: Signer
 ) {
-  const astral = new AstralClient({ chainId: 84532, signer: wallet });
+  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
   const escrow = new Contract(ESCROW_ADDRESS, ESCROW_ABI, wallet);
 
   // Create destination location attestation
-  const destination = await astral.location.create({
-    type: 'Point',
-    coordinates: destinationCoords
-  }, {
-    submitOnchain: true,
-    metadata: {
-      name: "Delivery Address",
-      description: "Package destination"
-    }
+  const destination = await astral.location.onchain.create({
+    location: { type: 'Point', coordinates: destinationCoords },
+    memo: "Delivery Address"
   });
 
   // Generate delivery ID
@@ -220,22 +216,23 @@ async function createDeliveryOrder(
 
 ## Step 3: Courier Flow
 
+This code runs on the **courier's mobile app** when they arrive at the delivery location.
+
 ```typescript
 async function confirmDelivery(
   deliveryId: string,
   destinationUID: string,
   wallet: Signer
 ) {
-  const astral = new AstralClient({ chainId: 84532, signer: wallet });
+  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
 
   // Get current location
   const coords = await getCurrentLocation();
 
   // Create location attestation
-  const courierLocation = await astral.location.create({
-    type: 'Point',
-    coordinates: coords
-  }, { submitOnchain: true });
+  const courierLocation = await astral.location.onchain.create({
+    location: { type: 'Point', coordinates: coords }
+  });
 
   // Prove within radius of destination
   const proof = await astral.compute.within(
@@ -253,7 +250,7 @@ async function confirmDelivery(
   }
 
   // Submit proof → triggers payment release
-  const tx = await astral.eas.submitDelegated(proof.delegatedAttestation);
+  const tx = await astral.compute.submit(proof.delegatedAttestation);
   await tx.wait();
 
   return { success: true, transactionHash: tx.hash };

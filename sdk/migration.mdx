@@ -1,0 +1,421 @@
+---
+title: "Migration Guide"
+description: "Migrate from Astral SDK v0.1.x to v0.2.0"
+---
+
+<Warning>
+  **Research Preview** — The SDK is under development.
+</Warning>
+
+# Migration Guide: v0.1.x to v0.2.0
+
+This guide covers the breaking changes and migration steps for upgrading from Astral SDK v0.1.x to v0.2.0.
+
+## Overview of Changes
+
+### What Changed
+
+1. **Namespaced API**: Methods are organized under `location.offchain.*`, `location.onchain.*`, and `compute.*`
+2. **New Compute Module**: The `compute.*` namespace provides verifiable geospatial operations
+3. **Simplified Configuration**: Single `AstralConfig` for initialization
+
+### What Stayed the Same
+
+- Core attestation types (`UnsignedLocationAttestation`, `OffchainLocationAttestation`, `OnchainLocationAttestation`)
+- Location format support (GeoJSON, WKT, H3, coordinates)
+- EAS integration and schema encoding
+
+---
+
+## Package Changes
+
+### Before (v0.1.x)
+
+```bash
+# Two separate packages
+npm install @decentralized-geo/astral-sdk
+npm install @decentralized-geo/astral-compute
+```
+
+### After (v0.2.0)
+
+```bash
+# Single unified package
+npm install @decentralized-geo/astral-sdk
+```
+
+---
+
+## Initialization Changes
+
+### Before (v0.1.x)
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralCompute, AstralEAS } from '@decentralized-geo/astral-compute';
+
+// Separate initialization
+const sdk = new AstralSDK({ signer: wallet });
+const compute = new AstralCompute({ chainId: 84532 });
+const eas = new AstralEAS(wallet, 84532);
+```
+
+### After (v0.2.0)
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+// Unified initialization
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+// Access modules via namespaces
+astral.location.offchain.*
+astral.location.onchain.*
+astral.compute.*
+```
+
+---
+
+## Method Migration Table
+
+### Location Module
+
+| v0.1.x Method | v0.2.0 Method |
+|---------------|---------------|
+| `sdk.buildLocationAttestation()` | `astral.location.build()` |
+| `sdk.encodeLocationAttestation()` | `astral.location.encode()` |
+| `sdk.decodeLocationAttestation()` | `astral.location.decode()` |
+
+### Offchain Workflow
+
+| v0.1.x Method | v0.2.0 Method |
+|---------------|---------------|
+| `sdk.createOffchainLocationAttestation()` | `astral.location.offchain.create()` |
+| `sdk.signOffchainLocationAttestation()` | `astral.location.offchain.sign()` |
+| `sdk.verifyOffchainLocationAttestation()` | `astral.location.offchain.verify()` |
+| `sdk.publishOffchainLocationAttestation()` | `astral.location.offchain.publish()` |
+
+### Onchain Workflow
+
+| v0.1.x Method | v0.2.0 Method |
+|---------------|---------------|
+| `sdk.createOnchainLocationAttestation()` | `astral.location.onchain.create()` |
+| `sdk.registerOnchainLocationAttestation()` | `astral.location.onchain.register()` |
+| `sdk.verifyOnchainLocationAttestation()` | `astral.location.onchain.verify()` |
+| `sdk.revokeOnchainLocationAttestation()` | `astral.location.onchain.revoke()` |
+
+### Compute Module
+
+| v0.1.x (astral-compute) | v0.2.0 Method |
+|-------------------------|---------------|
+| `compute.distance()` | `astral.compute.distance()` |
+| `compute.area()` | `astral.compute.area()` |
+| `compute.length()` | `astral.compute.length()` |
+| `compute.contains()` | `astral.compute.contains()` |
+| `compute.within()` | `astral.compute.within()` |
+| `compute.intersects()` | `astral.compute.intersects()` |
+| `eas.submitDelegated()` | `astral.compute.submit()` |
+| `eas.estimateGas()` | `astral.compute.estimate()` |
+
+---
+
+## Code Migration Examples
+
+### Example 1: Creating an Offchain Attestation
+
+#### Before (v0.1.x)
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const sdk = new AstralSDK({ signer: wallet });
+
+const unsigned = await sdk.buildLocationAttestation({
+  location: { type: 'Point', coordinates: [2.2945, 48.8584] },
+  memo: 'Eiffel Tower'
+});
+
+const signed = await sdk.signOffchainLocationAttestation(unsigned);
+const verified = await sdk.verifyOffchainLocationAttestation(signed);
+```
+
+#### After (v0.2.0)
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+// Option 1: Build and sign separately
+const unsigned = await astral.location.build({
+  location: { type: 'Point', coordinates: [2.2945, 48.8584] },
+  memo: 'Eiffel Tower'
+});
+const signed = await astral.location.offchain.sign(unsigned);
+
+// Option 2: Create in one step
+const attestation = await astral.location.offchain.create({
+  location: { type: 'Point', coordinates: [2.2945, 48.8584] },
+  memo: 'Eiffel Tower'
+});
+
+const verified = await astral.location.offchain.verify(attestation);
+```
+
+---
+
+### Example 2: Creating an Onchain Attestation
+
+#### Before (v0.1.x)
+
+```typescript
+const sdk = new AstralSDK({ signer: wallet, chainId: 84532 });
+
+const unsigned = await sdk.buildLocationAttestation({
+  location: geojson
+});
+
+const onchain = await sdk.registerOnchainLocationAttestation(unsigned);
+```
+
+#### After (v0.2.0)
+
+```typescript
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+// Option 1: Build and register separately
+const unsigned = await astral.location.build({ location: geojson });
+const onchain = await astral.location.onchain.register(unsigned);
+
+// Option 2: Create in one step
+const onchain = await astral.location.onchain.create({ location: geojson });
+```
+
+---
+
+### Example 3: Geospatial Computation
+
+#### Before (v0.1.x)
+
+```typescript
+import { AstralCompute, AstralEAS } from '@decentralized-geo/astral-compute';
+
+const compute = new AstralCompute({ chainId: 84532 });
+const eas = new AstralEAS(wallet, 84532);
+
+const result = await compute.within(
+  userLocationUID,
+  landmarkUID,
+  500,
+  { schema: SCHEMA_UID }
+);
+
+if (result.result) {
+  await eas.submitDelegated(result.delegatedAttestation);
+}
+```
+
+#### After (v0.2.0)
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+const result = await astral.compute.within(
+  userLocationUID,
+  landmarkUID,
+  500,
+  { schema: SCHEMA_UID }
+);
+
+if (result.result) {
+  await astral.compute.submit(result.delegatedAttestation);
+}
+```
+
+---
+
+### Example 4: Full Workflow
+
+#### Before (v0.1.x)
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralCompute, AstralEAS } from '@decentralized-geo/astral-compute';
+
+// Initialize three clients
+const sdk = new AstralSDK({ signer: wallet });
+const compute = new AstralCompute({ chainId: 84532 });
+const eas = new AstralEAS(wallet, 84532);
+
+// Create location
+const unsigned = await sdk.buildLocationAttestation({
+  location: userCoords
+});
+const location = await sdk.registerOnchainLocationAttestation(unsigned);
+
+// Check policy
+const result = await compute.within(
+  location.uid,
+  landmarkUID,
+  500,
+  { schema: SCHEMA_UID }
+);
+
+// Submit result
+if (result.result) {
+  await eas.submitDelegated(result.delegatedAttestation);
+}
+```
+
+#### After (v0.2.0)
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+// Single unified client
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+// Create location
+const location = await astral.location.onchain.create({
+  location: userCoords
+});
+
+// Check policy
+const result = await astral.compute.within(
+  location.uid,
+  landmarkUID,
+  500,
+  { schema: SCHEMA_UID }
+);
+
+// Submit result
+if (result.result) {
+  await astral.compute.submit(result.delegatedAttestation);
+}
+```
+
+---
+
+## Configuration Changes
+
+### Before (v0.1.x)
+
+```typescript
+// AstralSDK config
+interface AstralSDKConfig {
+  signer: Signer;
+  chainId?: number;
+  defaultChain?: string;
+}
+
+// AstralCompute config
+interface AstralComputeConfig {
+  chainId: number;
+  apiUrl?: string;
+}
+```
+
+### After (v0.2.0)
+
+```typescript
+interface AstralConfig {
+  // Required
+  chainId: number;
+
+  // Optional
+  signer?: Signer;
+  provider?: Provider;
+  apiUrl?: string;
+  debug?: boolean;
+  schemas?: RuntimeSchemaConfig[];
+  defaultSchema?: RuntimeSchemaConfig;
+  strictSchemaValidation?: boolean;
+}
+```
+
+---
+
+## Legacy Support
+
+If you need to maintain backward compatibility during migration, the v0.1.x API is available via `AstralSDKLegacy`:
+
+```typescript
+import { AstralSDKLegacy } from '@decentralized-geo/astral-sdk';
+
+// Use v0.1.x API
+const sdk = new AstralSDKLegacy({ signer: wallet });
+const unsigned = await sdk.buildLocationAttestation({ ... });
+const signed = await sdk.signOffchainLocationAttestation(unsigned);
+```
+
+<Warning>
+  `AstralSDKLegacy` is deprecated and will be removed in v0.3.0. Migrate to the new API before then.
+</Warning>
+
+---
+
+## TypeScript Import Changes
+
+### Before (v0.1.x)
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import {
+  AstralCompute,
+  AstralEAS,
+  NumericComputeResult,
+  BooleanComputeResult
+} from '@decentralized-geo/astral-compute';
+```
+
+### After (v0.2.0)
+
+```typescript
+import {
+  AstralSDK,
+  // Location types
+  LocationAttestationInput,
+  UnsignedLocationAttestation,
+  OffchainLocationAttestation,
+  OnchainLocationAttestation,
+  VerificationResult,
+  // Compute types
+  Input,
+  ComputeOptions,
+  NumericComputeResult,
+  BooleanComputeResult,
+  DelegatedAttestation,
+  // Configuration
+  AstralConfig,
+  RuntimeSchemaConfig,
+} from '@decentralized-geo/astral-sdk';
+```
+
+---
+
+## Need Help?
+
+If you encounter issues during migration:
+
+1. Check the [SDK Overview](/sdk/overview) for complete API reference
+2. Review the [Location Module](/sdk/location) and [Compute Module](/sdk/compute) documentation
+3. Join our [Telegram community](https://t.me/+UkTOSXnDcDM5ZTBk) for support
+4. Open an issue on [GitHub](https://github.com/AstralProtocol/astral-location-services)
+
+<Card title="Back: SDK Overview" icon="arrow-left" href="/sdk/overview">
+  Return to SDK overview
+</Card>

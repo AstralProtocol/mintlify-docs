@@ -1,0 +1,92 @@
+---
+title: "Records API Overview"
+description: "Query location attestations across chains"
+---
+
+# Records API
+
+The Records API provides read access to location attestations stored on EAS across multiple blockchains.
+
+<Note>
+  The Records API is part of the [Astral API](https://github.com/AstralProtocol/astral-api) service.
+</Note>
+
+## Base URL
+
+```
+https://api.astral.global/api/v0
+```
+
+## Purpose
+
+While the [Compute API](/api-reference/overview) performs geospatial operations, the Records API lets you:
+
+- Query existing location attestations by chain, address, or time range
+- Retrieve attestations by UID
+- Filter by geographic bounding box
+- Get statistics across chains
+
+## Authentication
+
+No authentication required for read operations. Rate limiting applies by IP address.
+
+## Supported Chains
+
+| Chain | Chain ID | Status |
+|-------|----------|--------|
+| Base Sepolia | 84532 | Active |
+| Ethereum Sepolia | 11155111 | Active |
+| Arbitrum One | 42161 | Active |
+| Celo | 42220 | Active |
+| Base | 8453 | Coming soon |
+
+## Quick Example
+
+```bash
+# Get recent location records on Base Sepolia
+curl "https://api.astral.global/api/v0/location-records?chain=base-sepolia&limit=10"
+```
+
+```json
+{
+  "data": [
+    {
+      "uid": "0x1234...abcd",
+      "chain": "base-sepolia",
+      "prover": "0xabcd...1234",
+      "timestamp": "2024-01-15T12:34:56Z",
+      "location": "{\"type\":\"Point\",\"coordinates\":[2.2945,48.8584]}",
+      "memo": "Eiffel Tower"
+    }
+  ],
+  "count": 1,
+  "limit": 10,
+  "offset": 0
+}
+```
+
+## Available Endpoints
+
+<CardGroup cols={2}>
+  <Card title="GET /location-records" href="/api-reference/records/list">
+    List and filter location attestations
+  </Card>
+  <Card title="GET /location-records/:uid" href="/api-reference/records/get">
+    Get a specific attestation by UID
+  </Card>
+  <Card title="GET /location-records/stats" href="/api-reference/records/stats">
+    Aggregated statistics
+  </Card>
+  <Card title="GET /config" href="/api-reference/records/config">
+    API configuration and supported chains
+  </Card>
+</CardGroup>
+
+## Compute vs Records
+
+| Need | API |
+|------|-----|
+| "Is this user within 500m of the landmark?" | [Compute API](/api-reference/overview) |
+| "Show me all attestations in San Francisco" | Records API |
+| "Get a signed result for a smart contract" | [Compute API](/api-reference/overview) |
+| "List attestations by this address" | Records API |

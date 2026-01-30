@@ -1,19 +1,28 @@
 ---
-title: "Location Attestations"
-description: "Signed spatial records that serve as inputs to geospatial operations"
+title: "Location Records"
+description: "Location data that serves as input to geospatial operations"
 ---
 
 <Warning>
-  **Development Preview** — Under active development.
+  **Research Preview** — Under active development.
 </Warning>
 
-# Location Attestations
+# Location Records
 
-Location Attestations are **signed spatial records** that conform to the [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) schema. They can represent points, polygons, routes, or any geospatial data.
+Location records are the **inputs** to geospatial operations. They represent spatial data — points, polygons, routes, or any geometry — that Astral can compute against.
 
-## What is a Location Attestation?
+## Supported Input Types
 
-A Location Attestation is an EAS attestation containing:
+Astral currently supports two types of location records:
+
+1. **Location Attestations** — EAS attestations conforming to the [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) schema
+2. **Raw GeoJSON** — Unsigned geometry data for reference locations or prototyping
+
+We plan to expand support for other location record formats in the future, including AT Protocol location lexicon records and other standards.
+
+## Location Attestations
+
+Location Attestations are **signed spatial records** stored as EAS attestations. They contain:
 
 - **Geometry**: The spatial data (GeoJSON format)
 - **Metadata**: Optional descriptive information
@@ -92,15 +101,15 @@ await astral.compute.distance(
 Location Attestations follow the [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) schema:
 
 <Warning>
-  **Schema fields need verification** — The fields below are illustrative. Reference the v0.2 spec for the current schema definition.
+  **Verification in progress** — We are actively verifying that deployed schemas conform to Location Protocol v0.2. There may be inconsistencies between the documentation, deployed schemas, and the spec. See [GitHub issue #11](https://github.com/AstralProtocol/astral-location-services/issues/11) for status.
 </Warning>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `locationType` | string | The type of location data (e.g., "GeoJSON") |
+| `lp_version` | string | Location Protocol version (e.g., "0.2") |
+| `location_type` | string | The type of location data (e.g., "GeoJSON") |
 | `location` | bytes | Encoded location data |
 | `srs` | string | Spatial reference system as OGC URI |
-| `properties` | bytes | Optional metadata (JSON encoded) |
 
 ## Using Location Attestations
 
