@@ -41,6 +41,32 @@ interface ComputeOptions {
 }
 ```
 
+### Schema Requirements
+
+<Warning>
+  **Use the correct schema type** — Compute operations encode data differently than Location attestations. Using the wrong schema UID causes a data/schema mismatch where the attestation is stored but cannot be decoded correctly.
+</Warning>
+
+| Operation | Required Schema Type |
+|-----------|---------------------|
+| `distance`, `area`, `length` | NumericPolicyAttestation |
+| `contains`, `within`, `intersects` | BooleanPolicyAttestation |
+
+```typescript
+// ✅ Correct: Boolean operation with Boolean schema
+await compute.within(point, target, 500, {
+  schema: BOOLEAN_POLICY_SCHEMA_UID  // bool result, bytes32[] inputRefs, ...
+});
+
+// ❌ Wrong: Boolean operation with Location schema
+await compute.within(point, target, 500, {
+  schema: LOCATION_SCHEMA_UID  // bytes geometry, string geometryType, ...
+});
+// The attestation is created but data is unreadable!
+```
+
+See [Schemas](/resources/schemas) for schema definitions and default UIDs.
+
 ---
 
 ## distance()
