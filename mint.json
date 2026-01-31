@@ -70,6 +70,7 @@
       "group": "Core Concepts",
       "pages": [
         "concepts/location-attestations",
+        "concepts/location-proofs",
         "concepts/geospatial-operations",
         "concepts/policy-attestations",
         "concepts/eas-resolvers",
@@ -81,7 +82,8 @@
       "pages": [
         "guides/location-gated-nft",
         "guides/geofenced-token",
-        "guides/delivery-verification"
+        "guides/delivery-verification",
+        "guides/agent-location-verification"
       ]
     },
     {

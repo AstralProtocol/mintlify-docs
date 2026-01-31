@@ -1,0 +1,155 @@
+---
+title: "Location Proofs"
+description: "Evidence-backed verification of where something is located"
+---
+
+<Warning>
+  **In Development** — Location proof plugins are under active development. This page describes the framework and architecture.
+</Warning>
+
+# Location Proofs
+
+Location proofs provide **evidence-backed verification** of geographic position. Rather than simply trusting GPS coordinates, location proofs combine multiple independent evidence sources to increase confidence that a claimed location is accurate.
+
+## The Problem
+
+GPS is spoofable. Any system that trusts raw coordinates from a device is vulnerable to location fraud. For high-value use cases — financial transactions, regulatory compliance, access control — we need stronger guarantees about where something actually is.
+
+## The Location Proof Framework
+
+Location proofs address this through a layered approach:
+
+1. **Evidence Collection** — Gather location signals from multiple independent sources
+2. **Artifact Signing** — Bundle the evidence into a signed, tamper-evident artifact
+3. **Evidence Evaluation** — Analyze the evidence to determine confidence in the claimed location
+
+This creates a spectrum of assurance levels. More corroborating evidence from diverse sources increases confidence. The appropriate level depends on the use case — a check-in at a coffee shop has different requirements than cross-border financial compliance.
+
+## Evidence Categories
+
+The framework supports multiple categories of location evidence, each with different trust properties:
+
+| Category | Examples | Trust Properties |
+|----------|----------|------------------|
+| **Network Signals** | Wi-Fi networks, cell towers, Bluetooth beacons | Hard to spoof at scale, reveals approximate area |
+| **Satellite Systems** | GPS, GLONASS, Galileo | Globally available, but spoofable |
+| **Network Measurements** | RTT latency, signal strength | Physical constraints limit spoofing |
+| **Sensor Data** | Accelerometer, barometer, camera | Environmental context, harder to fabricate |
+| **Delegated** | Ride-share logs, utility records, purchase history | Third-party corroboration |
+| **Social** | Peer attestations, community validation | Reputation-based verification |
+
+No single evidence source is definitive. The power comes from combining multiple independent sources that would be difficult to spoof simultaneously.
+
+## Location Proof Plugins
+
+Different environments require different approaches to evidence collection. A mobile phone has access to GPS, Wi-Fi, and cellular signals. A server in a data center has different signals available — network topology, IP geolocation, potentially hardware attestation.
+
+Location proof **plugins** handle evidence collection for specific contexts:
+
+- Different **device types** (mobile, desktop, server, IoT)
+- Different **environments** (consumer, enterprise, infrastructure)
+- Different **security requirements** (casual check-in vs. regulatory compliance)
+- Different **privacy requirements** (anonymous vs. identity-linked)
+
+We are launching with two initial plugins:
+
+<CardGroup cols={2}>
+  <Card title="User Device Plugin" icon="mobile">
+    For mobile and desktop applications. Collects evidence from device sensors, network signals, and environmental context.
+  </Card>
+  <Card title="Infrastructure Plugin" icon="server">
+    For servers, nodes, and autonomous agents. Collects evidence from network topology, hosting environment, and operational context.
+  </Card>
+</CardGroup>
+
+Additional plugins for specialized contexts will follow.
+
+## The Verification Flow
+
+<Steps>
+  <Step title="Evidence Collection">
+    The appropriate plugin gathers location evidence from available sources on the device or infrastructure
+  </Step>
+  <Step title="Artifact Creation">
+    Evidence is bundled into a location proof artifact and signed by the subject
+  </Step>
+  <Step title="Evidence Evaluation">
+    The **Astral Verify** module analyzes the evidence, checking consistency and assigning confidence scores
+  </Step>
+  <Step title="Policy Application">
+    The verified location feeds into Astral's geospatial policy engine for onchain actions
+  </Step>
+</Steps>
+
+<Info>
+  **Astral Verify** is the evidence evaluation component currently in development. It applies configurable rules to assess evidence quality and detect potential spoofing attempts.
+</Info>
+
+## Confidence Levels
+
+Not all location proofs are equal. The framework produces confidence assessments based on:
+
+- **Evidence diversity** — How many independent sources corroborate the location?
+- **Evidence quality** — How reliable are the individual sources?
+- **Consistency** — Do the sources agree with each other?
+- **Recency** — How fresh is the evidence?
+
+Applications can set minimum confidence thresholds appropriate to their risk tolerance.
+
+---
+
+## Infrastructure Location Proofs
+
+While most location verification focuses on **users** (where is this person?), infrastructure location proofs answer a different question: **where is this compute running?**
+
+### Why Infrastructure Location Matters
+
+- **Data Sovereignty** — Regulations like GDPR require data processing within specific jurisdictions
+- **Decentralization Verification** — Prove that validators, sequencers, or nodes actually run in diverse locations
+- **Latency Guarantees** — Verify that infrastructure operates where promised
+- **Regulatory Compliance** — Auditable evidence for financial services, healthcare, and other regulated industries
+
+### Infrastructure vs. User Proofs
+
+| Aspect | User Location | Infrastructure Location |
+|--------|--------------|------------------------|
+| **Subject** | Human with a device | Server, node, agent, or autonomous service |
+| **Frequency** | Per-action | Continuous or periodic |
+| **Evidence Sources** | Device sensors, network signals | Network topology, hosting metadata, operational context |
+| **Use Cases** | Geofenced apps, POAPs, local currencies | Data sovereignty, validator distribution, sequencer location |
+
+### Multi-Region Proofs
+
+Some applications require proof that infrastructure is distributed across multiple geographic regions — for redundancy, decentralization, or regulatory reasons.
+
+Multi-region proofs verify that a system operates nodes in distinct locations simultaneously. This is particularly relevant for:
+
+- **Validator sets** requiring geographic distribution
+- **Sequencers** with backup nodes in different regions
+- **Data processing** that must span multiple jurisdictions
+- **High-availability systems** with geographic redundancy requirements
+
+The infrastructure plugin supports collecting and coordinating evidence across multiple deployment locations to produce unified multi-region attestations.
+
+---
+
+## Integration with Astral
+
+Location proofs plug into the broader Astral Location Services pipeline:
+
+```
+Location Proof ──► Astral Verify ──► Location Record ──► Policy Engine ──► Onchain Action
+   (evidence)      (evaluation)       (attestation)      (computation)      (resolver)
+```
+
+Once evidence is evaluated and a location record is created, it can be used with all existing Astral geospatial operations — distance checks, containment queries, and policy attestations that trigger smart contract logic.
+
+## What's Next
+
+Location proof plugins and the Astral Verify module are in active development. Code examples and integration guides will be released as the components become available.
+
+For updates, follow the [roadmap](/resources/roadmap) or join the [community](https://t.me/+UkTOSXnDcDM5ZTBk).
+
+<Card title="Next: Geospatial Operations" icon="calculator" href="/concepts/geospatial-operations">
+  Learn about the spatial computations you can perform on location data
+</Card>

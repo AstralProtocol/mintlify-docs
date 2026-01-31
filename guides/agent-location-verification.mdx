@@ -1,0 +1,120 @@
+---
+title: "Agent Location Verification"
+description: "How autonomous agents prove where they're running"
+---
+
+<Warning>
+  **In Development** — Agent location verification is under active development. This guide describes the intended architecture.
+</Warning>
+
+# Agent Location Verification
+
+As autonomous agents become more prevalent — AI agents, trading bots, automated services, IoT devices — there's growing need to verify **where** these agents operate. This guide covers how agents use the location proof framework to attest their geographic position.
+
+## Why Agent Location Matters
+
+### Regulatory Compliance
+
+AI agents processing financial data may need to prove they run in licensed jurisdictions. Healthcare agents must demonstrate they operate within HIPAA-compliant regions. Data sovereignty requirements increasingly apply to automated systems, not just human users.
+
+### Trust and Transparency
+
+Users interacting with agents want assurance about where their data is processed. A European user may require that an AI agent handling their request operates within the EU. Location proofs provide verifiable transparency.
+
+### Service Level Agreements
+
+Agents promising regional availability or low-latency access can prove they actually run in promised locations, not in distant data centers claiming otherwise.
+
+### Jurisdictional Operations
+
+Some automated operations are only legal in specific locations. An agent must prove it operates from an authorized jurisdiction before executing restricted actions.
+
+## The Agent Location Flow
+
+Agents use the **infrastructure plugin** to collect location evidence and produce proofs:
+
+<Steps>
+  <Step title="Evidence Collection">
+    The infrastructure plugin gathers location evidence from the agent's operating environment — network topology, hosting metadata, latency measurements, and other contextual signals
+  </Step>
+  <Step title="Artifact Signing">
+    The agent bundles the collected evidence into a location proof artifact and signs it with its identity
+  </Step>
+  <Step title="Evidence Evaluation">
+    **Astral Verify** analyzes the evidence, checking for consistency and assigning confidence scores based on evidence quality and diversity
+  </Step>
+  <Step title="Location Record Creation">
+    If evaluation passes, a verified location record is created that can be used with Astral's geospatial policy engine
+  </Step>
+</Steps>
+
+## Evidence Sources for Agents
+
+Unlike mobile devices with GPS and cellular signals, server-based agents have different evidence available:
+
+| Evidence Type | Description |
+|--------------|-------------|
+| **Network Topology** | Traceroute data, AS paths, peering relationships |
+| **Hosting Metadata** | Cloud provider region, availability zone, data center identifiers |
+| **Latency Measurements** | Round-trip times to known geographic reference points |
+| **IP Geolocation** | Location data associated with the agent's IP address |
+| **Operational Context** | Deployment configuration, infrastructure provider attestations |
+
+The infrastructure plugin collects and packages these signals. Multiple corroborating sources increase confidence in the claimed location.
+
+## Periodic Verification
+
+Unlike user location proofs (typically one-time, per-action), agent location often requires **continuous or periodic verification**. An agent that proved its location yesterday might have migrated today.
+
+Agents can maintain fresh location proofs by:
+
+- Collecting evidence on a regular schedule
+- Refreshing proofs before they expire
+- Responding to on-demand verification requests
+
+The appropriate frequency depends on the use case. High-security applications may require hourly verification, while others might accept daily or weekly proofs.
+
+## Multi-Region Agents
+
+Some agent deployments span multiple geographic regions for redundancy, load balancing, or regulatory reasons. Multi-region proofs verify that an agent system operates across distinct locations simultaneously.
+
+This is relevant for:
+
+- **Distributed agent networks** requiring geographic diversity
+- **Failover configurations** with agents in multiple regions
+- **Regulatory requirements** mandating presence in specific jurisdictions
+- **Decentralization guarantees** proving no single geographic point of failure
+
+The infrastructure plugin can coordinate evidence collection across multiple deployment locations to produce unified multi-region attestations.
+
+## Integration with Policy Engine
+
+Once an agent has a verified location proof, it can participate in location-gated operations:
+
+- Prove compliance with jurisdictional requirements before executing sensitive operations
+- Demonstrate geographic distribution as part of decentralization guarantees
+- Satisfy data sovereignty requirements for processing user data
+- Meet SLA commitments about regional availability
+
+The verified location feeds into Astral's geospatial policy engine, enabling the same spatial operations available to user location proofs — containment checks, distance calculations, and policy attestations.
+
+## Security Considerations
+
+Agent location verification faces unique challenges:
+
+- **No GPS** — Servers lack the positioning hardware available on mobile devices
+- **Virtualization** — Cloud infrastructure can obscure physical location
+- **Migration** — Agents can move between regions, requiring fresh proofs
+- **Collusion** — Hosting providers could potentially assist in location spoofing
+
+The multi-source evidence approach addresses these by requiring corroboration across independent signals. Evidence diversity makes comprehensive spoofing significantly harder.
+
+## What's Next
+
+The infrastructure plugin and agent verification workflows are in active development. Code examples and integration guides will be released as the components become available.
+
+For updates, follow the [roadmap](/resources/roadmap) or join the [community](https://t.me/+UkTOSXnDcDM5ZTBk).
+
+<Card title="Back to: Location Proofs" icon="arrow-left" href="/concepts/location-proofs">
+  Learn about the location proof framework
+</Card>
