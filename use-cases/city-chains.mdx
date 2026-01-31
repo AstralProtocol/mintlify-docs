@@ -1,0 +1,521 @@
+---
+title: "City Chains"
+description: "Location proofs for municipal blockchain infrastructure"
+---
+
+<Warning>
+  **Research Preview** — City chain patterns are emerging. This guide explores potential architectures.
+</Warning>
+
+# City Chains
+
+City chains — blockchain infrastructure operated by or for municipalities — represent a compelling use case for location proofs. From verifying that infrastructure runs within city limits to enabling location-based civic participation, Astral Location Services can power the next generation of municipal blockchain applications.
+
+## Why Cities Need Location Proofs
+
+### Infrastructure Sovereignty
+
+Cities investing in blockchain infrastructure want assurance that:
+- Nodes and validators run within city boundaries
+- Data processing occurs under local jurisdiction
+- Sequencers and key infrastructure are geographically controlled
+
+### Civic Participation
+
+Location-based governance ensures:
+- Only residents can vote on local issues
+- Participation is weighted by proximity to affected areas
+- Municipal services are restricted to city boundaries
+
+### Local Economic Systems
+
+City-based digital currencies and services can:
+- Restrict usage to city boundaries
+- Verify local business participation
+- Enable hyperlocal economic activity
+
+---
+
+## City Chain Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    City Chain                        │
+├─────────────────────────────────────────────────────┤
+│                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────┐ │
+│  │ City         │  │ Civic        │  │ Local      │ │
+│  │ Validators   │  │ Governance   │  │ Services   │ │
+│  │ (in-city)    │  │ (residents)  │  │ (geofenced)│ │
+│  └──────┬───────┘  └──────┬───────┘  └─────┬──────┘ │
+│         │                 │                │        │
+│         └────────────┬────┴────────────────┘        │
+│                      │                              │
+│              ┌───────▼───────┐                      │
+│              │ Astral        │                      │
+│              │ Location      │                      │
+│              │ Services      │                      │
+│              └───────────────┘                      │
+│                                                      │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Use Case 1: Verified City Validators
+
+Ensure all validators actually operate within city limits.
+
+### City Boundary Definition
+
+```typescript
+// Define city boundary as a polygon
+const cityBoundary = await astral.location.create({
+  type: 'Polygon',
+  coordinates: [[
+    [-122.5155, 37.7079],  // San Francisco boundaries
+    [-122.3557, 37.7079],
+    [-122.3557, 37.8324],
+    [-122.5155, 37.8324],
+    [-122.5155, 37.7079]
+  ]]
+}, {
+  submitOnchain: true,
+  metadata: {
+    name: 'San Francisco City Limits',
+    type: 'municipal-boundary',
+    authority: 'sf.gov'
+  }
+});
+
+const CITY_BOUNDARY_UID = cityBoundary.uid;
+```
+
+### Validator Registration
+
+```typescript
+class CityValidatorRegistry {
+  private cityBoundaryUID: string;
+
+  async registerValidator(
+    validatorAddress: string,
+    validatorLocation: [number, number]
+  ): Promise<{ registered: boolean; attestationUID: string }> {
+    // Create validator location attestation
+    const location = await this.astral.location.create({
+      type: 'Point',
+      coordinates: validatorLocation
+    }, {
+      submitOnchain: true,
+      metadata: {
+        role: 'validator',
+        validator: validatorAddress
+      }
+    });
+
+    // Verify validator is within city
+    const compliance = await this.astral.compute.contains(
+      this.cityBoundaryUID,
+      location.uid,
+      {
+        schema: CITY_VALIDATOR_SCHEMA,
+        recipient: validatorAddress
+      }
+    );
+
+    if (!compliance.result) {
+      throw new Error('Validator must be located within city limits');
+    }
+
+    // Register with city chain
+    await this.cityChain.registerValidator(
+      validatorAddress,
+      compliance.attestation.uid
+    );
+
+    return {
+      registered: true,
+      attestationUID: compliance.attestation.uid
+    };
+  }
+}
+```
+
+### Validator Compliance Contract
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract CityValidatorRegistry {
+    address public astralSigner;
+    bytes32 public cityBoundaryUID;
+
+    struct ValidatorInfo {
+        bool registered;
+        bytes32 locationAttestationUID;
+        uint256 lastVerification;
+    }
+
+    mapping(address => ValidatorInfo) public validators;
+
+    uint256 public constant VERIFICATION_INTERVAL = 7 days;
+
+    event ValidatorRegistered(address indexed validator, bytes32 attestationUID);
+    event ValidatorRemoved(address indexed validator, string reason);
+
+    function registerValidator(bytes32 policyAttestationUID) external {
+        // Verify attestation from Astral
+        Attestation memory att = eas.getAttestation(policyAttestationUID);
+        require(att.attester == astralSigner, "Not from Astral");
+
+        // Decode and verify
+        (
+            bool isInCity,
+            bytes32[] memory inputRefs,
+            uint64 timestamp,
+            string memory operation
+        ) = abi.decode(att.data, (bool, bytes32[], uint64, string));
+
+        require(isInCity, "Validator not in city limits");
+        require(inputRefs[0] == cityBoundaryUID, "Wrong boundary checked");
+
+        validators[msg.sender] = ValidatorInfo({
+            registered: true,
+            locationAttestationUID: inputRefs[1],
+            lastVerification: block.timestamp
+        });
+
+        emit ValidatorRegistered(msg.sender, policyAttestationUID);
+    }
+
+    function isValidatorCompliant(address validator) external view returns (bool) {
+        ValidatorInfo memory info = validators[validator];
+        if (!info.registered) return false;
+        if (block.timestamp - info.lastVerification > VERIFICATION_INTERVAL) {
+            return false;  // Needs re-verification
+        }
+        return true;
+    }
+}
+```
+
+---
+
+## Use Case 2: Resident Governance
+
+Enable city governance where only verified residents can participate.
+
+### Resident Verification
+
+```typescript
+class CityGovernance {
+  async verifyResidency(
+    residentAddress: string,
+    homeLocation: [number, number]
+  ): Promise<{ verified: boolean; attestationUID: string }> {
+    // Create resident location attestation
+    const location = await this.astral.location.create({
+      type: 'Point',
+      coordinates: homeLocation
+    }, {
+      submitOnchain: true,
+      metadata: {
+        type: 'residence',
+        resident: residentAddress
+      }
+    });
+
+    // Verify within city
+    const verification = await this.astral.compute.contains(
+      this.cityBoundaryUID,
+      location.uid,
+      {
+        schema: RESIDENCY_SCHEMA,
+        recipient: residentAddress
+      }
+    );
+
+    return {
+      verified: verification.result,
+      attestationUID: verification.attestation.uid
+    };
+  }
+
+  async castVote(
+    proposalId: string,
+    vote: 'yes' | 'no',
+    residencyProof: string
+  ): Promise<void> {
+    // Contract verifies residency proof before accepting vote
+    await this.governanceContract.vote(proposalId, vote, residencyProof);
+  }
+}
+```
+
+### Proximity-Weighted Voting
+
+For issues that affect specific neighborhoods, weight votes by proximity:
+
+```typescript
+async function voteWithProximityWeight(
+  proposalId: string,
+  vote: 'yes' | 'no',
+  voterLocation: [number, number],
+  projectLocation: string  // UID of the project/issue location
+): Promise<{ weight: number; voteRecorded: boolean }> {
+  // Create voter location attestation
+  const location = await astral.location.create({
+    type: 'Point',
+    coordinates: voterLocation
+  }, { submitOnchain: true });
+
+  // Calculate distance to project
+  const distance = await astral.compute.distance(
+    location.uid,
+    projectLocation,
+    { schema: PROXIMITY_VOTE_SCHEMA }
+  );
+
+  // Submit vote with distance proof
+  // Contract calculates weight based on distance
+  const tx = await governanceContract.voteWithProximity(
+    proposalId,
+    vote,
+    distance.attestation.uid
+  );
+
+  // Weight decreases with distance
+  // e.g., < 500m = 100%, 500m-1km = 75%, 1km-2km = 50%, > 2km = 25%
+  const weight = calculateWeight(distance.result);
+
+  return { weight, voteRecorded: true };
+}
+```
+
+```solidity
+contract ProximityGovernance {
+    function voteWithProximity(
+        uint256 proposalId,
+        bool support,
+        bytes32 distanceAttestationUID
+    ) external {
+        // Get distance from attestation
+        Attestation memory att = eas.getAttestation(distanceAttestationUID);
+
+        (
+            uint256 distanceCm,
+            bytes32[] memory inputRefs,
+            uint64 timestamp,
+            string memory operation,
+            bytes32 attestedBy
+        ) = abi.decode(att.data, (uint256, bytes32[], uint64, string, bytes32));
+
+        // Calculate weight based on distance
+        uint256 distanceM = distanceCm / 100;
+        uint256 weight;
+
+        if (distanceM < 500) {
+            weight = 100;  // Full weight for nearby residents
+        } else if (distanceM < 1000) {
+            weight = 75;
+        } else if (distanceM < 2000) {
+            weight = 50;
+        } else {
+            weight = 25;  // Minimum weight for all city residents
+        }
+
+        proposals[proposalId].recordVote(msg.sender, support, weight);
+    }
+}
+```
+
+---
+
+## Use Case 3: City Services
+
+Geofence municipal services to city boundaries.
+
+### City Transit Pass
+
+```typescript
+class CityTransitSystem {
+  async activateTransitPass(
+    userAddress: string,
+    currentLocation: [number, number]
+  ): Promise<{ activated: boolean; expiresAt: number }> {
+    const location = await this.astral.location.create({
+      type: 'Point',
+      coordinates: currentLocation
+    }, { submitOnchain: true });
+
+    // Verify user is in city
+    const inCity = await this.astral.compute.contains(
+      this.cityBoundaryUID,
+      location.uid,
+      {
+        schema: TRANSIT_SCHEMA,
+        recipient: userAddress
+      }
+    );
+
+    if (!inCity.result) {
+      throw new Error('Transit pass only available within city limits');
+    }
+
+    // Activate 24-hour pass
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+
+    await this.transitContract.activatePass(
+      userAddress,
+      inCity.attestation.uid,
+      expiresAt
+    );
+
+    return { activated: true, expiresAt };
+  }
+}
+```
+
+### Municipal Digital Currency
+
+```typescript
+class CityToken {
+  async transfer(
+    to: string,
+    amount: bigint,
+    senderLocation: [number, number],
+    recipientLocation: [number, number]
+  ): Promise<void> {
+    // Both parties must be in city
+    const [senderLoc, recipientLoc] = await Promise.all([
+      this.astral.location.create({ type: 'Point', coordinates: senderLocation }),
+      this.astral.location.create({ type: 'Point', coordinates: recipientLocation })
+    ]);
+
+    const [senderInCity, recipientInCity] = await Promise.all([
+      this.astral.compute.contains(this.cityBoundaryUID, senderLoc.uid),
+      this.astral.compute.contains(this.cityBoundaryUID, recipientLoc.uid)
+    ]);
+
+    if (!senderInCity.result || !recipientInCity.result) {
+      throw new Error('City token transfers require both parties in city');
+    }
+
+    await this.tokenContract.transferWithProof(
+      to,
+      amount,
+      senderInCity.attestation.uid,
+      recipientInCity.attestation.uid
+    );
+  }
+}
+```
+
+---
+
+## Use Case 4: City Sequencer Requirements
+
+For city-operated rollups, ensure sequencers run within city infrastructure:
+
+```typescript
+class CitySequencer {
+  private locationProofInterval = 60 * 60 * 1000;  // 1 hour
+
+  async start(): Promise<void> {
+    // Verify initial location
+    await this.proveLocation();
+
+    // Maintain location proofs
+    setInterval(() => this.proveLocation(), this.locationProofInterval);
+
+    // Start sequencing
+    await this.sequencer.start();
+  }
+
+  private async proveLocation(): Promise<void> {
+    const location = await this.getSequencerLocation();
+
+    const locationAttestation = await this.astral.location.create({
+      type: 'Point',
+      coordinates: location.coordinates
+    }, {
+      submitOnchain: true,
+      metadata: {
+        role: 'sequencer',
+        sequencerId: this.id,
+        datacenter: this.datacenterInfo
+      }
+    });
+
+    const compliance = await this.astral.compute.contains(
+      this.cityBoundaryUID,
+      locationAttestation.uid,
+      { schema: CITY_SEQUENCER_SCHEMA }
+    );
+
+    if (!compliance.result) {
+      console.error('CRITICAL: Sequencer outside city limits');
+      await this.alertCityOperators();
+      // Optionally halt operations
+    }
+
+    // Publish proof to L1
+    await this.l1Contract.updateSequencerCompliance(
+      compliance.attestation.uid,
+      compliance.result
+    );
+  }
+}
+```
+
+---
+
+## Implementation Roadmap
+
+<Steps>
+  <Step title="Define city boundary">
+    Create an authoritative city boundary polygon attestation
+  </Step>
+  <Step title="Deploy verification contracts">
+    Set up EAS schemas and resolver contracts for city-specific use cases
+  </Step>
+  <Step title="Integrate with city systems">
+    Connect location verification to governance, services, and infrastructure
+  </Step>
+  <Step title="Establish operator requirements">
+    Define location requirements for validators, sequencers, and service providers
+  </Step>
+  <Step title="Launch citizen-facing features">
+    Enable resident verification and location-gated civic participation
+  </Step>
+</Steps>
+
+---
+
+## Considerations
+
+### Privacy
+
+Resident location data is sensitive. Consider:
+- Zero-knowledge proofs for "in city" without revealing exact location
+- Minimal attestation metadata
+- User-controlled location sharing
+
+### Boundary Disputes
+
+City boundaries can be complex:
+- Use official municipal GIS data
+- Handle enclaves and exclaves
+- Update boundaries through governance
+
+### Inclusivity
+
+Ensure location requirements don't exclude legitimate participants:
+- Provide verification alternatives for edge cases
+- Consider temporary residents and visitors
+- Allow appeals for boundary edge cases
+
+<Card title="Back to Use Cases" icon="arrow-left" href="/use-cases">
+  Explore other location-based applications
+</Card>

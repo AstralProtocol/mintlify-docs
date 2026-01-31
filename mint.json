@@ -73,7 +73,8 @@
         "concepts/geospatial-operations",
         "concepts/policy-attestations",
         "concepts/eas-resolvers",
-        "concepts/verifiable-computation"
+        "concepts/verifiable-computation",
+        "concepts/infrastructure-location-proofs"
       ]
     },
     {
@@ -81,13 +82,16 @@
       "pages": [
         "guides/location-gated-nft",
         "guides/geofenced-token",
-        "guides/delivery-verification"
+        "guides/delivery-verification",
+        "guides/agent-location-verification",
+        "guides/sovereign-chain-integration"
       ]
     },
     {
       "group": "Use Cases",
       "pages": [
-        "use-cases"
+        "use-cases",
+        "use-cases/city-chains"
       ]
     },
     {
