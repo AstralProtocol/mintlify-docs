@@ -1,497 +1,120 @@
 ---
 title: "Agent Location Verification"
-description: "How autonomous agents can prove where they're running"
+description: "How autonomous agents prove where they're running"
 ---
 
 <Warning>
-  **Research Preview** — Agent location verification is an emerging pattern. APIs and approaches may evolve.
+  **In Development** — Agent location verification is under active development. This guide describes the intended architecture.
 </Warning>
 
 # Agent Location Verification
 
-As autonomous agents become more prevalent — AI agents, trading bots, IoT devices, and automated services — there's growing need to verify **where** these agents operate. This guide covers patterns for agents to attest their geographic location.
+As autonomous agents become more prevalent — AI agents, trading bots, automated services, IoT devices — there's growing need to verify **where** these agents operate. This guide covers how agents use the location proof framework to attest their geographic position.
 
 ## Why Agent Location Matters
 
 ### Regulatory Compliance
 
-AI agents processing financial data may need to prove they run in licensed jurisdictions. Healthcare agents must demonstrate they operate within HIPAA-compliant regions.
-
-### Jurisdictional Restrictions
-
-Some operations are only legal in specific locations. An agent must prove it operates from an authorized jurisdiction before executing restricted actions.
+AI agents processing financial data may need to prove they run in licensed jurisdictions. Healthcare agents must demonstrate they operate within HIPAA-compliant regions. Data sovereignty requirements increasingly apply to automated systems, not just human users.
 
 ### Trust and Transparency
 
-Users interacting with agents want assurance about where their data is processed. Location attestations provide verifiable transparency.
+Users interacting with agents want assurance about where their data is processed. A European user may require that an AI agent handling their request operates within the EU. Location proofs provide verifiable transparency.
 
 ### Service Level Agreements
 
-Agents promising regional availability can prove they actually run in promised locations.
+Agents promising regional availability or low-latency access can prove they actually run in promised locations, not in distant data centers claiming otherwise.
 
-## The Agent Attestation Pattern
+### Jurisdictional Operations
+
+Some automated operations are only legal in specific locations. An agent must prove it operates from an authorized jurisdiction before executing restricted actions.
+
+## The Agent Location Flow
+
+Agents use the **infrastructure plugin** to collect location evidence and produce proofs:
 
 <Steps>
-  <Step title="Agent initialization">
-    On startup, the agent determines its geographic location
+  <Step title="Evidence Collection">
+    The infrastructure plugin gathers location evidence from the agent's operating environment — network topology, hosting metadata, latency measurements, and other contextual signals
   </Step>
-  <Step title="Initial attestation">
-    Creates a location attestation and registers with the compliance system
+  <Step title="Artifact Signing">
+    The agent bundles the collected evidence into a location proof artifact and signs it with its identity
   </Step>
-  <Step title="Periodic refresh">
-    Maintains fresh attestations to prove continuous presence
+  <Step title="Evidence Evaluation">
+    **Astral Verify** analyzes the evidence, checking for consistency and assigning confidence scores based on evidence quality and diversity
   </Step>
-  <Step title="Action gating">
-    Before executing location-sensitive operations, the agent proves its current location
+  <Step title="Location Record Creation">
+    If evaluation passes, a verified location record is created that can be used with Astral's geospatial policy engine
   </Step>
 </Steps>
 
----
+## Evidence Sources for Agents
 
-## Implementation
+Unlike mobile devices with GPS and cellular signals, server-based agents have different evidence available:
 
-### Basic Agent Location Attestation
+| Evidence Type | Description |
+|--------------|-------------|
+| **Network Topology** | Traceroute data, AS paths, peering relationships |
+| **Hosting Metadata** | Cloud provider region, availability zone, data center identifiers |
+| **Latency Measurements** | Round-trip times to known geographic reference points |
+| **IP Geolocation** | Location data associated with the agent's IP address |
+| **Operational Context** | Deployment configuration, infrastructure provider attestations |
 
-```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+The infrastructure plugin collects and packages these signals. Multiple corroborating sources increase confidence in the claimed location.
 
-interface AgentConfig {
-  chainId: number;
-  wallet: Signer;
-  complianceSchema: string;
-  requiredRegion: string;  // UID of the required operating region
-  attestationIntervalMs: number;
-}
+## Periodic Verification
 
-class LocationAwareAgent {
-  private astral: AstralSDK;
-  private config: AgentConfig;
-  private currentLocationUID: string | null = null;
-  private lastAttestationTime: number = 0;
+Unlike user location proofs (typically one-time, per-action), agent location often requires **continuous or periodic verification**. An agent that proved its location yesterday might have migrated today.
 
-  constructor(config: AgentConfig) {
-    this.config = config;
-    this.astral = new AstralSDK({
-      chainId: config.chainId,
-      signer: config.wallet
-    });
-  }
+Agents can maintain fresh location proofs by:
 
-  async initialize(): Promise<void> {
-    // Create initial location attestation
-    await this.refreshLocationAttestation();
+- Collecting evidence on a regular schedule
+- Refreshing proofs before they expire
+- Responding to on-demand verification requests
 
-    // Verify we're in the required region
-    const compliance = await this.verifyCompliance();
-    if (!compliance.compliant) {
-      throw new Error(`Agent not in required region: ${compliance.message}`);
-    }
-
-    // Start periodic attestation refresh
-    this.startPeriodicAttestation();
-  }
-
-  private async refreshLocationAttestation(): Promise<void> {
-    const location = await this.getAgentLocation();
-
-    const attestation = await this.astral.location.create({
-      type: 'Point',
-      coordinates: location.coordinates
-    }, {
-      submitOnchain: true,
-      metadata: {
-        agentId: process.env.AGENT_ID,
-        agentType: 'autonomous',
-        timestamp: Date.now()
-      }
-    });
-
-    this.currentLocationUID = attestation.uid;
-    this.lastAttestationTime = Date.now();
-  }
-
-  private async verifyCompliance(): Promise<{ compliant: boolean; message: string }> {
-    if (!this.currentLocationUID) {
-      return { compliant: false, message: 'No location attestation' };
-    }
-
-    const result = await this.astral.compute.contains(
-      this.config.requiredRegion,
-      this.currentLocationUID,
-      { schema: this.config.complianceSchema }
-    );
-
-    return {
-      compliant: result.result,
-      message: result.result
-        ? 'Agent operating in compliant region'
-        : 'Agent outside required region'
-    };
-  }
-
-  private startPeriodicAttestation(): void {
-    setInterval(async () => {
-      try {
-        await this.refreshLocationAttestation();
-        console.log('Location attestation refreshed');
-      } catch (error) {
-        console.error('Failed to refresh location attestation:', error);
-      }
-    }, this.config.attestationIntervalMs);
-  }
-
-  private async getAgentLocation(): Promise<{ coordinates: [number, number] }> {
-    // Implementation depends on your infrastructure
-    // Options include:
-    // - IP geolocation APIs
-    // - Hardware attestation
-    // - Configuration-based (for known deployments)
-    // - TEE attestation with location binding
-
-    // Example: Using environment configuration
-    const lat = parseFloat(process.env.AGENT_LATITUDE!);
-    const lon = parseFloat(process.env.AGENT_LONGITUDE!);
-
-    return { coordinates: [lon, lat] };
-  }
-
-  // Gate operations on location compliance
-  async executeIfCompliant<T>(
-    operation: () => Promise<T>
-  ): Promise<T> {
-    const compliance = await this.verifyCompliance();
-
-    if (!compliance.compliant) {
-      throw new Error(`Operation blocked: ${compliance.message}`);
-    }
-
-    return operation();
-  }
-}
-```
-
-### Usage Example
-
-```typescript
-const agent = new LocationAwareAgent({
-  chainId: 84532,
-  wallet: agentWallet,
-  complianceSchema: EU_COMPLIANCE_SCHEMA_UID,
-  requiredRegion: EU_REGION_POLYGON_UID,
-  attestationIntervalMs: 60 * 60 * 1000  // Refresh every hour
-});
-
-await agent.initialize();
-
-// Execute location-gated operations
-await agent.executeIfCompliant(async () => {
-  // This code only runs if agent is in EU
-  await processEUUserData(data);
-});
-```
-
----
+The appropriate frequency depends on the use case. High-security applications may require hourly verification, while others might accept daily or weekly proofs.
 
 ## Multi-Region Agents
 
-For agents that must prove presence in multiple regions (e.g., for redundancy or load balancing):
+Some agent deployments span multiple geographic regions for redundancy, load balancing, or regulatory reasons. Multi-region proofs verify that an agent system operates across distinct locations simultaneously.
 
-```typescript
-interface MultiRegionAgentConfig {
-  regions: {
-    id: string;
-    name: string;
-    polygonUID: string;
-  }[];
-  minRegionsRequired: number;
-}
+This is relevant for:
 
-class MultiRegionAgent {
-  private regionAttestations: Map<string, string> = new Map();
+- **Distributed agent networks** requiring geographic diversity
+- **Failover configurations** with agents in multiple regions
+- **Regulatory requirements** mandating presence in specific jurisdictions
+- **Decentralization guarantees** proving no single geographic point of failure
 
-  async attestAllRegions(): Promise<void> {
-    const results = await Promise.all(
-      this.config.regions.map(async (region) => {
-        const location = await this.getRegionLocation(region.id);
+The infrastructure plugin can coordinate evidence collection across multiple deployment locations to produce unified multi-region attestations.
 
-        const attestation = await this.astral.location.create({
-          type: 'Point',
-          coordinates: location.coordinates
-        }, {
-          submitOnchain: true,
-          metadata: {
-            agentId: process.env.AGENT_ID,
-            regionId: region.id,
-            regionName: region.name
-          }
-        });
+## Integration with Policy Engine
 
-        return { regionId: region.id, attestationUID: attestation.uid };
-      })
-    );
+Once an agent has a verified location proof, it can participate in location-gated operations:
 
-    for (const result of results) {
-      this.regionAttestations.set(result.regionId, result.attestationUID);
-    }
-  }
+- Prove compliance with jurisdictional requirements before executing sensitive operations
+- Demonstrate geographic distribution as part of decentralization guarantees
+- Satisfy data sovereignty requirements for processing user data
+- Meet SLA commitments about regional availability
 
-  async verifyDistribution(): Promise<{
-    compliant: boolean;
-    regionsVerified: string[];
-  }> {
-    const verifiedRegions: string[] = [];
-
-    for (const region of this.config.regions) {
-      const attestationUID = this.regionAttestations.get(region.id);
-      if (!attestationUID) continue;
-
-      const result = await this.astral.compute.contains(
-        region.polygonUID,
-        attestationUID
-      );
-
-      if (result.result) {
-        verifiedRegions.push(region.name);
-      }
-    }
-
-    return {
-      compliant: verifiedRegions.length >= this.config.minRegionsRequired,
-      regionsVerified: verifiedRegions
-    };
-  }
-}
-```
-
----
-
-## AI Agent Integration
-
-For AI agents (LLM-based systems, autonomous AI services):
-
-```typescript
-class AIAgentWithLocationCompliance {
-  private locationAgent: LocationAwareAgent;
-
-  async processRequest(request: UserRequest): Promise<Response> {
-    // Verify location before processing
-    const compliance = await this.locationAgent.verifyCompliance();
-
-    if (!compliance.compliant) {
-      return {
-        error: 'AI agent not operating in compliant region',
-        complianceStatus: compliance
-      };
-    }
-
-    // Include location proof in response metadata
-    const response = await this.llm.process(request);
-
-    return {
-      ...response,
-      metadata: {
-        processedAt: new Date().toISOString(),
-        locationAttestation: this.locationAgent.currentLocationUID,
-        region: 'EU'
-      }
-    };
-  }
-}
-```
-
----
-
-## IoT Device Agents
-
-For IoT devices with embedded location hardware:
-
-```typescript
-class IoTDeviceAgent {
-  private gpsModule: GPSModule;
-
-  async getAgentLocation(): Promise<{ coordinates: [number, number] }> {
-    // IoT devices may have hardware GPS
-    const reading = await this.gpsModule.getReading();
-
-    return {
-      coordinates: [reading.longitude, reading.latitude]
-    };
-  }
-
-  async attestDeploymentLocation(): Promise<void> {
-    const location = await this.getAgentLocation();
-
-    const attestation = await this.astral.location.create({
-      type: 'Point',
-      coordinates: location.coordinates
-    }, {
-      submitOnchain: true,
-      metadata: {
-        deviceId: this.deviceId,
-        deviceType: 'iot-sensor',
-        firmwareVersion: this.firmwareVersion,
-        gpsAccuracy: location.accuracy
-      }
-    });
-
-    // Store attestation for verification
-    await this.registry.registerDevice(this.deviceId, attestation.uid);
-  }
-}
-```
-
----
-
-## Resolver Contract for Agent Verification
-
-```solidity
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-import "@eas/contracts/resolver/SchemaResolver.sol";
-
-contract AgentComplianceResolver is SchemaResolver {
-    address public astralSigner;
-    bytes32 public requiredRegionUID;
-
-    mapping(address => bytes32) public agentLocationAttestations;
-    mapping(address => uint256) public lastAttestationTime;
-    mapping(address => bool) public registeredAgents;
-
-    uint256 public constant MAX_ATTESTATION_AGE = 24 hours;
-
-    error AgentNotRegistered();
-    error AttestationTooOld();
-    error NotInRequiredRegion();
-
-    event AgentRegistered(address indexed agent, bytes32 locationUID);
-    event AgentLocationUpdated(address indexed agent, bytes32 newLocationUID);
-
-    constructor(
-        IEAS eas,
-        address _astralSigner,
-        bytes32 _requiredRegionUID
-    ) SchemaResolver(eas) {
-        astralSigner = _astralSigner;
-        requiredRegionUID = _requiredRegionUID;
-    }
-
-    function onAttest(
-        Attestation calldata attestation,
-        uint256 /*value*/
-    ) internal override returns (bool) {
-        // Verify from Astral
-        require(attestation.attester == astralSigner, "Not from Astral");
-
-        // Decode compliance check result
-        (
-            bool isInRegion,
-            bytes32[] memory inputRefs,
-            uint64 timestamp,
-            string memory operation
-        ) = abi.decode(
-            attestation.data,
-            (bool, bytes32[], uint64, string)
-        );
-
-        // Verify the required region was checked
-        require(inputRefs[0] == requiredRegionUID, "Wrong region checked");
-
-        if (!isInRegion) revert NotInRequiredRegion();
-
-        // Update agent's location record
-        address agent = attestation.recipient;
-        agentLocationAttestations[agent] = inputRefs[1];  // Agent's location UID
-        lastAttestationTime[agent] = timestamp;
-        registeredAgents[agent] = true;
-
-        emit AgentLocationUpdated(agent, inputRefs[1]);
-        return true;
-    }
-
-    function isAgentCompliant(address agent) external view returns (bool) {
-        if (!registeredAgents[agent]) return false;
-        if (block.timestamp - lastAttestationTime[agent] > MAX_ATTESTATION_AGE) {
-            return false;
-        }
-        return true;
-    }
-
-    function onRevoke(Attestation calldata, uint256)
-        internal pure override returns (bool)
-    {
-        return true;
-    }
-}
-```
-
----
-
-## Best Practices
-
-### 1. Attestation Freshness
-
-Location attestations should be refreshed regularly. Stale attestations don't prove current location.
-
-```typescript
-const MAX_ATTESTATION_AGE_MS = 60 * 60 * 1000;  // 1 hour
-
-function isAttestationFresh(attestationTime: number): boolean {
-  return Date.now() - attestationTime < MAX_ATTESTATION_AGE_MS;
-}
-```
-
-### 2. Graceful Degradation
-
-Handle location verification failures gracefully:
-
-```typescript
-async function executeWithLocationFallback<T>(
-  operation: () => Promise<T>,
-  fallback: () => Promise<T>
-): Promise<T> {
-  try {
-    const compliance = await verifyCompliance();
-    if (compliance.compliant) {
-      return await operation();
-    }
-  } catch (error) {
-    console.warn('Location verification failed:', error);
-  }
-
-  return await fallback();
-}
-```
-
-### 3. Audit Trail
-
-Maintain logs of all location attestations for compliance auditing:
-
-```typescript
-interface AttestationLog {
-  timestamp: number;
-  attestationUID: string;
-  location: [number, number];
-  complianceResult: boolean;
-  region: string;
-}
-
-const attestationHistory: AttestationLog[] = [];
-```
-
----
+The verified location feeds into Astral's geospatial policy engine, enabling the same spatial operations available to user location proofs — containment checks, distance calculations, and policy attestations.
 
 ## Security Considerations
 
-<Warning>
-  **Location spoofing**: Agents can potentially lie about their location. Consider:
+Agent location verification faces unique challenges:
 
-  - **TEE execution**: Run agents in trusted execution environments
-  - **Hardware attestation**: Use hardware-backed location proofs where available
-  - **Multi-party verification**: Require multiple independent attestations
-  - **Network-based verification**: Cross-reference with network topology
-</Warning>
+- **No GPS** — Servers lack the positioning hardware available on mobile devices
+- **Virtualization** — Cloud infrastructure can obscure physical location
+- **Migration** — Agents can move between regions, requiring fresh proofs
+- **Collusion** — Hosting providers could potentially assist in location spoofing
 
-<Card title="Next: Sovereign Chain Integration" icon="link" href="/guides/sovereign-chain-integration">
-  Learn how sovereign blockchains can integrate location proofs
+The multi-source evidence approach addresses these by requiring corroboration across independent signals. Evidence diversity makes comprehensive spoofing significantly harder.
+
+## What's Next
+
+The infrastructure plugin and agent verification workflows are in active development. Code examples and integration guides will be released as the components become available.
+
+For updates, follow the [roadmap](/resources/roadmap) or join the [community](https://t.me/+UkTOSXnDcDM5ZTBk).
+
+<Card title="Back to: Location Proofs" icon="arrow-left" href="/concepts/location-proofs">
+  Learn about the location proof framework
 </Card>
