@@ -11,19 +11,6 @@ description: "Evidence-based verification of location claims"
 
 Location Proofs provide **evidence-based verification** of location claims. They answer the question: *How confident can we be that a subject was at a claimed location during a claimed time?*
 
-## Relationship to Geospatial Operations
-
-Location Verification is **upstream** of [Geospatial Operations](/concepts/geospatial-operations):
-
-| Location Verification | Geospatial Operations |
-|----------------------|----------------------|
-| Evaluates evidence credibility | Computes spatial relationships |
-| Input: location proof (claim + stamps) | Input: locations (claimed or verified) |
-| Output: credibility assessment | Output: policy attestation |
-| "How confident are we that X was at L?" | "Is A inside B?" |
-
-Verified location proofs can serve as **trusted inputs** to geospatial operations, increasing confidence in computed results.
-
 ## Core Concepts
 
 ### Location Claims
@@ -206,7 +193,7 @@ The credibility assessment helps applications make this determination.
 ### Collecting Evidence
 
 ```typescript
-import { astral } from '@decentralized-geo/astral-sdk';
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
 
 // Configure plugin
 const pluginOptions = {
@@ -248,23 +235,6 @@ console.log(result.credibility.confidence);  // 0.85
 console.log(result.uid);                     // 0xabc123...
 ```
 
-## Integration with Compute
-
-Verified Location Proofs can be used as **inputs** to [Geospatial Operations](/concepts/geospatial-operations):
-
-```typescript
-// Verify user's location
-const verifiedProof = await astral.verify.proof(proof);
-
-// Use as trusted input to geospatial operation
-const result = await astral.compute.contains({
-  container: sfBayAreaPolygonUID,
-  geometry: { verifiedProof: verifiedProof.uid },
-  chainId: 84532,
-  schema: SCHEMA_UID
-});
-```
-
 ## Output: Verified Location Proof
 
 The final output is an **EAS attestation**:
@@ -281,6 +251,38 @@ interface VerifiedLocationProof {
 ```
 
 Can be onchain or offchain — no requirement to submit onchain.
+
+---
+
+## Relationship to Geospatial Operations
+
+Location Verification is **upstream** of [Geospatial Operations](/concepts/geospatial-operations):
+
+| Location Verification | Geospatial Operations |
+|----------------------|----------------------|
+| Evaluates evidence credibility | Computes spatial relationships |
+| Input: location proof (claim + stamps) | Input: locations (claimed or verified) |
+| Output: credibility assessment | Output: policy attestation |
+| "How confident are we that X was at L?" | "Is A inside B?" |
+
+Verified location proofs can serve as **trusted inputs** to geospatial operations, increasing confidence in computed results.
+
+### Integration with Compute
+
+Verified Location Proofs can be used as **inputs** to Geospatial Operations:
+
+```typescript
+// Verify user's location
+const verifiedProof = await astral.verify.proof(proof);
+
+// Use as trusted input to geospatial operation
+const result = await astral.compute.contains({
+  container: sfBayAreaPolygonUID,
+  geometry: { verifiedProof: verifiedProof.uid },
+  chainId: 84532,
+  schema: SCHEMA_UID
+});
+```
 
 <Card title="Next: Geospatial Operations" icon="calculator" href="/concepts/geospatial-operations">
   Learn about spatial computations on location data
