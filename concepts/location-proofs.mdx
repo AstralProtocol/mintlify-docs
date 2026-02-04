@@ -51,7 +51,10 @@ interface LocationClaim {
 
 ### Location Stamps
 
-A **Location Stamp** is evidence from a proof-of-location system. Stamps are **independent of claims** — they capture where and when evidence was collected, not what is being claimed.
+A **Location Stamp** is evidence from a proof-of-location system. Stamps are **independent of claims** — they provide evidence supporting a spatiotemporal assertion. This evidence may come from:
+
+- **Direct observation**: GPS readings, sensor data, network measurements
+- **Indirect/derived sources**: Documents, records, institutional attestations (e.g., address from a bank statement)
 
 ```typescript
 interface LocationStamp {
