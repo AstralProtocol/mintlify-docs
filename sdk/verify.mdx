@@ -1,6 +1,6 @@
 ---
 title: "Verify"
-description: "astral.verify.* and astral.stamps.* — Location proof verification"
+description: "astral.verify.*, astral.stamps.*, astral.proofs.* — Location proof verification"
 ---
 
 <Warning>
@@ -9,10 +9,11 @@ description: "astral.verify.* and astral.stamps.* — Location proof verificatio
 
 # Verify Module
 
-The Verify module provides **cryptographic verification of location proofs**. It includes two namespaces:
+The Verify module provides **evidence-based verification of location claims**. It includes three namespaces:
 
-- `astral.verify.*` — Verification operations (server-side)
 - `astral.stamps.*` — Evidence collection (client-side)
+- `astral.proofs.*` — Proof construction
+- `astral.verify.*` — Verification operations (server-side)
 
 <Info>
   For conceptual background, see [Location Proofs](/concepts/location-proofs).
@@ -21,22 +22,29 @@ The Verify module provides **cryptographic verification of location proofs**. It
 ## Quick Start
 
 ```typescript
-import { astral } from '@astral/sdk';
+import { astral } from '@decentralized-geo/astral-sdk';
 
-// 1. Collect evidence (client-side)
-const signals = await astral.stamps.collect('proofmode');
-const unsigned = await astral.stamps.create('proofmode', signals);
+// 1. Collect evidence
+const pluginOptions = { name: 'proofmode', version: '0.1.0' };
+const signals = await astral.stamps.collect(pluginOptions);
+const unsigned = await astral.stamps.create(pluginOptions, signals);
 const stamp = await astral.stamps.sign(unsigned, signer);
 
-// 2. Create a claim
-const claim = astral.verify.createClaim({
+// 2. Create claim (extends Location Protocol)
+const claim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
+  location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
   subject: { scheme: 'eth-address', value: '0x...' },
-  location: { center: [-122.4194, 37.7749], radius: 100 },
-  time: { start: Date.now() - 60000, end: Date.now() }
-});
+  radius: 100,
+  time: { start: Date.now() / 1000 - 60, end: Date.now() / 1000 }
+};
 
-// 3. Verify
-const result = await astral.verify.stamp(claim, stamp);
+// 3. Bundle into proof and verify
+const proof = astral.proofs.create(claim, [stamp]);
+const result = await astral.verify.proof(proof);
+
 console.log(result.credibility.confidence);  // 0.85
 ```
 
@@ -51,25 +59,26 @@ Methods for collecting and packaging location evidence on the client.
 Collect raw signals from the environment using a plugin.
 
 ```typescript
-const signals = await astral.stamps.collect(plugin, options?);
+const signals = await astral.stamps.collect(pluginOptions);
 ```
 
 **Parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `plugin` | `string` | Yes | Plugin name: `"proofmode"` or `"witnesschain"` |
-| `options.timeout` | `number` | No | Max collection time in ms |
-| `options.minSignals` | `number` | No | Minimum signal count before returning |
+| `pluginOptions.name` | `string` | Yes | Plugin name: `"proofmode"` or `"witnesschain"` |
+| `pluginOptions.version` | `string` | Yes | Plugin version (semver) |
+| `pluginOptions.config` | `object` | No | Plugin-specific configuration |
 
 **Returns:** `Promise<RawSignals>` — Plugin-specific signal data
 
 **Example:**
 
 ```typescript
-const signals = await astral.stamps.collect('proofmode', {
-  timeout: 5000,
-  minSignals: 3
+const signals = await astral.stamps.collect({
+  name: 'proofmode',
+  version: '0.1.0',
+  config: { timeout: 5000 }
 });
 ```
 
@@ -78,14 +87,14 @@ const signals = await astral.stamps.collect('proofmode', {
 Process raw signals into an unsigned stamp.
 
 ```typescript
-const unsigned = await astral.stamps.create(plugin, signals);
+const unsigned = await astral.stamps.create(pluginOptions, signals);
 ```
 
 **Parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `plugin` | `string` | Yes | Plugin name |
+| `pluginOptions` | `PluginOptions` | Yes | Plugin name and version |
 | `signals` | `RawSignals` | Yes | Output from `collect()` |
 
 **Returns:** `Promise<UnsignedStamp>` — Stamp ready for signing
@@ -93,10 +102,10 @@ const unsigned = await astral.stamps.create(plugin, signals);
 **Example:**
 
 ```typescript
-const unsigned = await astral.stamps.create('proofmode', signals);
+const unsigned = await astral.stamps.create(pluginOptions, signals);
 
-console.log(unsigned.spatialFootprint);  // GeoJSON geometry
-console.log(unsigned.temporalFootprint); // { start, end }
+console.log(unsigned.location);           // Observed location (LP format)
+console.log(unsigned.temporalFootprint);  // { start, end }
 ```
 
 ### sign
@@ -116,123 +125,64 @@ const stamp = await astral.stamps.sign(unsigned, signer);
 
 **Returns:** `Promise<LocationStamp>` — Signed stamp ready for verification
 
-**Example:**
+---
+
+## astral.proofs.*
+
+Methods for constructing location proofs.
+
+### create
+
+Bundle a claim with stamps into a location proof.
 
 ```typescript
-import { Wallet } from 'ethers';
-
-const signer = new Wallet(privateKey);
-const stamp = await astral.stamps.sign(unsigned, signer);
-
-console.log(stamp.signatures);  // [{ signer, algorithm, value }]
-```
-
-### bundle
-
-Bundle multiple stamps into an array for multi-stamp verification.
-
-```typescript
-const stamps = astral.stamps.bundle([stamp1, stamp2]);
+const proof = astral.proofs.create(claim, stamps);
 ```
 
 **Parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `stamps` | `LocationStamp[]` | Yes | Array of signed stamps |
+| `claim` | `LocationClaim` | Yes | The location claim |
+| `stamps` | `LocationStamp[]` | Yes | One or more signed stamps |
 
-**Returns:** `LocationStamp[]` — Bundled stamps
+**Returns:** `LocationProof` — Proof ready for verification
 
 ---
 
 ## astral.verify.*
 
-Methods for verifying location proofs. These typically run server-side.
-
-### createClaim
-
-Helper to construct a LocationClaim.
-
-```typescript
-const claim = astral.verify.createClaim(params);
-```
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `params.subject` | `SubjectIdentifier` | Yes | Who is claiming location |
-| `params.location.center` | `[number, number]` | Yes | `[longitude, latitude]` |
-| `params.location.radius` | `number` | Yes | Radius in meters |
-| `params.time.start` | `number` | Yes | Unix timestamp (seconds or ms) |
-| `params.time.end` | `number` | Yes | Unix timestamp (seconds or ms) |
-
-**Returns:** `LocationClaim`
-
-**Example:**
-
-```typescript
-const claim = astral.verify.createClaim({
-  subject: {
-    scheme: 'eth-address',
-    value: '0x1234...'
-  },
-  location: {
-    center: [-122.4194, 37.7749],  // San Francisco
-    radius: 100                     // 100 meters
-  },
-  time: {
-    start: Date.now() - 3600000,   // 1 hour ago
-    end: Date.now()
-  }
-});
-```
+Methods for verifying location proofs. These run server-side.
 
 ### stamp
 
-Verify a single stamp against a claim.
+Verify a stamp's internal validity (no claim assessment).
 
 ```typescript
-const result = await astral.verify.stamp(claim, stamp, options?);
+const result = await astral.verify.stamp(stamp);
 ```
 
 **Parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `claim` | `LocationClaim` | Yes | The location claim to verify |
-| `stamp` | `LocationStamp` | Yes | Evidence to verify against claim |
-| `options.chainId` | `number` | No | Chain for attestation signing |
-| `options.submitOnchain` | `boolean` | No | Submit attestation onchain (default: false) |
+| `stamp` | `LocationStamp` | Yes | The stamp to verify |
 
-**Returns:** `Promise<VerificationResult>`
+**Returns:** `Promise<StampVerificationResult>`
 
 ```typescript
-interface VerificationResult {
-  result: StampVerificationResult;
-  credibility: CredibilityVector;
-  attestation: {
-    uid: string;
-    delegatedAttestation?: DelegatedAttestation;
-  };
-}
-```
-
-**Example:**
-
-```typescript
-const result = await astral.verify.stamp(claim, stamp, {
-  chainId: 84532
-});
-
-if (result.credibility.confidence > 0.8) {
-  console.log('High confidence location proof');
+interface StampVerificationResult {
+  valid: boolean;
+  signaturesValid: boolean;
+  structureValid: boolean;
+  signalsConsistent: boolean;
+  pluginResult: Record<string, unknown>;
 }
 ```
 
 ### proof
 
-Verify a multi-stamp proof with cross-correlation analysis.
+Full verification of a location proof against its claim.
 
 ```typescript
 const result = await astral.verify.proof(proof, options?);
@@ -242,113 +192,129 @@ const result = await astral.verify.proof(proof, options?);
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `proof.claim` | `LocationClaim` | Yes | The location claim to verify |
-| `proof.stamps` | `LocationStamp[]` | Yes | Array of evidence stamps |
+| `proof` | `LocationProof` | Yes | The proof to verify |
 | `options.chainId` | `number` | No | Chain for attestation signing |
-| `options.submitOnchain` | `boolean` | No | Submit attestation onchain |
+| `options.submitOnchain` | `boolean` | No | Submit attestation onchain (default: false) |
 
 **Returns:** `Promise<VerifiedLocationProof>`
 
 ```typescript
 interface VerifiedLocationProof {
-  claim: LocationClaim;
-  credibility: CredibilityVector;
-  evidenceRefs: string[];
-  attestation: {
-    uid: string;
-    attester: string;
-    timestamp: number;
-    chainId: number;
-  };
+  proof: LocationProof;
+  credibility: CredibilityAssessment;
+  uid: string;
+  attester: string;
+  timestamp: number;
+  chainId?: number;
 }
 ```
 
 **Example:**
 
 ```typescript
-const result = await astral.verify.proof({
-  claim,
-  stamps: [proofmodeStamp, witnessStamp]
-}, {
-  chainId: 84532
-});
+const result = await astral.verify.proof(proof, { chainId: 84532 });
 
-// Multi-stamp provides correlation analysis
-console.log(result.credibility.correlation.independence);   // 0.9
-console.log(result.credibility.correlation.corroboration);  // 0.85
-console.log(result.credibility.confidence);                 // Higher than single
+if (result.credibility.confidence > 0.8) {
+  console.log('High confidence location proof');
+}
 ```
 
 ---
 
 ## Types
 
-### SubjectIdentifier
+### PluginOptions
 
 ```typescript
-interface SubjectIdentifier {
-  scheme: string;   // "eth-address" | "device-pubkey" | "did:web"
-  value: string;    // The actual identifier
+interface PluginOptions {
+  name: string;                         // "proofmode" | "witnesschain"
+  version: string;                      // Semantic version
+  config?: Record<string, unknown>;     // Plugin-specific config
 }
 ```
 
 ### LocationClaim
 
+Extends Location Protocol v0.2 with verification-specific fields.
+
 ```typescript
 interface LocationClaim {
+  // Location Protocol fields
+  lpVersion: string;
+  locationType: string;
+  location: LocationData;
+  srs: string;
+
+  // Verification fields
   subject: SubjectIdentifier;
-  spatialRegion: {
-    center: [number, number];  // [longitude, latitude]
-    radius: number;            // meters
-  };
-  temporalRange: {
-    start: number;             // Unix timestamp (seconds)
-    end: number;
-  };
+  radius: number;                       // Required — meters
+  time: { start: number; end: number }; // Unix timestamps (seconds)
+  eventType?: string;
 }
+```
+
+### SubjectIdentifier
+
+Follows [DID](https://www.w3.org/TR/did-core/) pattern.
+
+```typescript
+interface SubjectIdentifier {
+  scheme: string;   // "eth-address" | "device-pubkey" | "did:web"
+  value: string;
+}
+
+// Examples:
+// { scheme: "eth-address", value: "0x1234..." }
+// { scheme: "device-pubkey", value: "0xabcd..." }
 ```
 
 ### LocationStamp
 
+Evidence conforming to Location Protocol for its location data.
+
 ```typescript
 interface LocationStamp {
-  plugin: string;
-  version: string;
-  spatialFootprint: GeoJSON.Geometry;
+  // Location (LP v0.2) — observed location
+  lpVersion: string;
+  locationType: string;
+  location: LocationData;
+  srs: string;
+
+  // Temporal
   temporalFootprint: { start: number; end: number };
+
+  // Plugin
+  plugin: string;
+  pluginVersion: string;
   signals: Record<string, unknown>;
   signatures: Signature[];
 }
-
-interface Signature {
-  signer: SubjectIdentifier;
-  algorithm: string;
-  value: string;
-}
 ```
 
-### CredibilityVector
+### CredibilityAssessment
 
 ```typescript
-interface CredibilityVector {
-  confidence: number;                    // 0-1
-  dimensions: Record<string, number>;    // Extensible
-  stampResults: StampVerificationResult[];
+interface CredibilityAssessment {
+  confidence: number;                   // 0-1 (NOT calibrated probability)
+  stampResults: StampResult[];
   correlation?: CorrelationAssessment;
+  dimensions?: Record<string, number>;
 }
 
-interface StampVerificationResult {
+interface StampResult {
   stampIndex: number;
   plugin: string;
-  spatialOverlap: boolean;
-  temporalOverlap: boolean;
   signaturesValid: boolean;
+  structureValid: boolean;
+  signalsConsistent: boolean;
+  supportsClaim: boolean;
+  claimSupportScore: number;
   pluginResult: Record<string, unknown>;
 }
 
 interface CorrelationAssessment {
   independence: number;    // 0-1
-  corroboration: number;   // 0-1
+  agreement: number;       // 0-1
   notes: string[];
 }
 ```
@@ -359,28 +325,36 @@ interface CorrelationAssessment {
 
 ### Available Plugins
 
-| Plugin | Environment | Evidence Type |
+| Plugin | Environments | Evidence Type |
 |--------|-------------|---------------|
-| `proofmode` | Mobile (React Native) | GPS, sensors, hardware attestation |
-| `witnesschain` | Server/Node | Network latency, challenger attestations |
+| `proofmode` | iOS, Android, React Native | Hardware attestation, sensor fusion |
+| `witnesschain` | Node.js server | Network latency, challenger attestations |
 
-### Plugin-Specific Options
+### Plugin-Specific Config
 
 **ProofMode:**
 
 ```typescript
-const signals = await astral.stamps.collect('proofmode', {
-  timeout: 5000,
-  sensors: ['gps', 'accelerometer', 'gyroscope']
+const signals = await astral.stamps.collect({
+  name: 'proofmode',
+  version: '0.1.0',
+  config: {
+    timeout: 5000,
+    sensors: ['accelerometer', 'gyroscope']
+  }
 });
 ```
 
 **WitnessChain:**
 
 ```typescript
-const signals = await astral.stamps.collect('witnesschain', {
-  timeout: 10000,
-  minChallengers: 3
+const signals = await astral.stamps.collect({
+  name: 'witnesschain',
+  version: '0.1.0',
+  config: {
+    timeout: 10000,
+    minChallengers: 3
+  }
 });
 ```
 

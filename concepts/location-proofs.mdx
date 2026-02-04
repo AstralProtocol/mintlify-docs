@@ -1,6 +1,6 @@
 ---
 title: "Location Proofs"
-description: "Cryptographic verification of location evidence"
+description: "Evidence-based verification of location claims"
 ---
 
 <Warning>
@@ -9,174 +9,193 @@ description: "Cryptographic verification of location evidence"
 
 # Location Proofs
 
-Location Proofs provide **cryptographic verification** that a subject was at a claimed location during a claimed time. Unlike [Location Records](/concepts/location-attestations), which are simply signed spatial data, Location Proofs assess the **credibility of evidence** supporting a location claim.
+Location Proofs provide **evidence-based verification** of location claims. They answer the question: *How confident can we be that a subject was at a claimed location during a claimed time?*
 
-## How It Differs from Geospatial Operations
+## Relationship to Geospatial Operations
 
-| [Geospatial Operations](/concepts/geospatial-operations) | Location Proofs |
-|----------------------------------------------------------|-----------------|
-| Computes spatial relationships | Assesses evidence credibility |
-| Input: geometries (claimed or attested) | Input: location claim + evidence |
-| Output: distance, area, contains, etc. | Output: credibility vector |
-| "Is point A inside polygon B?" | "How confident are we that X was at location L?" |
+Location Verification is **upstream** of [Geospatial Operations](/concepts/geospatial-operations):
 
-**Geospatial Operations** answer spatial questions. **Location Proofs** answer trust questions.
+| Location Verification | Geospatial Operations |
+|----------------------|----------------------|
+| Evaluates evidence credibility | Computes spatial relationships |
+| Input: location proof (claim + stamps) | Input: locations (claimed or verified) |
+| Output: credibility assessment | Output: policy attestation |
+| "How confident are we that X was at L?" | "Is A inside B?" |
+
+Verified location proofs can serve as **trusted inputs** to geospatial operations, increasing confidence in computed results.
 
 ## Core Concepts
 
 ### Location Claims
 
-A **Location Claim** is an assertion that a subject was within a spatial region during a time interval:
+A **Location Claim** is an assertion about the timing and location of an event. Claims extend the [Location Protocol](https://github.com/DecentralizedGeo/location-protocol-spec) specification:
 
 ```typescript
 interface LocationClaim {
-  subject: {
-    scheme: string;              // "eth-address" | "device-pubkey"
-    value: string;               // The identifier
-  };
-  spatialRegion: {
-    center: [number, number];    // [longitude, latitude]
-    radius: number;              // meters
-  };
-  temporalRange: {
-    start: number;               // Unix timestamp
-    end: number;                 // Unix timestamp
-  };
+  // Location Protocol v0.2 fields
+  lpVersion: string;            // "0.2"
+  locationType: string;         // "geojson-point", "h3-index", etc.
+  location: LocationData;       // The asserted location
+  srs: string;                  // Spatial reference system
+
+  // Verification-specific fields
+  subject: SubjectIdentifier;   // Who/what was at the location
+  radius: number;               // Spatial uncertainty (meters) — required
+  time: { start: number; end: number };  // Temporal bounds
+  eventType?: string;           // "presence", "transaction", "delivery"
 }
 ```
 
 <Note>
-  Claims use **ranges, not points** — both spatially and temporally. You cannot prove presence at an exact point in space or time. Larger ranges increase confidence but decrease precision.
+  `radius` is **required** — you cannot claim presence at an exact point. Both spatial and temporal bounds involve uncertainty.
 </Note>
+
+The event could be: a person's presence, a transaction's origin, an asset's location, a delivery, etc.
 
 ### Location Stamps
 
-A **Location Stamp** is evidence from a proof-of-location system. Stamps are **independent of claims** — they provide evidence supporting a spatiotemporal assertion. This evidence may come from:
+A **Location Stamp** is evidence from a proof-of-location system. Stamps are **independent of claims** — they provide evidence about an observed location, which may come from:
 
-- **Direct observation**: GPS readings, sensor data, network measurements
-- **Indirect/derived sources**: Documents, records, institutional attestations (e.g., address from a bank statement)
+- **Direct observation**: Hardware attestation, network measurements
+- **Indirect/derived sources**: Documents, records, institutional attestations
 
 ```typescript
 interface LocationStamp {
-  plugin: string;                        // "proofmode" | "witnesschain"
-  version: string;
-  spatialFootprint: GeoJSON.Geometry;    // Where evidence indicates
-  temporalFootprint: {
-    start: number;
-    end: number;
-  };
-  signals: Record<string, unknown>;      // Raw evidence data
-  signatures: Signature[];               // Cryptographic binding
+  // Location data (LP v0.2) — the OBSERVED location
+  lpVersion: string;
+  locationType: string;
+  location: LocationData;       // Where evidence indicates subject was
+  srs: string;
+
+  // Temporal footprint
+  temporalFootprint: { start: number; end: number };
+
+  // Plugin identification
+  plugin: string;               // "proofmode" | "witnesschain"
+  pluginVersion: string;
+
+  // Evidence and signatures
+  signals: Record<string, unknown>;
+  signatures: Signature[];
 }
 ```
 
-Stamps can come from different **plugins**:
+Both claims and stamps use Location Protocol format for their location data:
+- **Claim location** = asserted location (where subject claims to have been)
+- **Stamp location** = observed location (where evidence indicates subject was)
 
-<CardGroup cols={2}>
-  <Card title="ProofMode" icon="mobile">
-    - Device-based attestation
-    - GPS + sensor fusion
-    - Hardware attestation (Secure Enclave)
-    - Best for: consumer devices
-  </Card>
-  <Card title="WitnessChain" icon="server">
-    - Infrastructure-based verification
-    - Network latency triangulation
-    - Challenger network attestations
-    - Best for: servers and nodes
-  </Card>
-</CardGroup>
+Verification compares: *does the observed support the asserted?*
+
+### Location Proofs
+
+A **Location Proof** bundles stamps with a claim — this is the verifiable artifact:
+
+```typescript
+interface LocationProof {
+  claim: LocationClaim;
+  stamps: LocationStamp[];   // One or more stamps
+}
+```
+
+Single-stamp proofs are valid. Multi-stamp proofs from independent systems enable cross-correlation analysis.
 
 ### Verification
 
-**Verification** answers: *Does the evidence support the claim?*
+**Verification (Evidence Evaluation)** is a three-phase process:
 
-```
-Claim:    [spatial_region] × [temporal_range]
-Evidence: [spatial_footprint] × [temporal_footprint]
-          ↓
-Verification: assess overlap, check signatures, evaluate consistency
-          ↓
-Output:   credibility vector
-```
+1. **Verify each stamp** — Check signatures, structure, signal consistency
+2. **Assess stamps against claim** — Does the observed location support the asserted location?
+3. **Assess cross-correlation** — Do multiple stamps corroborate each other?
 
-The output is a **Credibility Vector** — a multidimensional assessment of how well evidence supports the claim.
+The output is a **Credibility Assessment**.
 
-## The Uncertainty Tradeoff
+## Credibility Assessment
 
-Location proofs inherently involve uncertainty:
+Verification outputs a structured assessment, not just a yes/no:
 
-- **Spatial uncertainty**: GPS has ~5m error, network triangulation ~50-500m
-- **Temporal uncertainty**: Sensor readings take time to collect
-
-The fundamental tradeoff:
-
-```
-Larger margins = Higher confidence, Lower precision
-Smaller margins = Lower confidence, Higher precision
+```typescript
+interface CredibilityAssessment {
+  confidence: number;           // 0-1 overall score
+  stampResults: StampResult[];  // Per-stamp verification
+  correlation?: {               // For multi-stamp proofs
+    independence: number;       // Are sources uncorrelated?
+    agreement: number;          // Do sources agree?
+  };
+}
 ```
 
-A claim of "within 100km sometime in 2024" is easy to verify but useless. A claim of "within 5m at exactly 14:32:07" is precise but nearly impossible to verify with high confidence.
+<Warning>
+  **Confidence ≠ Probability.** A confidence of 0.8 does NOT mean "80% probability the claim is true." It means "the evidence is reasonably strong." Calibrating to true probability is future work.
+</Warning>
 
-**Applications decide** what precision/confidence balance they need.
+### Multi-Factor Proofs
 
-## Multi-Factor Proofs
-
-Multiple stamps from **independent, uncorrelated systems** create stronger proofs:
+Multiple stamps from **independent systems** increase confidence:
 
 ```typescript
 // Single stamp: moderate confidence
-const singleStamp = await astral.stamps.collect('proofmode');
-const result1 = await astral.verify.stamp(claim, singleStamp);
+const result1 = await astral.verify.proof({
+  claim,
+  stamps: [proofmodeStamp]
+});
 // result1.credibility.confidence → 0.7
 
-// Multi-stamp: higher confidence
-const proofmodeStamp = await collectAndSign('proofmode');
-const witnessStamp = await collectAndSign('witnesschain');
-const proof = astral.stamps.bundle([proofmodeStamp, witnessStamp]);
-
-const result2 = await astral.verify.proof({ claim, stamps: proof });
+// Multi-stamp from independent systems: higher confidence
+const result2 = await astral.verify.proof({
+  claim,
+  stamps: [proofmodeStamp, witnessStamp]
+});
 // result2.credibility.confidence → 0.9
-// result2.credibility.correlation.independence → 0.95 (different systems)
-// result2.credibility.correlation.corroboration → 0.85 (they agree)
+// result2.credibility.correlation.independence → 0.95
 ```
 
 <Info>
-  **Key principle**: Independent, corroborating evidence is worth more than redundant evidence. Two GPS readings add little. GPS + network triangulation adds a lot.
+  **Key principle**: Independent, corroborating evidence increases confidence. Redundant stamps from the same system don't add confidence — but they don't subtract either.
 </Info>
 
-## Credibility Vector
+## Plugins
 
-Verification outputs a **Credibility Vector** — not just a binary yes/no:
+Stamps come from a range of **plugins** — an extensible library of proof-of-location systems:
 
-```typescript
-interface CredibilityVector {
-  confidence: number;           // 0-1 overall score
-  dimensions: {
-    // Extensible — specific dimensions TBD
-    [key: string]: number;
-  };
-  stampResults: StampVerificationResult[];
-  correlation?: {
-    independence: number;       // Are sources uncorrelated?
-    corroboration: number;      // Do sources agree?
-  };
-}
-```
+<CardGroup cols={2}>
+  <Card title="ProofMode" icon="mobile">
+    **Device attestation + sensor fusion**
+    - iOS (Swift, Secure Enclave)
+    - Android (Kotlin, hardware keystore)
+    - React Native wrapper
+    - Trust: Device integrity
+  </Card>
+  <Card title="WitnessChain" icon="server">
+    **Infrastructure verification**
+    - Node.js server
+    - UDP latency triangulation
+    - Challenger network
+    - Trust: Speed of light + cryptoeconomic
+  </Card>
+</CardGroup>
 
-This enables **application-specific trust policies**:
+Each plugin documents its own threat model and trust assumptions.
 
-```typescript
-// High-security application
-if (result.credibility.confidence < 0.9) {
-  throw new Error('Insufficient location proof');
-}
+## The Uncertainty Tradeoff
 
-// Casual check-in application
-if (result.credibility.confidence < 0.5) {
-  throw new Error('Location unverified');
-}
-```
+Location proofs involve uncertainty in both space and time:
+
+**Larger bounds = Higher confidence, Lower precision**
+
+- "Somewhere in California during 2024" — easy to verify, not very useful
+- "Within 10m at 14:32:07" — precise, but hard to verify confidently
+
+Applications decide what precision/confidence balance they need. Broader claims may be valuable for **privacy preservation**.
+
+## Forgery Resistance
+
+> **The cost of forging a location proof should exceed the economic value of the transaction it underpins.**
+
+This is application-specific:
+- $10 check-in reward → lower forgery resistance needed
+- $10M land title transfer → higher forgery resistance needed
+
+The credibility assessment helps applications make this determination.
 
 ## SDK Usage
 
@@ -184,53 +203,49 @@ if (result.credibility.confidence < 0.5) {
   **Code snippets need testing** — Verify against actual implementation before use.
 </Note>
 
-### Collecting Evidence (Client-Side)
+### Collecting Evidence
 
 ```typescript
-import { astral } from '@astral/sdk';
+import { astral } from '@decentralized-geo/astral-sdk';
 
-// Collect signals using a plugin
-const signals = await astral.stamps.collect('proofmode', {
-  timeout: 5000
-});
+// Configure plugin
+const pluginOptions = {
+  name: 'proofmode',
+  version: '0.1.0',
+  config: { timeout: 5000 }
+};
 
-// Create and sign the stamp
-const unsigned = await astral.stamps.create('proofmode', signals);
+// Collect signals
+const signals = await astral.stamps.collect(pluginOptions);
+
+// Create and sign stamp
+const unsigned = await astral.stamps.create(pluginOptions, signals);
 const stamp = await astral.stamps.sign(unsigned, deviceSigner);
 ```
 
-### Verifying a Claim
+### Creating and Verifying a Proof
 
 ```typescript
-// Create a claim
-const claim = astral.verify.createClaim({
+// Define claim (extends Location Protocol)
+const claim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
+  location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
   subject: { scheme: 'eth-address', value: '0x...' },
-  location: { center: [-122.4194, 37.7749], radius: 100 },
-  time: { start: Date.now() - 60000, end: Date.now() }
-});
+  radius: 100,  // meters — required
+  time: { start: Date.now() / 1000 - 60, end: Date.now() / 1000 },
+  eventType: 'presence'
+};
 
-// Verify single stamp
-const result = await astral.verify.stamp(claim, stamp);
+// Bundle into proof
+const proof = astral.proofs.create(claim, [stamp]);
+
+// Verify
+const result = await astral.verify.proof(proof);
 
 console.log(result.credibility.confidence);  // 0.85
-console.log(result.attestation.uid);         // 0xabc123...
-```
-
-### Multi-Stamp Verification
-
-```typescript
-// Bundle multiple stamps
-const proof = astral.stamps.bundle([proofmodeStamp, witnessStamp]);
-
-// Verify the bundle
-const result = await astral.verify.proof({
-  claim,
-  stamps: proof
-});
-
-// Access correlation analysis
-console.log(result.credibility.correlation.independence);
-console.log(result.credibility.correlation.corroboration);
+console.log(result.uid);                     // 0xabc123...
 ```
 
 ## Integration with Compute
@@ -238,61 +253,34 @@ console.log(result.credibility.correlation.corroboration);
 Verified Location Proofs can be used as **inputs** to [Geospatial Operations](/concepts/geospatial-operations):
 
 ```typescript
-// Verify a user's location first
-const verifiedProof = await astral.verify.stamp(claim, stamp);
+// Verify user's location
+const verifiedProof = await astral.verify.proof(proof);
 
-// Use verified location in a geospatial operation
+// Use as trusted input to geospatial operation
 const result = await astral.compute.contains({
   container: sfBayAreaPolygonUID,
-  geometry: { verifiedProof: verifiedProof.attestation.uid },
+  geometry: { verifiedProof: verifiedProof.uid },
   chainId: 84532,
   schema: SCHEMA_UID
 });
 ```
 
-<Info>
-  The Compute module accepts both verified and unverified location inputs. Applications decide their trust requirements.
-</Info>
-
 ## Output: Verified Location Proof
 
-The final output is an **EAS attestation** containing the credibility assessment:
+The final output is an **EAS attestation**:
 
 ```typescript
 interface VerifiedLocationProof {
-  claim: LocationClaim;
-  credibility: CredibilityVector;
-  evidenceRefs: string[];        // UIDs/URIs of stamps
-  attestation: {
-    uid: string;
-    attester: string;            // Astral service key
-    timestamp: number;
-    chainId: number;
-  };
+  proof: LocationProof;
+  credibility: CredibilityAssessment;
+  uid: string;
+  attester: string;        // Astral service address
+  timestamp: number;
+  chainId?: number;        // If submitted onchain
 }
 ```
 
-This attestation can be:
-- Referenced by smart contracts for onchain logic
-- Used as input to Geospatial Operations
-- Stored for audit trails
-
-## Security Model
-
-### Trust Assumptions
-
-| Plugin | Trust Assumption |
-|--------|-----------------|
-| ProofMode | Device TEE/Secure Enclave is not compromised |
-| WitnessChain | Speed-of-light constraints hold; majority of challengers honest |
-
-### Forgery Resistance
-
-Per the [Flashbots research](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323):
-
-> "The anticipated cost of faking all contributing signals should outweigh potential gains."
-
-Multi-factor proofs from independent systems raise the forgery cost. Application developers should assess whether the credibility level meets their security requirements.
+Can be onchain or offchain — no requirement to submit onchain.
 
 <Card title="Next: Geospatial Operations" icon="calculator" href="/concepts/geospatial-operations">
   Learn about spatial computations on location data
