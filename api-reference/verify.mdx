@@ -1,0 +1,286 @@
+---
+title: "Verify API"
+description: "Location proof verification endpoints"
+---
+
+<Warning>
+  **Research Preview** — Under active development.
+</Warning>
+
+# Verify API
+
+The Verify API provides endpoints for verifying location proofs and retrieving plugin information.
+
+**Base URL:** `https://api.astral.global/v1`
+
+---
+
+## POST /verify/stamp
+
+Verify a single location stamp against a claim.
+
+### Request
+
+```bash
+curl -X POST https://api.astral.global/v1/verify/stamp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "claim": {
+      "subject": {
+        "scheme": "eth-address",
+        "value": "0x1234..."
+      },
+      "spatialRegion": {
+        "center": [-122.4194, 37.7749],
+        "radius": 100
+      },
+      "temporalRange": {
+        "start": 1706900000,
+        "end": 1706903600
+      }
+    },
+    "stamp": {
+      "plugin": "proofmode",
+      "version": "0.1.0",
+      "spatialFootprint": {
+        "type": "Point",
+        "coordinates": [-122.4194, 37.7749]
+      },
+      "temporalFootprint": {
+        "start": 1706901000,
+        "end": 1706901060
+      },
+      "signals": { ... },
+      "signatures": [{ ... }]
+    },
+    "options": {
+      "chainId": 84532
+    }
+  }'
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `claim` | `LocationClaim` | Yes | The location claim to verify |
+| `stamp` | `LocationStamp` | Yes | Evidence stamp to verify |
+| `options.chainId` | `number` | No | Chain ID for attestation signing |
+| `options.submitOnchain` | `boolean` | No | Submit attestation onchain (default: false) |
+
+### Response
+
+```json
+{
+  "result": {
+    "stampIndex": 0,
+    "plugin": "proofmode",
+    "spatialOverlap": true,
+    "temporalOverlap": true,
+    "signaturesValid": true,
+    "pluginResult": { ... }
+  },
+  "credibility": {
+    "confidence": 0.85,
+    "dimensions": { ... },
+    "stampResults": [{ ... }]
+  },
+  "attestation": {
+    "uid": "0xabc123...",
+    "delegatedAttestation": { ... }
+  }
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `result` | `StampVerificationResult` | Detailed verification outcome |
+| `credibility` | `CredibilityVector` | Multidimensional confidence assessment |
+| `attestation.uid` | `string` | EAS attestation UID |
+| `attestation.delegatedAttestation` | `object` | For onchain submission |
+
+---
+
+## POST /verify/proof
+
+Verify a multi-stamp proof with cross-correlation analysis.
+
+### Request
+
+```bash
+curl -X POST https://api.astral.global/v1/verify/proof \
+  -H "Content-Type: application/json" \
+  -d '{
+    "proof": {
+      "claim": { ... },
+      "stamps": [
+        { "plugin": "proofmode", ... },
+        { "plugin": "witnesschain", ... }
+      ]
+    },
+    "options": {
+      "chainId": 84532
+    }
+  }'
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `proof.claim` | `LocationClaim` | Yes | The location claim to verify |
+| `proof.stamps` | `LocationStamp[]` | Yes | Array of evidence stamps |
+| `options.chainId` | `number` | No | Chain ID for attestation signing |
+| `options.submitOnchain` | `boolean` | No | Submit attestation onchain |
+
+### Response
+
+```json
+{
+  "claim": { ... },
+  "credibility": {
+    "confidence": 0.92,
+    "dimensions": { ... },
+    "stampResults": [
+      { "stampIndex": 0, "plugin": "proofmode", ... },
+      { "stampIndex": 1, "plugin": "witnesschain", ... }
+    ],
+    "correlation": {
+      "independence": 0.95,
+      "corroboration": 0.88,
+      "notes": ["Different physical phenomena", "Spatial footprints align"]
+    }
+  },
+  "evidenceRefs": ["0x...", "0x..."],
+  "attestation": {
+    "uid": "0xdef456...",
+    "attester": "0xastral...",
+    "timestamp": 1706903700,
+    "chainId": 84532
+  }
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `claim` | `LocationClaim` | The verified claim |
+| `credibility` | `CredibilityVector` | Includes cross-correlation analysis |
+| `credibility.correlation` | `CorrelationAssessment` | Multi-stamp correlation metrics |
+| `evidenceRefs` | `string[]` | UIDs/URIs of evidence stamps |
+| `attestation` | `object` | EAS attestation details |
+
+---
+
+## GET /verify/plugins
+
+List available verification plugins.
+
+### Request
+
+```bash
+curl https://api.astral.global/v1/verify/plugins
+```
+
+### Response
+
+```json
+{
+  "plugins": [
+    {
+      "name": "proofmode",
+      "version": "0.1.0",
+      "environments": ["mobile"],
+      "description": "Device-based location attestation with sensor fusion"
+    },
+    {
+      "name": "witnesschain",
+      "version": "0.1.0",
+      "environments": ["server"],
+      "description": "Infrastructure-based location verification via challenger network"
+    }
+  ]
+}
+```
+
+---
+
+## Data Types
+
+### LocationClaim
+
+```typescript
+{
+  subject: {
+    scheme: string;              // "eth-address" | "device-pubkey"
+    value: string;
+  };
+  spatialRegion: {
+    center: [number, number];    // [longitude, latitude]
+    radius: number;              // meters
+  };
+  temporalRange: {
+    start: number;               // Unix timestamp (seconds)
+    end: number;
+  };
+}
+```
+
+### LocationStamp
+
+```typescript
+{
+  plugin: string;
+  version: string;
+  spatialFootprint: GeoJSON.Geometry;
+  temporalFootprint: {
+    start: number;
+    end: number;
+  };
+  signals: Record<string, unknown>;
+  signatures: Array<{
+    signer: { scheme: string; value: string };
+    algorithm: string;
+    value: string;
+  }>;
+}
+```
+
+### CredibilityVector
+
+```typescript
+{
+  confidence: number;                     // 0-1
+  dimensions: Record<string, number>;
+  stampResults: StampVerificationResult[];
+  correlation?: {
+    independence: number;
+    corroboration: number;
+    notes: string[];
+  };
+}
+```
+
+---
+
+## Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `INVALID_CLAIM` | Malformed location claim |
+| 400 | `INVALID_STAMP` | Malformed location stamp |
+| 400 | `UNKNOWN_PLUGIN` | Unrecognized plugin name |
+| 422 | `SIGNATURE_INVALID` | Stamp signature verification failed |
+| 500 | `VERIFICATION_FAILED` | Internal verification error |
+
+```json
+{
+  "error": {
+    "code": "INVALID_CLAIM",
+    "message": "spatialRegion.radius must be positive"
+  }
+}
+```
