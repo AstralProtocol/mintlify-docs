@@ -1,0 +1,346 @@
+---
+title: "Verify API"
+description: "Location proof verification endpoints"
+---
+
+<Warning>
+  **Research Preview** — Under active development.
+</Warning>
+
+# Verify API
+
+The Verify API provides endpoints for verifying location proofs and retrieving plugin information.
+
+**Base URL:** `https://api.astral.global/v1`
+
+---
+
+## POST /verify/stamp
+
+Verify a single location stamp's internal validity (no claim assessment).
+
+### Request
+
+```bash
+curl -X POST https://api.astral.global/v1/verify/stamp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "stamp": {
+      "lpVersion": "0.2",
+      "locationType": "geojson-point",
+      "location": { "type": "Point", "coordinates": [-122.4194, 37.7749] },
+      "srs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+      "temporalFootprint": {
+        "start": 1706901000,
+        "end": 1706901060
+      },
+      "plugin": "proofmode",
+      "pluginVersion": "0.1.0",
+      "signals": { ... },
+      "signatures": [{ ... }]
+    }
+  }'
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `stamp` | `LocationStamp` | Yes | The stamp to verify |
+
+### Response
+
+```json
+{
+  "valid": true,
+  "signaturesValid": true,
+  "structureValid": true,
+  "signalsConsistent": true,
+  "pluginResult": { ... }
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `valid` | `boolean` | Overall validity |
+| `signaturesValid` | `boolean` | Cryptographic signatures verified |
+| `structureValid` | `boolean` | Stamp structure is correct |
+| `signalsConsistent` | `boolean` | Internal signal consistency |
+| `pluginResult` | `object` | Plugin-specific verification output |
+
+---
+
+## POST /verify/proof
+
+Verify a location proof (claim + stamps) with cross-correlation analysis.
+
+### Request
+
+```bash
+curl -X POST https://api.astral.global/v1/verify/proof \
+  -H "Content-Type: application/json" \
+  -d '{
+    "proof": {
+      "claim": {
+        "lpVersion": "0.2",
+        "locationType": "geojson-point",
+        "location": { "type": "Point", "coordinates": [-122.4194, 37.7749] },
+        "srs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+        "subject": {
+          "scheme": "eth-address",
+          "value": "0x1234..."
+        },
+        "radius": 100,
+        "time": {
+          "start": 1706900000,
+          "end": 1706903600
+        }
+      },
+      "stamps": [
+        { "plugin": "proofmode", ... },
+        { "plugin": "witnesschain", ... }
+      ]
+    },
+    "options": {
+      "chainId": 84532
+    }
+  }'
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `proof` | `LocationProof` | Yes | The proof to verify |
+| `options.chainId` | `number` | No | Chain ID for attestation signing |
+| `options.submitOnchain` | `boolean` | No | Submit attestation onchain (default: false) |
+
+### Response
+
+```json
+{
+  "proof": { ... },
+  "credibility": {
+    "confidence": 0.92,
+    "stampResults": [
+      {
+        "stampIndex": 0,
+        "plugin": "proofmode",
+        "signaturesValid": true,
+        "structureValid": true,
+        "signalsConsistent": true,
+        "supportsClaim": true,
+        "claimSupportScore": 0.88,
+        "pluginResult": { ... }
+      },
+      {
+        "stampIndex": 1,
+        "plugin": "witnesschain",
+        "signaturesValid": true,
+        "structureValid": true,
+        "signalsConsistent": true,
+        "supportsClaim": true,
+        "claimSupportScore": 0.85,
+        "pluginResult": { ... }
+      }
+    ],
+    "correlation": {
+      "independence": 0.95,
+      "agreement": 0.88,
+      "notes": ["Different physical phenomena", "Spatial footprints align"]
+    }
+  },
+  "uid": "0xdef456...",
+  "attester": "0xastral...",
+  "timestamp": 1706903700,
+  "chainId": 84532
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `proof` | `LocationProof` | The verified proof |
+| `credibility` | `CredibilityAssessment` | Verification assessment |
+| `uid` | `string` | EAS attestation UID |
+| `attester` | `string` | Astral service address |
+| `timestamp` | `number` | Verification timestamp |
+| `chainId` | `number` | Chain ID (if submitted onchain) |
+
+<Warning>
+  **Confidence ≠ Probability.** A confidence of 0.92 does NOT mean "92% probability the claim is true." It means "the evidence is reasonably strong." Calibrating to true probability is future work.
+</Warning>
+
+---
+
+## GET /verify/plugins
+
+List available verification plugins.
+
+### Request
+
+```bash
+curl https://api.astral.global/v1/verify/plugins
+```
+
+### Response
+
+```json
+{
+  "plugins": [
+    {
+      "name": "proofmode",
+      "version": "0.1.0",
+      "environments": ["iOS", "Android", "React Native"],
+      "description": "Device attestation with hardware security (Secure Enclave/Keystore)"
+    },
+    {
+      "name": "witnesschain",
+      "version": "0.1.0",
+      "environments": ["Node.js"],
+      "description": "Infrastructure verification via UDP latency triangulation"
+    }
+  ]
+}
+```
+
+---
+
+## Data Types
+
+### LocationClaim
+
+Extends [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec) with verification-specific fields.
+
+```typescript
+interface LocationClaim {
+  // Location Protocol v0.2 fields
+  lpVersion: string;              // "0.2"
+  locationType: string;           // "geojson-point", "h3-index", etc.
+  location: LocationData;         // The asserted location
+  srs: string;                    // Spatial reference system URI
+
+  // Verification-specific fields
+  subject: SubjectIdentifier;
+  radius: number;                 // Meters — required
+  time: {
+    start: number;                // Unix timestamp (seconds)
+    end: number;
+  };
+  eventType?: string;             // "presence", "transaction", "delivery"
+}
+```
+
+### SubjectIdentifier
+
+Follows [DID](https://www.w3.org/TR/did-core/) pattern.
+
+```typescript
+interface SubjectIdentifier {
+  scheme: string;   // "eth-address" | "device-pubkey" | "did:web"
+  value: string;
+}
+
+// Examples:
+// { scheme: "eth-address", value: "0x1234..." }
+// { scheme: "device-pubkey", value: "0xabcd..." }
+```
+
+### LocationStamp
+
+Evidence from a proof-of-location system. Uses LP format for observed location.
+
+```typescript
+interface LocationStamp {
+  // Location data (LP v0.2) — the OBSERVED location
+  lpVersion: string;
+  locationType: string;
+  location: LocationData;
+  srs: string;
+
+  // Temporal
+  temporalFootprint: {
+    start: number;
+    end: number;
+  };
+
+  // Plugin
+  plugin: string;
+  pluginVersion: string;
+  signals: Record<string, unknown>;
+  signatures: Signature[];
+}
+
+interface Signature {
+  signer: SubjectIdentifier;
+  algorithm: string;              // "secp256k1" | "ed25519"
+  value: string;                  // Hex-encoded
+  timestamp: number;
+}
+```
+
+### LocationProof
+
+```typescript
+interface LocationProof {
+  claim: LocationClaim;
+  stamps: LocationStamp[];
+}
+```
+
+### CredibilityAssessment
+
+```typescript
+interface CredibilityAssessment {
+  confidence: number;             // 0-1 (NOT calibrated probability)
+  stampResults: StampResult[];
+  correlation?: CorrelationAssessment;
+  dimensions?: Record<string, number>;
+}
+
+interface StampResult {
+  stampIndex: number;
+  plugin: string;
+  signaturesValid: boolean;
+  structureValid: boolean;
+  signalsConsistent: boolean;
+  supportsClaim: boolean;
+  claimSupportScore: number;      // 0-1
+  pluginResult: Record<string, unknown>;
+}
+
+interface CorrelationAssessment {
+  independence: number;           // 0-1
+  agreement: number;              // 0-1
+  notes: string[];
+}
+```
+
+---
+
+## Error Responses
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `INVALID_CLAIM` | Malformed location claim |
+| 400 | `INVALID_STAMP` | Malformed location stamp |
+| 400 | `UNKNOWN_PLUGIN` | Unrecognized plugin name |
+| 400 | `MISSING_RADIUS` | Claim missing required radius field |
+| 422 | `SIGNATURE_INVALID` | Stamp signature verification failed |
+| 500 | `VERIFICATION_FAILED` | Internal verification error |
+
+```json
+{
+  "error": {
+    "code": "MISSING_RADIUS",
+    "message": "LocationClaim.radius is required"
+  }
+}
+```
+
+<Card title="SDK Reference: Verify" icon="code" href="/sdk/verify">
+  View the SDK documentation for client-side usage
+</Card>

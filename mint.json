@@ -70,6 +70,7 @@
       "group": "Core Concepts",
       "pages": [
         "concepts/location-attestations",
+        "concepts/location-proofs",
         "concepts/geospatial-operations",
         "concepts/policy-attestations",
         "concepts/eas-resolvers",
@@ -94,6 +95,12 @@
       "group": "API Reference",
       "pages": [
         "api-reference/overview",
+        {
+          "group": "Verify API",
+          "pages": [
+            "api-reference/verify"
+          ]
+        },
         {
           "group": "Compute API",
           "pages": [
@@ -123,6 +130,7 @@
         "sdk/overview",
         "sdk/installation",
         "sdk/location",
+        "sdk/verify",
         "sdk/compute",
         "sdk/eas",
         "sdk/migration"
