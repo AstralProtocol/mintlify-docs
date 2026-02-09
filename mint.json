@@ -141,6 +141,7 @@
       "pages": [
         "resources/playground",
         "resources/staging",
+        "resources/eigencompute-deployment",
         "resources/schemas",
         "resources/security",
         "resources/roadmap",
