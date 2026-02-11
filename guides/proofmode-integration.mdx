@@ -1,0 +1,196 @@
+---
+title: "ProofMode integration"
+description: "Device-level location proofs with ProofMode on Android"
+---
+
+<Warning>
+  **Research Preview** — The React Native bridge is under development. The parser and verification are available now.
+</Warning>
+
+# ProofMode integration
+
+[ProofMode](https://proofmode.org/) by the Guardian Project captures rich device-level evidence — GPS coordinates, cell tower data, WiFi networks, hardware attestation (SafetyNet/Play Integrity), and PGP signatures. The Astral ProofMode plugin parses these proof bundles, verifies their cryptographic signatures, and evaluates them against location claims.
+
+## What ProofMode provides
+
+Each ProofMode proof bundle is a ZIP file containing:
+
+| File | Content |
+|------|---------|
+| Media file | Photo or video that triggered the proof |
+| `.csv` / `.json` | 33+ signal fields (GPS, cell, WiFi, device info) |
+| `.asc` | PGP detached signature |
+| `pubkey.asc` | PGP public key |
+| `.gst` | SafetyNet/Play Integrity JWT |
+| `.ots` | OpenTimestamps proof (optional) |
+| SHA-256 hash | Integrity check for the media file |
+
+## Installation
+
+```bash
+npm install @decentralized-geo/plugin-proofmode
+```
+
+<Note>
+  `@decentralized-geo/plugin-proofmode` requires `@decentralized-geo/astral-sdk` as a peer dependency.
+</Note>
+
+## Parsing proof bundles
+
+The most immediate use case is accepting ProofMode bundles however they arrive — exported from the app, shared via a file, uploaded through an API — and verifying them.
+
+```typescript
+import { ProofModePlugin } from '@decentralized-geo/plugin-proofmode';
+import { parseProofBundle } from '@decentralized-geo/plugin-proofmode/parse';
+
+const plugin = new ProofModePlugin();
+
+// Parse a proof bundle from a ZIP file
+const bundle = await parseProofBundle(zipBuffer);
+
+console.log(bundle.signals);
+// {
+//   'Location.Latitude': 48.8584,
+//   'Location.Longitude': 2.2945,
+//   'Location.Accuracy': 12.5,
+//   'Location.Provider': 'gps',
+//   'CellInfo.CellId': 12345,
+//   'WiFi.SSID': 'CafeWifi',
+//   'Device.Hardware': 'Pixel 7',
+//   ...33+ fields
+// }
+```
+
+### Signal fields
+
+ProofMode captures a rich set of signals from the device:
+
+| Category | Key fields |
+|----------|-----------|
+| **GPS** | `Location.Latitude`, `Location.Longitude`, `Location.Accuracy`, `Location.Provider`, `Location.Speed`, `Location.Bearing` |
+| **Cell** | `CellInfo.CellId`, `CellInfo.LAC`, `CellInfo.MCC`, `CellInfo.MNC`, `CellInfo.SignalStrength` |
+| **WiFi** | `WiFi.SSID`, `WiFi.BSSID`, `WiFi.SignalStrength` |
+| **Device** | `Device.Hardware`, `Device.Manufacturer`, `Device.Model`, `Device.Fingerprint` |
+| **Timestamps** | `File.DateTimeOriginal`, `Proof.Timestamp` |
+
+## Verification
+
+The plugin verifies three layers of integrity:
+
+```typescript
+const stamp = await plugin.create(await plugin.collect());
+const result = await plugin.verify(stamp);
+
+console.log(result.signaturesValid);   // PGP signature checks
+console.log(result.structureValid);    // Bundle format and completeness
+console.log(result.signalsConsistent); // Signal cross-checks
+console.log(result.details);
+// {
+//   pgpSignatureValid: true,
+//   sha256HashValid: true,
+//   safetyNetPassed: true,
+//   basicIntegrity: true,
+//   ctsProfileMatch: true,
+// }
+```
+
+### What gets verified
+
+1. **PGP signatures** — detached `.asc` signature verified against included `pubkey.asc`
+2. **SHA-256 hash** — media file integrity check
+3. **SafetyNet/Play Integrity** — JWT structure and `basicIntegrity`/`ctsProfileMatch` flags
+4. **OpenTimestamps** — proof timestamp verification (if present)
+5. **Signal consistency** — location provider matches accuracy range, timestamps are coherent
+
+<Warning>
+  **v0 limitation**: SafetyNet/Play Integrity JWT certificate chain validation is not performed. The plugin checks the JWT structure and flag values but does not validate the signing certificate against Google's root. This is a known limitation documented in the threat model.
+</Warning>
+
+## Evaluation against claims
+
+```typescript
+const claim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
+  location: { type: 'Point', coordinates: [2.2945, 48.8584] },
+  srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
+  subject: { scheme: 'eth-address', value: '0x...' },
+  radius: 100,
+  time: { start: 1738200000, end: 1738200300 },
+};
+
+const credibility = await plugin.evaluate(stamp, claim);
+
+console.log(credibility.score);    // 0.0 to ~0.7
+console.log(credibility.spatial);  // Haversine distance scoring
+console.log(credibility.temporal); // Temporal overlap scoring
+console.log(credibility.details);
+// {
+//   distanceMeters: 45,
+//   locationAccuracy: 12.5,
+//   safetyNetBonus: true,
+//   missingSignals: [],
+// }
+```
+
+### Scoring model
+
+| Factor | Weight | Notes |
+|--------|--------|-------|
+| Spatial accuracy | 65% | Haversine distance weighted by `Location.Accuracy` |
+| Temporal overlap | 35% | Overlap between stamp footprint and claim window |
+| SafetyNet pass | +0.05 bonus | `basicIntegrity: true` indicates unmodified device |
+| Missing signals | Penalty | Missing GPS or cell data reduces confidence |
+
+<Info>
+  **Spatial confidence cap**: ProofMode GPS is self-reported by the device. A compromised device can report any coordinates. Because of this, ProofMode alone maxes out around 0.7 for spatial accuracy. Pair with an independent source (like WitnessChain) for higher confidence.
+</Info>
+
+## React Native bridge
+
+<Warning>
+  **Coming soon** — The React Native native module that wraps `libproofmode` for live evidence collection is under development. The parser and verification above work now.
+</Warning>
+
+When the RN bridge is available, the full lifecycle will work on mobile:
+
+```typescript
+import { ProofModePlugin } from '@decentralized-geo/plugin-proofmode';
+
+const plugin = new ProofModePlugin();
+
+// Collect triggers camera capture and gathers all device signals
+const signals = await plugin.collect({ timeout: 15000 });
+
+// Create stamp from device evidence
+const unsigned = await plugin.create(signals);
+
+// Sign with device keystore
+const stamp = await plugin.sign(unsigned, deviceSigner);
+```
+
+### Android setup
+
+The Android bridge wraps the `android-libproofmode` Maven artifact (`org.witness:android-libproofmode`). Required permissions:
+
+- `ACCESS_FINE_LOCATION` — GPS coordinates
+- `READ_PHONE_STATE` — Cell tower information
+- `ACCESS_WIFI_STATE` — WiFi network scanning
+- `CAMERA` — Media capture (ProofMode triggers on photo/video)
+- `READ_EXTERNAL_STORAGE` / `WRITE_EXTERNAL_STORAGE` — Proof bundle storage
+
+### The media trigger
+
+ProofMode's evidence collection is triggered by photo or video capture — there is no `generateLocationProof()` API without media. The plugin supports two modes:
+
+1. **Camera trigger** — `collect()` opens the camera; evidence is captured alongside the photo
+2. **Bundle adapter** — accept pre-existing ProofMode bundles from the app's export feature
+
+<CardGroup cols={2}>
+  <Card title="WitnessChain integration" icon="tower-broadcast" href="/guides/witnesschain-integration">
+    Add infrastructure-level verification
+  </Card>
+  <Card title="Creating location proofs" icon="rocket" href="/guides/creating-location-proofs">
+    Full tutorial with the mock plugin
+  </Card>
+</CardGroup>

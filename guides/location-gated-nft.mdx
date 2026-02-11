@@ -12,7 +12,7 @@ description: "Build an NFT that requires physical presence to mint"
 Create an NFT collection where minting requires passing a geospatial policy check — verifying the user is within range of a target location.
 
 <Info>
-  **About location verification**: This guide uses GPS coordinates as input. GPS is spoofable. We're working on [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) that will replace `navigator.geolocation` for stronger verification — these are still in development.
+  **About location verification**: This guide uses GPS coordinates as input. GPS is spoofable. For stronger verification, see [location proofs](/concepts/location-proofs) — Astral's plugin system combines evidence from device sensors, network infrastructure, and other sources into credibility assessments. See the [creating location proofs](/guides/creating-location-proofs) guide to integrate location proofs into your app.
 </Info>
 
 ## Overview
@@ -207,7 +207,7 @@ console.log('Schema UID:', SCHEMA_UID);
 ## Step 4: Frontend Integration
 
 <Warning>
-  **Location source**: The `navigator.geolocation` API provides GPS coordinates which are spoofable. In production, replace with [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) as they become available.
+  **Location source**: The `navigator.geolocation` API provides GPS coordinates which are spoofable. For stronger verification, use [location proof plugins](/concepts/location-proofs) to collect evidence from multiple independent sources.
 </Warning>
 
 ```typescript

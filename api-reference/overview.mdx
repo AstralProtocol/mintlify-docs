@@ -1,6 +1,6 @@
 ---
 title: "API Overview"
-description: "REST APIs for geospatial operations and location records"
+description: "REST APIs for geospatial operations, location verification, and location records"
 ---
 
 <Warning>
@@ -9,16 +9,20 @@ description: "REST APIs for geospatial operations and location records"
 
 # API Reference
 
-Astral provides two REST APIs:
+Astral provides three REST APIs:
 
 | API | Purpose | Base URL |
 |-----|---------|----------|
 | **Compute API** | Verifiable geospatial operations | `/compute/v0` |
+| **Verify API** | Location proof verification | `/verify/v0` |
 | **Records API** | Query location attestations | `/api/v0` |
 
-<CardGroup cols={2}>
+<CardGroup cols={3}>
   <Card title="Compute API" icon="calculator" href="#compute-api">
     Distance, containment, proximity checks with signed attestations
+  </Card>
+  <Card title="Verify API" icon="shield-check" href="#verify-api">
+    Stamp verification and proof credibility assessment
   </Card>
   <Card title="Records API" icon="database" href="/api-reference/records/overview">
     Query existing location attestations across chains
@@ -163,3 +167,149 @@ The following table shows addresses for supported chains. The **Attester Address
     Length of a line
   </Card>
 </CardGroup>
+
+---
+
+# Verify API
+
+The Verify API verifies location stamps and evaluates location proofs, returning credibility assessments with optional TEE-signed attestations.
+
+## Base URL
+
+```
+https://api.astral.global/verify/v0
+```
+
+## Endpoints
+
+### POST /verify/v0/stamp
+
+Verify a stamp's internal validity (signatures, structure, signal consistency). Does **not** evaluate the stamp against a claim.
+
+```bash
+curl https://api.astral.global/verify/v0/stamp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "stamp": {
+      "lpVersion": "0.2",
+      "locationType": "geojson-point",
+      "location": {"type": "Point", "coordinates": [2.2945, 48.8584]},
+      "srs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+      "temporalFootprint": {"start": 1738200000, "end": 1738200300},
+      "plugin": "mock",
+      "pluginVersion": "0.1.0",
+      "signals": {},
+      "signatures": [{"signer": {"scheme": "eth-address", "value": "0x..."}, "algorithm": "secp256k1", "value": "0x...", "timestamp": 1738200000}]
+    }
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "valid": true,
+  "signaturesValid": true,
+  "structureValid": true,
+  "signalsConsistent": true,
+  "details": {
+    "signatureRecovered": true,
+    "recoveredAddress": "0x..."
+  }
+}
+```
+
+### POST /verify/v0/proof
+
+Verify a full location proof (claim + stamps) and return a credibility assessment with a signed EAS attestation.
+
+```bash
+curl https://api.astral.global/verify/v0/proof \
+  -H "Content-Type: application/json" \
+  -d '{
+    "proof": {
+      "claim": {
+        "lpVersion": "0.2",
+        "locationType": "geojson-point",
+        "location": {"type": "Point", "coordinates": [2.2945, 48.8584]},
+        "srs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+        "subject": {"scheme": "eth-address", "value": "0x..."},
+        "radius": 100,
+        "time": {"start": 1738200000, "end": 1738200300}
+      },
+      "stamps": [...]
+    },
+    "options": {
+      "chainId": 84532,
+      "schema": "0x...",
+      "recipient": "0x..."
+    }
+  }'
+```
+
+**Response (200):**
+
+```json
+{
+  "uid": "0x...",
+  "credibility": {
+    "confidence": 0.72,
+    "stampResults": [
+      {
+        "stampIndex": 0,
+        "plugin": "mock",
+        "signaturesValid": true,
+        "structureValid": true,
+        "signalsConsistent": true,
+        "supportsClaim": true,
+        "claimSupportScore": 0.72,
+        "pluginResult": {}
+      }
+    ]
+  },
+  "proof": { "..." : "..." },
+  "attestation": { "..." : "..." },
+  "delegatedAttestation": { "..." : "..." },
+  "attester": "0x...",
+  "timestamp": 1738200000
+}
+```
+
+### GET /verify/v0/plugins
+
+List available verification plugins.
+
+**Response (200):**
+
+```json
+{
+  "plugins": [
+    {
+      "name": "proofmode",
+      "version": "0.1.0",
+      "environments": ["react-native"],
+      "description": "ProofMode device-level location proofs"
+    },
+    {
+      "name": "witnesschain",
+      "version": "0.1.0",
+      "environments": ["react-native", "node", "browser"],
+      "description": "WitnessChain network infrastructure proofs"
+    }
+  ]
+}
+```
+
+## Error Format
+
+Errors follow the same [RFC 7807](https://tools.ietf.org/html/rfc7807) format as the Compute API:
+
+```json
+{
+  "type": "https://api.astral.global/errors/invalid-input",
+  "title": "Invalid Input",
+  "status": 400,
+  "detail": "stamp.signatures: Required",
+  "instance": "/verify/v0/stamp"
+}
+```

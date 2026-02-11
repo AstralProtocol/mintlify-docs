@@ -1,0 +1,277 @@
+---
+title: "Creating location proofs"
+description: "End-to-end tutorial: collect evidence, build a proof, verify credibility"
+---
+
+<Warning>
+  **Research Preview** — Code snippets need testing against actual implementation.
+</Warning>
+
+# Creating location proofs
+
+This guide walks through the full location proof lifecycle using the mock plugin. By the end, you'll collect evidence, build a proof, verify it, and get a credibility assessment — the same flow that works with real plugins like ProofMode and WitnessChain.
+
+## Prerequisites
+
+```bash
+npm install @decentralized-geo/astral-sdk @decentralized-geo/plugin-mock ethers
+```
+
+## Setup
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { MockPlugin } from '@decentralized-geo/plugin-mock';
+import { ethers } from 'ethers';
+
+// Create SDK instance
+const astral = new AstralSDK({ chainId: 84532 });
+
+// Register the mock plugin
+astral.plugins.register(new MockPlugin({
+  defaultLocation: { lat: 48.8584, lon: 2.2945 },  // Eiffel Tower
+  jitterMeters: 50,  // Random offset up to 50m
+}));
+```
+
+The mock plugin generates realistic stamps with real ECDSA signatures — everything except the actual sensor data is genuine.
+
+## Step 1: Collect evidence
+
+```typescript
+const signals = await astral.stamps.collect({
+  plugins: ['mock'],
+});
+
+console.log(signals[0]);
+// {
+//   plugin: 'mock',
+//   timestamp: 1738200000,
+//   data: {
+//     latitude: 48.8587,
+//     longitude: 2.2941,
+//     accuracy: 12.5,
+//     provider: 'mock-gps',
+//     ...
+//   }
+// }
+```
+
+With real plugins, `collect()` reads device sensors (ProofMode) or queries APIs (WitnessChain). The mock plugin generates plausible signals based on its configuration.
+
+## Step 2: Create an unsigned stamp
+
+```typescript
+const unsigned = await astral.stamps.create(
+  { plugin: 'mock' },
+  signals[0]
+);
+
+console.log(unsigned.location);
+// { type: 'Point', coordinates: [2.2941, 48.8587] }
+
+console.log(unsigned.plugin);
+// 'mock'
+```
+
+The plugin transforms raw signals into the standard `UnsignedLocationStamp` format — a GeoJSON location, temporal footprint, and the original signals as structured data.
+
+## Step 3: Sign the stamp
+
+```typescript
+// Create a signer (in production, use a hardware wallet or keystore)
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY);
+const signer = {
+  algorithm: 'secp256k1',
+  signer: { scheme: 'eth-address', value: wallet.address },
+  sign: async (data: string) => wallet.signMessage(data),
+};
+
+const stamp = await astral.stamps.sign(
+  { plugin: 'mock' },
+  unsigned,
+  signer
+);
+
+console.log(stamp.signatures.length); // 1
+console.log(stamp.signatures[0].algorithm); // 'secp256k1'
+```
+
+## Step 4: Define a claim
+
+The claim is your assertion about where and when something happened:
+
+```typescript
+const claim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
+  location: { type: 'Point', coordinates: [2.2945, 48.8584] },
+  srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
+  subject: { scheme: 'eth-address', value: wallet.address },
+  radius: 100,  // Claiming to be within 100m
+  time: {
+    start: Math.floor(Date.now() / 1000) - 300,  // 5 minutes ago
+    end: Math.floor(Date.now() / 1000),
+  },
+};
+```
+
+## Step 5: Build a proof
+
+```typescript
+const proof = astral.proofs.create(claim, [stamp]);
+
+console.log(proof.stamps.length); // 1
+```
+
+A proof bundles your claim with supporting evidence. You can include stamps from multiple plugins for stronger credibility.
+
+## Step 6: Verify
+
+```typescript
+const assessment = await astral.verify.proof(proof);
+
+console.log(assessment.confidence);       // 0.0 to 0.85 (single-stamp cap)
+console.log(assessment.stampResults[0]);
+// {
+//   stampIndex: 0,
+//   plugin: 'mock',
+//   signaturesValid: true,
+//   structureValid: true,
+//   signalsConsistent: true,
+//   supportsClaim: true,
+//   claimSupportScore: 0.72,
+//   pluginResult: { ... }
+// }
+```
+
+---
+
+## Multi-stamp proofs
+
+Stronger proofs use evidence from independent sources. Register multiple plugins and collect from all of them:
+
+```typescript
+import { WitnessChainPlugin } from '@decentralized-geo/plugin-witnesschain';
+
+astral.plugins.register(new WitnessChainPlugin({ proverId: '0x...' }));
+
+// Collect from both
+const signals = await astral.stamps.collect({
+  plugins: ['mock', 'witnesschain'],
+});
+
+// Create and sign stamps from each
+const stamps = [];
+for (const s of signals) {
+  const unsigned = await astral.stamps.create({ plugin: s.plugin }, s);
+  const signed = await astral.stamps.sign({ plugin: s.plugin }, unsigned, signer);
+  stamps.push(signed);
+}
+
+// Build multi-stamp proof
+const proof = astral.proofs.create(claim, stamps);
+const assessment = await astral.verify.proof(proof);
+
+console.log(assessment.confidence);  // Higher — multi-stamp bonus
+console.log(assessment.correlation);
+// {
+//   independence: 1.0,    // Different plugins = fully independent
+//   agreement: 0.85,      // Stamps agree on location
+//   notes: ['All stamps from independent plugins', 'Strong agreement between stamps']
+// }
+```
+
+Multi-stamp proofs from independent systems get bonuses:
+- **Independence bonus**: up to +10% for stamps from different plugins
+- **Agreement bonus**: up to +4.5% when stamps corroborate each other
+- A single stamp is capped at 0.85 confidence; multiple independent stamps can exceed that
+
+## Verifying a single stamp
+
+If you just want to check whether a stamp is valid without evaluating it against a claim:
+
+```typescript
+const result = await astral.verify.stamp(stamp);
+
+console.log(result.valid);             // true/false
+console.log(result.signaturesValid);   // Crypto signatures check out
+console.log(result.structureValid);    // Data format is correct
+console.log(result.signalsConsistent); // Signals don't contradict each other
+```
+
+## Hosted verification
+
+For onchain use, verify through the Astral hosted service to get a TEE-signed attestation:
+
+```typescript
+// Local verification — no attestation
+const local = await astral.verify.proof(proof);
+
+// Hosted verification — adds TEE attestation
+const hosted = await astral.verify.proof(proof, { hosted: true });
+// hosted includes attestation and delegatedAttestation for onchain submission
+```
+
+<Info>
+  Hosted verification is not yet available. Use local verification for now.
+</Info>
+
+## Putting it together
+
+Here's the full flow in one script:
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { MockPlugin } from '@decentralized-geo/plugin-mock';
+import { ethers } from 'ethers';
+
+// Setup
+const astral = new AstralSDK({ chainId: 84532 });
+astral.plugins.register(new MockPlugin({
+  defaultLocation: { lat: 48.8584, lon: 2.2945 },
+}));
+
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY);
+const signer = {
+  algorithm: 'secp256k1',
+  signer: { scheme: 'eth-address', value: wallet.address },
+  sign: async (data: string) => wallet.signMessage(data),
+};
+
+// Collect → Create → Sign
+const signals = await astral.stamps.collect({ plugins: ['mock'] });
+const unsigned = await astral.stamps.create({ plugin: 'mock' }, signals[0]);
+const stamp = await astral.stamps.sign({ plugin: 'mock' }, unsigned, signer);
+
+// Claim + Proof
+const claim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
+  location: { type: 'Point', coordinates: [2.2945, 48.8584] },
+  srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
+  subject: { scheme: 'eth-address', value: wallet.address },
+  radius: 100,
+  time: {
+    start: Math.floor(Date.now() / 1000) - 300,
+    end: Math.floor(Date.now() / 1000),
+  },
+};
+
+const proof = astral.proofs.create(claim, [stamp]);
+
+// Verify
+const assessment = await astral.verify.proof(proof);
+console.log(`Confidence: ${(assessment.confidence * 100).toFixed(1)}%`);
+console.log(`Signatures valid: ${assessment.stampResults[0].signaturesValid}`);
+console.log(`Supports claim: ${assessment.stampResults[0].supportsClaim}`);
+```
+
+<CardGroup cols={2}>
+  <Card title="ProofMode integration" icon="mobile" href="/guides/proofmode-integration">
+    Use real device sensors on Android
+  </Card>
+  <Card title="WitnessChain integration" icon="tower-broadcast" href="/guides/witnesschain-integration">
+    Use network infrastructure verification
+  </Card>
+</CardGroup>

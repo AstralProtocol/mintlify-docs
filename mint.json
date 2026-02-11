@@ -74,7 +74,9 @@
         "concepts/geospatial-operations",
         "concepts/policy-attestations",
         "concepts/eas-resolvers",
-        "concepts/verifiable-computation"
+        "concepts/verifiable-computation",
+        "concepts/location-proofs",
+        "concepts/plugins"
       ]
     },
     {
@@ -82,7 +84,11 @@
       "pages": [
         "guides/location-gated-nft",
         "guides/geofenced-token",
-        "guides/delivery-verification"
+        "guides/delivery-verification",
+        "guides/creating-location-proofs",
+        "guides/proofmode-integration",
+        "guides/witnesschain-integration",
+        "guides/writing-plugins"
       ]
     },
     {

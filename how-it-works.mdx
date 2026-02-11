@@ -155,9 +155,9 @@ There are two distinct trust questions in location-based systems:
 
 ### 1. Are the inputs truthful?
 
-This is the **location verification problem** — how do you know a user was actually at the location they claim? GPS is spoofable, and proving physical presence remains an open research problem.
+This is the **location verification problem** — how do you know a user was actually at the location they claim? GPS is spoofable, and proving physical presence requires evidence from multiple independent sources.
 
-We're actively working on this through our [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323). For now, Astral Location Services trust the location data provided as input.
+Astral's [location proof system](/concepts/location-proofs) addresses this through a plugin architecture. Evidence from device sensors ([ProofMode](/guides/proofmode-integration)), network infrastructure ([WitnessChain](/guides/witnesschain-integration)), and other sources is combined into credibility assessments scored from 0 to 1.
 
 ### 2. Was the computation performed correctly?
 

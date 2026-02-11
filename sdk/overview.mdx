@@ -1,6 +1,6 @@
 ---
 title: "SDK Overview"
-description: "Unified TypeScript SDK for Astral Location Services v0.2.0"
+description: "Unified TypeScript SDK for Astral Location Services v0.3.0"
 ---
 
 <Warning>
@@ -8,17 +8,17 @@ description: "Unified TypeScript SDK for Astral Location Services v0.2.0"
 </Warning>
 
 <Note>
-  **v0.2.0 Unified SDK** — The SDK now provides a unified API with namespaced modules.
-  Location attestations and geospatial computations are now in a single package: `@decentralized-geo/astral-sdk`.
+  **v0.3.0** — The SDK now includes stamps, proofs, and verify modules for location verification alongside location attestations and geospatial computations.
 </Note>
 
 # SDK Overview
 
-The Astral SDK is the official TypeScript client for Astral Location Services, providing a unified interface for location attestations and verifiable geospatial computations.
+The Astral SDK is the official TypeScript client for Astral Location Services, providing a unified interface for location attestations, verifiable geospatial computations, and location verification.
 
 ## Design Philosophy
 
-- **Namespaced API**: Clear separation between location and compute operations
+- **Namespaced API**: Clear separation between location, compute, and verification operations
+- **Plugin architecture**: Extensible proof-of-location system through `LocationProofPlugin` interface
 - **Workflow-oriented**: Distinct offchain and onchain workflows for location attestations
 - **Type-safe**: Full TypeScript support with comprehensive types
 - **Batteries included**: Handles signing, encoding, and EAS integration
@@ -64,6 +64,24 @@ astral.compute.intersects(a, b, options);
 astral.compute.submit(delegatedAttestation);
 astral.compute.estimate(delegatedAttestation);
 astral.compute.health();
+
+// Plugin registry - register proof-of-location plugins
+astral.plugins.register(plugin);
+astral.plugins.get('mock');
+astral.plugins.list();
+
+// Stamps module - evidence collection
+astral.stamps.collect({ plugins: ['mock'] });
+astral.stamps.create({ plugin: 'mock' }, signals);
+astral.stamps.sign({ plugin: 'mock' }, unsigned, signer);
+
+// Proofs module - bundle claim + stamps
+astral.proofs.create(claim, stamps);
+
+// Verify module - verification and credibility assessment
+astral.verify.stamp(stamp);
+astral.verify.proof(proof);
+astral.verify.plugins();
 ```
 
 ## Quick Start
@@ -171,16 +189,32 @@ AstralSDK
 │   ├── build()         - Build unsigned attestation
 │   ├── encode()        - Encode for EAS
 │   └── decode()        - Decode from EAS
-└── compute: ComputeModule
-    ├── distance()      - Distance between geometries
-    ├── area()          - Area of polygon
-    ├── length()        - Length of line
-    ├── contains()      - Containment check
-    ├── within()        - Proximity check
-    ├── intersects()    - Intersection check
-    ├── submit()        - Submit delegated attestation
-    ├── estimate()      - Estimate gas
-    └── health()        - Service health check
+├── compute: ComputeModule
+│   ├── distance()      - Distance between geometries
+│   ├── area()          - Area of polygon
+│   ├── length()        - Length of line
+│   ├── contains()      - Containment check
+│   ├── within()        - Proximity check
+│   ├── intersects()    - Intersection check
+│   ├── submit()        - Submit delegated attestation
+│   ├── estimate()      - Estimate gas
+│   └── health()        - Service health check
+├── plugins: PluginRegistry
+│   ├── register()      - Register a proof-of-location plugin
+│   ├── get()           - Get plugin by name
+│   ├── has()           - Check if plugin is registered
+│   ├── list()          - List all plugin metadata
+│   └── withMethod()    - Find plugins implementing a method
+├── stamps: StampsModule
+│   ├── collect()       - Gather raw signals from plugins
+│   ├── create()        - Transform signals into unsigned stamp
+│   └── sign()          - Cryptographically sign a stamp
+├── proofs: ProofsModule
+│   └── create()        - Bundle claim + stamps into proof
+└── verify: VerifyModule
+    ├── stamp()         - Verify a stamp's internal validity
+    ├── proof()         - Full proof verification + credibility assessment
+    └── plugins()       - List available verification plugins
 ```
 
 ## Pages
@@ -194,6 +228,12 @@ AstralSDK
   </Card>
   <Card title="Compute Module" icon="calculator" href="/sdk/compute">
     Geospatial computation methods
+  </Card>
+  <Card title="Location Proofs" icon="stamp" href="/concepts/location-proofs">
+    Evidence-based location verification
+  </Card>
+  <Card title="Plugin Architecture" icon="puzzle-piece" href="/concepts/plugins">
+    Proof-of-location plugin system
   </Card>
   <Card title="Migration Guide" icon="arrow-right" href="/sdk/migration">
     Migrate from v0.1.x to v0.2.0

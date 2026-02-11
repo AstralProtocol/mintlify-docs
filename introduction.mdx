@@ -99,7 +99,7 @@ Astral solves this by providing:
 This introduces **location as a new onchain primitive** — enabling smart contracts to reason about geography for the first time.
 
 <Info>
-  **What about location verification?** GPS is spoofable, and verifying *where* a user actually is remains an open problem. We're developing the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) to address this. Astral Location Services provide the geospatial policy layer that location proofs will plug into.
+  **What about location verification?** GPS is spoofable. Astral's [location proof system](/concepts/location-proofs) addresses this by combining evidence from multiple independent proof-of-location plugins — device sensors ([ProofMode](/guides/proofmode-integration)), network infrastructure ([WitnessChain](/guides/witnesschain-integration)), and more — into credibility assessments. The plugin architecture is extensible, so new proof-of-location systems can integrate as they emerge.
 </Info>
 
 ## What You Can Build
@@ -121,7 +121,7 @@ This introduces **location as a new onchain primitive** — enabling smart contr
 
 ## The SDK
 
-The Astral SDK provides a namespaced API for location attestations and geospatial computations:
+The Astral SDK provides a namespaced API for location attestations, geospatial computations, and location verification:
 
 ```typescript
 // Location attestations
@@ -132,7 +132,11 @@ astral.location.onchain.create(input);
 astral.compute.distance(from, to, options);
 astral.compute.contains(container, containee, options);
 astral.compute.within(geometry, target, radius, options);
-astral.compute.submit(delegatedAttestation);
+
+// Location verification (new in v0.3.0)
+astral.stamps.collect({ plugins: ['proofmode', 'witnesschain'] });
+astral.proofs.create(claim, stamps);
+astral.verify.proof(proof);
 ```
 
 <Card title="SDK Reference" icon="code" href="/sdk/overview">

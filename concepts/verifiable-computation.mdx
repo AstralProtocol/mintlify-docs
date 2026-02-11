@@ -24,7 +24,7 @@ graph LR
 **Astral Location Services solve the middle step** — verifiable geospatial computation. Given location inputs, we can provably check spatial relationships and produce signed attestations for onchain use.
 
 <Info>
-  **What about step 1?** Verifying *where* a user actually is remains an open problem. GPS is spoofable. We're developing the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) to address this. Location proofs will plug into Astral Location Services to complete the pipeline.
+  **What about step 1?** GPS is spoofable. Astral's [location proof system](/concepts/location-proofs) addresses this through a plugin architecture — evidence from device sensors ([ProofMode](/guides/proofmode-integration)), network infrastructure ([WitnessChain](/guides/witnesschain-integration)), and other sources is combined into credibility assessments.
 </Info>
 
 ## Why Verification Matters
@@ -144,17 +144,17 @@ Location A + Location B → TEE (PostGIS) → Signed attestation: "distance = 45
 
 Even with verifiable computation, users can lie about their location. GPS is spoofable. The attestation proves the *computation* was correct, not that the *inputs* were honest.
 
-This is why we're developing the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) — to provide evidence-based location claims that can feed into Astral Location Services for a fully verifiable pipeline.
+Astral's [location proof plugins](/concepts/location-proofs) address this by combining evidence from multiple independent proof-of-location systems into credibility assessments. See the [creating location proofs](/guides/creating-location-proofs) guide to get started.
 
 <Warning>
-  **Be upfront with your users**: Until location proof plugins are integrated, location verification relies on trusting the user's GPS. Astral Location Services provides verifiable *computation*, not verifiable *location*.
+  **Be upfront with your users**: Location proof confidence scores are heuristic assessments, not calibrated probabilities. A single GPS-based stamp is capped at ~0.7 confidence because the device controls the sensor. Multi-source proofs from independent systems provide stronger assurance.
 </Warning>
 
 ## Why Build the Geospatial Layer First?
 
 Location proofs become useful when they can trigger onchain actions through geospatial policies. Astral Location Services apply those policies — checking if a location is inside a boundary, within range of a target, or satisfies other spatial constraints.
 
-By building the geospatial policy infrastructure now, we can experiment with use cases and iterate while developing the [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323). As proof mechanisms mature, they plug directly into the existing pipeline.
+By building the geospatial policy infrastructure now, we can experiment with use cases and iterate as [location proof plugins](/concepts/plugins) mature. New proof-of-location systems plug directly into the existing pipeline through the `LocationProofPlugin` interface.
 
 ## Determinism Guarantees
 

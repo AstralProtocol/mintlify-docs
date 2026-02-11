@@ -1,0 +1,213 @@
+---
+title: "WitnessChain integration"
+description: "Infrastructure-level location proofs via network latency triangulation"
+---
+
+<Warning>
+  **Research Preview** — Code snippets need testing against actual implementation.
+</Warning>
+
+# WitnessChain integration
+
+[WitnessChain](https://www.witnesschain.com/) verifies location through network infrastructure — latency measurements, IP geolocation from multiple sources, and decentralized challenge protocols. Unlike device-based systems, the evidence comes from infrastructure the user doesn't control, providing an independent signal that's harder to spoof.
+
+## How WitnessChain works
+
+WitnessChain uses a challenge-response protocol:
+
+1. A **challenger** node sends network probes to a **prover** (the user's machine)
+2. Round-trip latency measurements triangulate the prover's physical location
+3. Multiple IP geolocation services provide independent estimates
+4. Results are signed with ECDSA by the challenger
+5. A `consolidated_result` combines all signals into a location determination
+
+## Installation
+
+```bash
+npm install @decentralized-geo/plugin-witnesschain
+```
+
+<Note>
+  `@decentralized-geo/plugin-witnesschain` requires `@decentralized-geo/astral-sdk` and `ethers` as peer dependencies.
+</Note>
+
+## Quick start
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { WitnessChainPlugin } from '@decentralized-geo/plugin-witnesschain';
+
+const astral = new AstralSDK({ chainId: 84532 });
+
+astral.plugins.register(new WitnessChainPlugin({
+  proverId: '0x1234...',  // The prover address to fetch challenges for
+  apiUrl: 'https://api.witnesschain.com',
+}));
+```
+
+## Fetching historical proofs
+
+The primary mode for v0 is fetching existing challenge results:
+
+```typescript
+const signals = await astral.stamps.collect({
+  plugins: ['witnesschain'],
+});
+
+console.log(signals[0].data);
+// {
+//   challengeId: 'abc123',
+//   challenger: '0xchallenger...',
+//   prover: '0xprover...',
+//   challengeStatus: 'success',
+//   claims: { latitude: 48.858, longitude: 2.295 },
+//   consolidated_result: {
+//     verified: true,
+//     latitude: 48.857,
+//     longitude: 2.294,
+//     KnowLocUncertaintyKm: 5.2,
+//     ...
+//   },
+//   pingDelay: { avg: 12.5, min: 10, max: 15 },
+//   ...
+// }
+```
+
+This queries the WitnessChain API for completed challenges associated with the prover address.
+
+<Info>
+  **On-demand challenges** (triggering a new challenge via the API) require POINTS tokens and are not available in v0. The plugin throws a descriptive error if you attempt this. Use historical proofs for now.
+</Info>
+
+## Creating stamps
+
+```typescript
+const unsigned = await astral.stamps.create(
+  { plugin: 'witnesschain' },
+  signals[0]
+);
+
+console.log(unsigned.location);
+// { type: 'Point', coordinates: [2.295, 48.858] }
+
+console.log(unsigned.signals);
+// {
+//   challengeId: 'abc123',
+//   challenger: '0xchallenger...',
+//   pingDelay: { avg: 12.5, min: 10, max: 15 },
+//   consolidatedResult: { verified: true, ... },
+//   knowLocUncertaintyKm: 5.2,
+// }
+```
+
+The plugin extracts location from the challenge result's `claims` field and maps all relevant signals into the stamp.
+
+## Verification
+
+WitnessChain stamps are verified with real ECDSA cryptography:
+
+```typescript
+const result = await astral.verify.stamp(stamp);
+
+console.log(result.signaturesValid);   // ECDSA signature recovery
+console.log(result.structureValid);    // lpVersion, plugin name, coordinates
+console.log(result.signalsConsistent); // consolidated_result structure
+console.log(result.details);
+// {
+//   challengeSignatureValid: true,
+//   recoveredSigner: '0xchallenger...',
+//   coordinatesInRange: true,
+//   consolidatedResultPresent: true,
+// }
+```
+
+### What gets verified
+
+1. **Challenge signature** — ECDSA signature on the challenge message is recovered and compared against the `challenger` address
+2. **Stamp-level signatures** — any Astral-level signatures on the stamp are verified
+3. **Structure** — `lpVersion` is `0.2`, `plugin` is `witnesschain`, coordinates are valid
+4. **Consolidated result** — the `consolidated_result` object has the expected structure
+
+## Evaluation against claims
+
+```typescript
+const credibility = await plugin.evaluate(stamp, claim);
+
+console.log(credibility.score);    // 0.0 to ~0.75
+console.log(credibility.spatial);  // Distance + uncertainty scoring
+console.log(credibility.temporal); // Temporal overlap
+console.log(credibility.details);
+// {
+//   distanceKm: 0.45,
+//   uncertaintyKm: 5.2,
+//   ipAgreement: { ipapi: true, ipregistry: true, maxmind: false },
+//   consolidatedVerified: true,
+//   knowLocPresent: true,
+// }
+```
+
+### Scoring model
+
+| Factor | Weight | Notes |
+|--------|--------|-------|
+| Spatial accuracy | 65% | Haversine distance weighted by `KnowLocUncertaintyKm` |
+| Temporal overlap | 35% | Challenge timestamp vs claim time window |
+| Consolidated verified | +0.05 bonus | `consolidated_result.verified === true` |
+| KnowLoc present | +0.05 bonus | Location knowledge indicator available |
+| IP agreement | Up to +0.1 | Bonus for IP geolocation source agreement |
+| Challenge failure | -0.3 penalty | Challenge status indicates failure |
+
+### Multi-source IP geolocation
+
+WitnessChain's consolidated results can include IP geolocation estimates from multiple providers. The plugin checks agreement between these sources — if ipapi, ipregistry, and MaxMind all place the user in the same region, confidence increases.
+
+## Multi-stamp proofs
+
+WitnessChain is most powerful when combined with device-level evidence. A proof with both ProofMode (device sensors) and WitnessChain (network infrastructure) stamps gets an independence bonus because the evidence comes from fundamentally different physical phenomena:
+
+```typescript
+import { MockPlugin } from '@decentralized-geo/plugin-mock';
+
+// Register both plugins
+astral.plugins.register(new MockPlugin());  // Simulating ProofMode
+astral.plugins.register(new WitnessChainPlugin({ proverId: '0x...' }));
+
+// Collect from both
+const signals = await astral.stamps.collect();
+
+// Build and sign stamps
+const stamps = [];
+for (const s of signals) {
+  const unsigned = await astral.stamps.create({ plugin: s.plugin }, s);
+  const signed = await astral.stamps.sign({ plugin: s.plugin }, unsigned, signer);
+  stamps.push(signed);
+}
+
+// Multi-stamp proof
+const proof = astral.proofs.create(claim, stamps);
+const assessment = await astral.verify.proof(proof);
+
+console.log(assessment.correlation.independence); // 1.0 — fully independent
+console.log(assessment.confidence); // Higher than either stamp alone
+```
+
+## Authentication
+
+WitnessChain's API uses wallet-based authentication — you sign a challenge message to prove you're the prover:
+
+```typescript
+const plugin = new WitnessChainPlugin({
+  proverId: '0x1234...',
+  apiUrl: 'https://api.witnesschain.com',
+  // Authentication is handled internally when collect() is called
+});
+```
+
+<CardGroup cols={2}>
+  <Card title="ProofMode integration" icon="mobile" href="/guides/proofmode-integration">
+    Add device-level evidence
+  </Card>
+  <Card title="Creating location proofs" icon="rocket" href="/guides/creating-location-proofs">
+    Full tutorial with the mock plugin
+  </Card>
+</CardGroup>
