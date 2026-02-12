@@ -129,9 +129,32 @@ A proof bundles your claim with supporting evidence. You can include stamps from
 ## Step 6: Verify
 
 ```typescript
-const assessment = await astral.verify.proof(proof);
+const assessment = await astral.proofs.verify(proof);
 
-console.log(assessment.confidence);       // 0.0 to 0.85 (single-stamp cap)
+console.log(assessment.dimensions);
+// {
+//   spatial: {
+//     meanDistanceMeters: 45.2,
+//     maxDistanceMeters: 45.2,
+//     withinRadiusFraction: 1.0
+//   },
+//   temporal: {
+//     meanOverlap: 1.0,
+//     minOverlap: 1.0,
+//     fullyOverlappingFraction: 1.0
+//   },
+//   validity: {
+//     signaturesValidFraction: 1.0,
+//     structureValidFraction: 1.0,
+//     signalsConsistentFraction: 1.0
+//   },
+//   independence: {
+//     uniquePluginRatio: 1.0,
+//     spatialAgreement: 1.0,
+//     pluginNames: ['mock']
+//   }
+// }
+
 console.log(assessment.stampResults[0]);
 // {
 //   stampIndex: 0,
@@ -140,8 +163,8 @@ console.log(assessment.stampResults[0]);
 //   structureValid: true,
 //   signalsConsistent: true,
 //   supportsClaim: true,
-//   claimSupportScore: 0.72,
-//   pluginResult: { ... }
+//   distanceMeters: 45.2,
+//   temporalOverlap: 1.0
 // }
 ```
 
@@ -171,28 +194,34 @@ for (const s of signals) {
 
 // Build multi-stamp proof
 const proof = astral.proofs.create(claim, stamps);
-const assessment = await astral.verify.proof(proof);
+const assessment = await astral.proofs.verify(proof);
 
-console.log(assessment.confidence);  // Higher — multi-stamp bonus
-console.log(assessment.correlation);
+console.log(assessment.dimensions.independence);
 // {
-//   independence: 1.0,    // Different plugins = fully independent
-//   agreement: 0.85,      // Stamps agree on location
-//   notes: ['All stamps from independent plugins', 'Strong agreement between stamps']
+//   uniquePluginRatio: 1.0,         // All stamps from different plugins
+//   spatialAgreement: 0.95,         // Stamps agree on location
+//   pluginNames: ['mock', 'witnesschain']
+// }
+
+console.log(assessment.dimensions.spatial);
+// {
+//   meanDistanceMeters: 35.8,       // Average distance from claim
+//   maxDistanceMeters: 52.1,        // Worst case distance
+//   withinRadiusFraction: 1.0       // All stamps within radius
 // }
 ```
 
-Multi-stamp proofs from independent systems get bonuses:
-- **Independence bonus**: up to +10% for stamps from different plugins
-- **Agreement bonus**: up to +4.5% when stamps corroborate each other
-- A single stamp is capped at 0.85 confidence; multiple independent stamps can exceed that
+Multi-stamp proofs from independent systems provide stronger evidence through cross-validation:
+- **Independence**: `uniquePluginRatio` measures how many different plugins were used
+- **Agreement**: `spatialAgreement` measures how closely stamps corroborate each other
+- Applications define their own trust models to weight these dimensions
 
 ## Verifying a single stamp
 
 If you just want to check whether a stamp is valid without evaluating it against a claim:
 
 ```typescript
-const result = await astral.verify.stamp(stamp);
+const result = await astral.stamps.verify(stamp);
 
 console.log(result.valid);             // true/false
 console.log(result.signaturesValid);   // Crypto signatures check out
@@ -206,10 +235,13 @@ For onchain use, verify through the Astral hosted service to get a TEE-signed at
 
 ```typescript
 // Local verification — no attestation
-const local = await astral.verify.proof(proof);
+const local = await astral.proofs.verify(proof);
 
 // Hosted verification — adds TEE attestation
-const hosted = await astral.verify.proof(proof, { hosted: true });
+const hosted = await astral.proofs.verify(proof, {
+  mode: 'hosted',
+  endpoint: 'https://api.astral.global/verify/v0'
+});
 // hosted includes attestation and delegatedAttestation for onchain submission
 ```
 
@@ -261,10 +293,10 @@ const claim = {
 const proof = astral.proofs.create(claim, [stamp]);
 
 // Verify
-const assessment = await astral.verify.proof(proof);
-console.log(`Confidence: ${(assessment.confidence * 100).toFixed(1)}%`);
-console.log(`Signatures valid: ${assessment.stampResults[0].signaturesValid}`);
-console.log(`Supports claim: ${assessment.stampResults[0].supportsClaim}`);
+const assessment = await astral.proofs.verify(proof);
+console.log('Spatial accuracy:', assessment.dimensions.spatial.meanDistanceMeters, 'meters');
+console.log('Signatures valid:', assessment.stampResults[0].signaturesValid);
+console.log('Supports claim:', assessment.stampResults[0].supportsClaim);
 ```
 
 <CardGroup cols={2}>

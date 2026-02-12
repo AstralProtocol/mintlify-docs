@@ -107,7 +107,7 @@ The plugin extracts location from the challenge result's `claims` field and maps
 WitnessChain stamps are verified with real ECDSA cryptography:
 
 ```typescript
-const result = await astral.verify.stamp(stamp);
+const result = await astral.stamps.verify(stamp);
 
 console.log(result.signaturesValid);   // ECDSA signature recovery
 console.log(result.structureValid);    // lpVersion, plugin name, coordinates
@@ -128,38 +128,41 @@ console.log(result.details);
 3. **Structure** — `lpVersion` is `0.2`, `plugin` is `witnesschain`, coordinates are valid
 4. **Consolidated result** — the `consolidated_result` object has the expected structure
 
-## Evaluation against claims
+## Evaluating proofs
+
+When you verify a proof containing WitnessChain stamps, the SDK evaluates them as part of the multidimensional credibility assessment:
 
 ```typescript
-const credibility = await plugin.evaluate(stamp, claim);
+const proof = astral.proofs.create(claim, [stamp]);
+const assessment = await astral.proofs.verify(proof);
 
-console.log(credibility.score);    // 0.0 to ~0.75
-console.log(credibility.spatial);  // Distance + uncertainty scoring
-console.log(credibility.temporal); // Temporal overlap
-console.log(credibility.details);
+console.log(assessment.dimensions.spatial);
 // {
-//   distanceKm: 0.45,
-//   uncertaintyKm: 5.2,
-//   ipAgreement: { ipapi: true, ipregistry: true, maxmind: false },
-//   consolidatedVerified: true,
-//   knowLocPresent: true,
+//   meanDistanceMeters: 450,
+//   maxDistanceMeters: 450,
+//   withinRadiusFraction: 1.0
 // }
+
+console.log(assessment.dimensions.temporal);
+// {
+//   meanOverlap: 1.0,
+//   minOverlap: 1.0,
+//   fullyOverlappingFraction: 1.0
+// }
+
+console.log(assessment.stampResults[0].distanceMeters);
+// 450
 ```
 
-### Scoring model
+### What the SDK analyzes
 
-| Factor | Weight | Notes |
-|--------|--------|-------|
-| Spatial accuracy | 65% | Haversine distance weighted by `KnowLocUncertaintyKm` |
-| Temporal overlap | 35% | Challenge timestamp vs claim time window |
-| Consolidated verified | +0.05 bonus | `consolidated_result.verified === true` |
-| KnowLoc present | +0.05 bonus | Location knowledge indicator available |
-| IP agreement | Up to +0.1 | Bonus for IP geolocation source agreement |
-| Challenge failure | -0.3 penalty | Challenge status indicates failure |
+The SDK's proof evaluation considers WitnessChain-specific signals:
+- **Spatial accuracy**: Distance from claim location, weighted by `KnowLocUncertaintyKm`
+- **Temporal accuracy**: Challenge timestamp vs claim time window
+- **Consolidated result**: Whether `consolidated_result.verified === true`
+- **IP geolocation agreement**: Agreement between multiple IP geolocation sources
 
-### Multi-source IP geolocation
-
-WitnessChain's consolidated results can include IP geolocation estimates from multiple providers. The plugin checks agreement between these sources — if ipapi, ipregistry, and MaxMind all place the user in the same region, confidence increases.
+Applications define their own trust models to weight these dimensions.
 
 ## Multi-stamp proofs
 
@@ -185,10 +188,14 @@ for (const s of signals) {
 
 // Multi-stamp proof
 const proof = astral.proofs.create(claim, stamps);
-const assessment = await astral.verify.proof(proof);
+const assessment = await astral.proofs.verify(proof);
 
-console.log(assessment.correlation.independence); // 1.0 — fully independent
-console.log(assessment.confidence); // Higher than either stamp alone
+console.log(assessment.dimensions.independence);
+// {
+//   uniquePluginRatio: 1.0,         // Fully independent
+//   spatialAgreement: 0.95,         // Stamps agree on location
+//   pluginNames: ['mock', 'witnesschain']
+// }
 ```
 
 ## Authentication

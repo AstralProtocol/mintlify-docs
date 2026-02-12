@@ -135,8 +135,9 @@ astral.compute.within(geometry, target, radius, options);
 
 // Location verification (new in v0.3.0)
 astral.stamps.collect({ plugins: ['proofmode', 'witnesschain'] });
+astral.stamps.verify(stamp);
 astral.proofs.create(claim, stamps);
-astral.verify.proof(proof);
+astral.proofs.verify(proof);
 ```
 
 <Card title="SDK Reference" icon="code" href="/sdk/overview">

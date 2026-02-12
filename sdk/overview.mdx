@@ -70,18 +70,15 @@ astral.plugins.register(plugin);
 astral.plugins.get('mock');
 astral.plugins.list();
 
-// Stamps module - evidence collection
+// Stamps module - evidence collection and verification
 astral.stamps.collect({ plugins: ['mock'] });
 astral.stamps.create({ plugin: 'mock' }, signals);
 astral.stamps.sign({ plugin: 'mock' }, unsigned, signer);
+astral.stamps.verify(stamp);
 
-// Proofs module - bundle claim + stamps
+// Proofs module - bundle claim + stamps and evaluate credibility
 astral.proofs.create(claim, stamps);
-
-// Verify module - verification and credibility assessment
-astral.verify.stamp(stamp);
-astral.verify.proof(proof);
-astral.verify.plugins();
+astral.proofs.verify(proof, options);
 ```
 
 ## Quick Start
@@ -208,13 +205,11 @@ AstralSDK
 ├── stamps: StampsModule
 │   ├── collect()       - Gather raw signals from plugins
 │   ├── create()        - Transform signals into unsigned stamp
-│   └── sign()          - Cryptographically sign a stamp
+│   ├── sign()          - Cryptographically sign a stamp
+│   └── verify()        - Verify a stamp's internal validity
 ├── proofs: ProofsModule
-│   └── create()        - Bundle claim + stamps into proof
-└── verify: VerifyModule
-    ├── stamp()         - Verify a stamp's internal validity
-    ├── proof()         - Full proof verification + credibility assessment
-    └── plugins()       - List available verification plugins
+│   ├── create()        - Bundle claim + stamps into proof
+│   └── verify()        - Full proof verification + credibility assessment
 ```
 
 ## Pages

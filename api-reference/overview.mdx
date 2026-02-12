@@ -1,6 +1,6 @@
 ---
 title: "API Overview"
-description: "REST APIs for geospatial operations, location verification, and location records"
+description: "REST APIs for location verification, verifiable geospatial operations, and location records"
 ---
 
 <Warning>
@@ -13,19 +13,19 @@ Astral provides three REST APIs:
 
 | API | Purpose | Base URL |
 |-----|---------|----------|
-| **Compute API** | Verifiable geospatial operations | `/compute/v0` |
 | **Verify API** | Location proof verification | `/verify/v0` |
-| **Records API** | Query location attestations | `/api/v0` |
+| **Compute API** | Verifiable geospatial operations | `/compute/v0` |
+| **Records API** | Query location attestations | `/records/v0` |
 
 <CardGroup cols={3}>
+  <Card title="Verify API" icon="shield-check" href="#verify-api">
+    Verify location stamps and evaluate proof credibility
+  </Card>
   <Card title="Compute API" icon="calculator" href="#compute-api">
     Distance, containment, proximity checks with signed attestations
   </Card>
-  <Card title="Verify API" icon="shield-check" href="#verify-api">
-    Stamp verification and proof credibility assessment
-  </Card>
   <Card title="Records API" icon="database" href="/api-reference/records/overview">
-    Query existing location attestations across chains
+    Query location records across systems
   </Card>
 </CardGroup>
 

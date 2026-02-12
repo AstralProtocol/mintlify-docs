@@ -31,7 +31,7 @@ Location proofs fill in step 1. They provide *evidence* that a subject was at a 
 | **Stamp** | Evidence from a single proof-of-location system (one observation) |
 | **Proof** | A claim bundled with one or more stamps |
 | **Verify** | Check a stamp's internal validity — signatures, structure, signal consistency |
-| **Evaluate** | Assess how well a stamp supports a claim — produces a credibility vector |
+| **Evaluate** | Assess how well stamps support a claim — SDK-side analysis producing a credibility vector |
 
 ## How it works
 
@@ -59,20 +59,20 @@ Each stamp carries evidence from a different proof-of-location system — device
     For multi-stamp proofs, the system analyzes independence (are stamps from different physical phenomena?) and agreement (do they corroborate each other?). Two stamps from different systems that agree are stronger than two from the same system.
   </Step>
   <Step title="Credibility assessment">
-    An overall confidence score is computed from individual stamp scores, correlation bonuses, and penalties. A single stamp is capped at 0.85 confidence. Multiple independent stamps can push higher.
+    A multidimensional credibility vector is produced with spatial, temporal, validity, and independence measurements. Applications define their own trust models to weight these dimensions according to their requirements.
   </Step>
 </Steps>
 
 ## Credibility, not certainty
 
-The confidence score is **not** a calibrated probability. It's a heuristic assessment incorporating:
+The credibility assessment is **not** a calibrated probability. It's a multidimensional measurement across four dimensions:
 
-- Evidence validity (are signatures and structures correct?)
-- Claim support (does the evidence match the claim spatially and temporally?)
-- Source independence (are stamps from different physical phenomena?)
-- Source agreement (do independent stamps corroborate each other?)
+- **Spatial**: How close are stamps to the claimed location? (mean/max distance, within-radius fraction)
+- **Temporal**: How well do stamps overlap the claimed time window? (mean/min overlap, fully-overlapping fraction)
+- **Validity**: Are signatures correct, structures well-formed, and signals consistent? (per-check fractions)
+- **Independence**: Are stamps from different plugins? How well do they agree spatially? (unique plugin ratio, spatial agreement)
 
-A ProofMode stamp with self-reported GPS maxes out around 0.7 for spatial accuracy — the device controls the sensor. A WitnessChain stamp using network latency triangulation provides independent verification from infrastructure the user doesn't control. Together, they're stronger than either alone.
+Applications weight these dimensions according to their own trust models. A ProofMode stamp with self-reported GPS provides device-level evidence. A WitnessChain stamp using network latency triangulation provides independent infrastructure-level verification. Together, they score higher on the independence dimension than either alone.
 
 ## The plugin architecture
 
@@ -84,7 +84,6 @@ graph TB
         Registry[Plugin Registry]
         Stamps[stamps module]
         Proofs[proofs module]
-        Verify[verify module]
     end
 
     subgraph Plugins
@@ -97,10 +96,10 @@ graph TB
     Registry --> WC
     Registry --> Mock
     Stamps --> Registry
-    Verify --> Registry
+    Proofs --> Registry
 ```
 
-All methods on the plugin interface are optional. A mobile-only plugin might implement `collect`/`create`/`sign` but skip `verify`/`evaluate` (letting the hosted service handle those). A verification-only plugin might implement just `verify`/`evaluate`.
+All methods on the plugin interface are optional. A mobile-only plugin might implement `collect`/`create`/`sign` but skip `verify` (letting the hosted service handle validation). A verification-only plugin might implement just `verify` for stamp validation.
 
 <Card title="Plugin architecture details" icon="puzzle-piece" href="/concepts/plugins">
   How the plugin system works — interface, registry, runtime model
@@ -122,19 +121,23 @@ All methods on the plugin interface are optional. A mobile-only plugin might imp
 
 ## Local vs hosted verification
 
-Plugins implement `verify` and `evaluate` as regular code — you can run them anywhere. The distinction between local and hosted verification is whether you want a TEE attestation on top:
+Plugins implement `verify` as regular code — you can run it anywhere. The distinction between local and hosted verification is whether you want a TEE attestation on top:
 
 | Mode | What happens | Attestation |
 |------|-------------|-------------|
-| **Local** | SDK calls plugin's `verify`/`evaluate` directly | None — you trust the plugin code |
-| **Hosted** | SDK calls the Astral service, which runs the same plugin code in a TEE | Signed EAS attestation from TEE |
+| **Local** | SDK calls plugin's `verify` directly and evaluates in the ProofsModule | None — you trust the plugin code |
+| **Hosted** | SDK calls the Astral service, which runs the same plugin code in a TEE and evaluates server-side | Signed EAS attestation from TEE |
 
 ```typescript
 // Local verification — runs plugin code in your environment
-const result = await astral.verify.stamp(stamp);
+const result = await astral.stamps.verify(stamp);
+const assessment = await astral.proofs.verify(proof);
 
 // Hosted verification — same logic, but with TEE attestation
-const result = await astral.verify.stamp(stamp, { hosted: true });
+const assessment = await astral.proofs.verify(proof, {
+  mode: 'hosted',
+  endpoint: 'https://api.astral.global/verify/v0'
+});
 ```
 
 Both paths produce the same credibility assessment. The hosted path adds a signed attestation you can submit onchain.

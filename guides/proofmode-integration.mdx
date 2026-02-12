@@ -106,7 +106,9 @@ console.log(result.details);
   **v0 limitation**: SafetyNet/Play Integrity JWT certificate chain validation is not performed. The plugin checks the JWT structure and flag values but does not validate the signing certificate against Google's root. This is a known limitation documented in the threat model.
 </Warning>
 
-## Evaluation against claims
+## Evaluating proofs
+
+When you verify a proof containing ProofMode stamps, the SDK evaluates them as part of the multidimensional credibility assessment:
 
 ```typescript
 const claim = {
@@ -119,31 +121,36 @@ const claim = {
   time: { start: 1738200000, end: 1738200300 },
 };
 
-const credibility = await plugin.evaluate(stamp, claim);
+const proof = astral.proofs.create(claim, [stamp]);
+const assessment = await astral.proofs.verify(proof);
 
-console.log(credibility.score);    // 0.0 to ~0.7
-console.log(credibility.spatial);  // Haversine distance scoring
-console.log(credibility.temporal); // Temporal overlap scoring
-console.log(credibility.details);
+console.log(assessment.dimensions.spatial);
 // {
-//   distanceMeters: 45,
-//   locationAccuracy: 12.5,
-//   safetyNetBonus: true,
-//   missingSignals: [],
+//   meanDistanceMeters: 45,
+//   maxDistanceMeters: 45,
+//   withinRadiusFraction: 1.0
+// }
+
+console.log(assessment.dimensions.validity);
+// {
+//   signaturesValidFraction: 1.0,
+//   structureValidFraction: 1.0,
+//   signalsConsistentFraction: 1.0
 // }
 ```
 
-### Scoring model
+### What the SDK analyzes
 
-| Factor | Weight | Notes |
-|--------|--------|-------|
-| Spatial accuracy | 65% | Haversine distance weighted by `Location.Accuracy` |
-| Temporal overlap | 35% | Overlap between stamp footprint and claim window |
-| SafetyNet pass | +0.05 bonus | `basicIntegrity: true` indicates unmodified device |
-| Missing signals | Penalty | Missing GPS or cell data reduces confidence |
+The SDK's proof evaluation considers ProofMode-specific signals:
+- **Spatial accuracy**: Distance from claim location, weighted by `Location.Accuracy`
+- **Temporal accuracy**: Overlap between stamp footprint and claim window
+- **SafetyNet integrity**: Whether `basicIntegrity` and `ctsProfileMatch` flags are present
+- **Signal completeness**: Whether key signals (GPS, cell, WiFi) are present
+
+Applications define their own trust models to weight these dimensions.
 
 <Info>
-  **Spatial confidence cap**: ProofMode GPS is self-reported by the device. A compromised device can report any coordinates. Because of this, ProofMode alone maxes out around 0.7 for spatial accuracy. Pair with an independent source (like WitnessChain) for higher confidence.
+  **Device-level evidence**: ProofMode GPS is self-reported by the device. A compromised device can report any coordinates. Pair ProofMode with an independent source (like WitnessChain) to validate device claims with infrastructure-level evidence. This is captured in the `independence` dimension.
 </Info>
 
 ## React Native bridge

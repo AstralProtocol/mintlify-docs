@@ -28,14 +28,13 @@ import type {
 } from '@decentralized-geo/astral-sdk/plugins';
 ```
 
-All five methods are optional. Implement what makes sense for your system:
+All four methods are optional. Implement what makes sense for your system:
 
 | If your system... | Implement |
 |-------------------|-----------|
 | Collects evidence from sensors/APIs | `collect`, `create`, `sign` |
 | Can verify its own stamps | `verify` |
-| Can evaluate stamps against claims | `evaluate` |
-| Does all of the above | All five |
+| Does all of the above | All four |
 
 ## Scaffold
 
@@ -47,10 +46,8 @@ import type {
   RawSignals,
   UnsignedLocationStamp,
   LocationStamp,
-  LocationClaim,
   StampSigner,
   StampVerificationResult,
-  CredibilityVector,
 } from '@decentralized-geo/astral-sdk/plugins';
 
 export class MyPlugin implements LocationProofPlugin {
@@ -77,13 +74,6 @@ export class MyPlugin implements LocationProofPlugin {
 
   async verify(stamp: LocationStamp): Promise<StampVerificationResult> {
     // Check internal validity
-  }
-
-  async evaluate(
-    stamp: LocationStamp,
-    claim: LocationClaim
-  ): Promise<CredibilityVector> {
-    // Score how well the stamp supports the claim
   }
 }
 ```
@@ -240,75 +230,9 @@ async verify(stamp: LocationStamp): Promise<StampVerificationResult> {
 }
 ```
 
-## Implementing evaluate
-
-`evaluate` scores how well a stamp supports a location claim. Return a `CredibilityVector` with spatial and temporal scores.
-
-```typescript
-async evaluate(
-  stamp: LocationStamp,
-  claim: LocationClaim
-): Promise<CredibilityVector> {
-  // Calculate spatial distance (haversine)
-  const stampCoords = (stamp.location as { coordinates: number[] }).coordinates;
-  const claimCoords = (claim.location as { coordinates: number[] }).coordinates;
-  const distanceKm = haversine(
-    stampCoords[1], stampCoords[0],
-    claimCoords[1], claimCoords[0]
-  );
-
-  // Spatial scoring — closer is better, weighted by claim radius
-  const claimRadiusKm = claim.radius / 1000;
-  const spatial = distanceKm <= claimRadiusKm
-    ? 1.0 - (distanceKm / claimRadiusKm) * 0.3
-    : Math.max(0, 1.0 - distanceKm / (claimRadiusKm * 10));
-
-  // Temporal scoring — more overlap is better
-  const overlapStart = Math.max(stamp.temporalFootprint.start, claim.time.start);
-  const overlapEnd = Math.min(stamp.temporalFootprint.end, claim.time.end);
-  const overlapDuration = Math.max(0, overlapEnd - overlapStart);
-  const claimDuration = claim.time.end - claim.time.start;
-  const temporal = claimDuration > 0
-    ? Math.min(1.0, overlapDuration / claimDuration)
-    : overlapDuration > 0 ? 1.0 : 0;
-
-  // Combined score
-  const SPATIAL_WEIGHT = 0.65;
-  const TEMPORAL_WEIGHT = 0.35;
-  const score = spatial * SPATIAL_WEIGHT + temporal * TEMPORAL_WEIGHT;
-
-  return {
-    supportsClaim: score > 0.3,
-    score,
-    spatial,
-    temporal,
-    details: {
-      distanceKm,
-      claimRadiusKm,
-      overlapDuration,
-    },
-  };
-}
-```
-
-### Haversine helper
-
-```typescript
-function haversine(
-  lat1: number, lon1: number,
-  lat2: number, lon2: number
-): number {
-  const R = 6371; // Earth radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) *
-    Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-```
+<Note>
+  **Evaluation is SDK-side**: Plugins no longer implement `evaluate()`. The SDK's `ProofsModule` handles evaluation by analyzing all stamps against the claim to produce a multidimensional credibility vector.
+</Note>
 
 ## Package structure
 
@@ -319,7 +243,6 @@ my-plugin/
     collect.ts        # Evidence collection
     create.ts         # Signal → stamp transformation
     verify.ts         # Stamp verification
-    evaluate.ts       # Claim evaluation
     types.ts          # Plugin-specific types
   test/
     fixtures/         # Test data
@@ -359,17 +282,15 @@ describe('MyPlugin', () => {
     expect(signals.data.latitude).toBeDefined();
   });
 
-  it('full lifecycle: collect → create → sign → verify → evaluate', async () => {
+  it('full lifecycle: collect → create → sign → verify', async () => {
     const signals = await plugin.collect();
     const unsigned = await plugin.create(signals);
     const stamp = await plugin.sign(unsigned, testSigner);
 
     const verification = await plugin.verify(stamp);
     expect(verification.valid).toBe(true);
-
-    const evaluation = await plugin.evaluate(stamp, testClaim);
-    expect(evaluation.supportsClaim).toBe(true);
-    expect(evaluation.score).toBeGreaterThan(0);
+    expect(verification.signaturesValid).toBe(true);
+    expect(verification.structureValid).toBe(true);
   });
 });
 ```

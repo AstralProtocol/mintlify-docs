@@ -25,11 +25,10 @@ interface LocationProofPlugin {
   create?(signals: RawSignals): Promise<UnsignedLocationStamp>;
   sign?(stamp: UnsignedLocationStamp, signer: StampSigner): Promise<LocationStamp>;
   verify?(stamp: LocationStamp): Promise<StampVerificationResult>;
-  evaluate?(stamp: LocationStamp, claim: LocationClaim): Promise<CredibilityVector>;
 }
 ```
 
-All five methods are optional. Plugins implement what makes sense for their environment and capabilities.
+All four methods are optional. Plugins implement what makes sense for their environment and capabilities.
 
 ### Method lifecycle
 
@@ -37,7 +36,6 @@ All five methods are optional. Plugins implement what makes sense for their envi
 graph LR
     A[collect] --> B[create] --> C[sign] --> D["LocationStamp"]
     D --> E[verify]
-    D --> F[evaluate]
 ```
 
 | Method | Purpose | When to implement |
@@ -46,7 +44,6 @@ graph LR
 | `create` | Transform raw signals into an unsigned stamp | Plugin produces stamps (not just verifying existing ones) |
 | `sign` | Cryptographically bind the stamp to a signer | Plugin stamps need signatures |
 | `verify` | Check a stamp's internal validity | Plugin can validate its own stamp format |
-| `evaluate` | Score how well a stamp supports a claim | Plugin can assess spatial/temporal accuracy |
 
 ### Runtimes and capabilities
 
@@ -148,35 +145,58 @@ const proof = astral.proofs.create(claim, [stamp1, stamp2]);
 ### 5. Verify
 
 ```typescript
-const assessment = await astral.verify.proof(proof);
-console.log(assessment.confidence); // 0.0 to 1.0
+const assessment = await astral.proofs.verify(proof);
+console.log(assessment.dimensions); // Multidimensional credibility vector
 ```
 
 ## Credibility vector
 
-When a plugin evaluates a stamp against a claim, it returns a `CredibilityVector`:
+When the SDK evaluates a proof, it returns a `CredibilityVector`:
 
 ```typescript
 interface CredibilityVector {
-  supportsClaim: boolean;  // Binary: does evidence support the claim?
-  score: number;           // Overall support (0-1)
-  spatial: number;         // Spatial accuracy (0-1)
-  temporal: number;        // Temporal overlap (0-1)
-  details: Record<string, unknown>;  // Plugin-specific details
+  dimensions: {
+    spatial: {
+      meanDistanceMeters: number;
+      maxDistanceMeters: number;
+      withinRadiusFraction: number;
+    };
+    temporal: {
+      meanOverlap: number;
+      minOverlap: number;
+      fullyOverlappingFraction: number;
+    };
+    validity: {
+      signaturesValidFraction: number;
+      structureValidFraction: number;
+      signalsConsistentFraction: number;
+    };
+    independence: {
+      uniquePluginRatio: number;
+      spatialAgreement: number;
+      pluginNames: string[];
+    };
+  };
+  stampResults: StampVerificationResult[];
+  meta: {
+    stampCount: number;
+    evaluatedAt: number;
+    evaluationMode: 'local' | 'hosted';
+  };
 }
 ```
 
-This replaces a single confidence number with dimensional scores that the verification system can reason about. A stamp might have high temporal accuracy (it was captured at the right time) but low spatial accuracy (the location is only approximate).
+This multidimensional model lets applications define their own trust models. A stamp might have high temporal accuracy (captured at the right time) but lower spatial accuracy (location is approximate). Applications weight these dimensions according to their requirements.
 
 ## How the hosted service uses plugins
 
-The Astral hosted service imports plugin packages and runs verify/evaluate inside a TEE. The service adds three things that local verification doesn't provide:
+The Astral hosted service imports plugin packages and runs verify inside a TEE, then evaluates stamps against claims server-side. The service adds three things that local verification doesn't provide:
 
 1. **TEE execution** — plugin code runs in a trusted execution environment
 2. **Signed attestation** — results are signed by a TEE-held key
 3. **EAS integration** — attestation is formatted for onchain submission
 
-The verification logic is the same. The difference is the trust model: local verification trusts your environment, hosted verification trusts the TEE.
+The verification and evaluation logic is the same. The difference is the trust model: local verification trusts your environment, hosted verification trusts the TEE.
 
 <CardGroup cols={2}>
   <Card title="Creating location proofs" icon="rocket" href="/guides/creating-location-proofs">
