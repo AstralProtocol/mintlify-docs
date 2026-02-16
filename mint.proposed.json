@@ -1,0 +1,174 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Astral",
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/introduction"
+    }
+  ],
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#D4A63A",
+    "light": "#FEE9B3",
+    "dark": "#B8860B",
+    "anchors": {
+      "from": "#D4A63A",
+      "to": "#FEE9B3"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Playground",
+      "url": "https://playground.astral.global"
+    },
+    {
+      "name": "GitHub",
+      "url": "https://github.com/AstralProtocol"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "/quickstart"
+  },
+  "tabs": [
+    {
+      "name": "SDK",
+      "url": "sdk"
+    },
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/AstralProtocol"
+    },
+    {
+      "name": "Community",
+      "icon": "telegram",
+      "url": "https://t.me/+UkTOSXnDcDM5ZTBk"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "how-it-works"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "concepts/geographic-features",
+        "concepts/geocomputation",
+        "concepts/verifiable-computation",
+        "concepts/location-proofs",
+        "concepts/result-format",
+        "concepts/privacy-model"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/local-development",
+        "guides/calling-the-api",
+        "guides/verifying-location-proofs",
+        "guides/blockchain-integration",
+        "guides/agent-integration",
+        "guides/building-plugins"
+      ]
+    },
+    {
+      "group": "Use Cases",
+      "pages": [
+        "use-cases/delivery-verification",
+        "use-cases/parametric-insurance",
+        "use-cases/geofence-compliance",
+        "use-cases/onchain-attestation"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/overview",
+        {
+          "group": "Compute API",
+          "pages": [
+            "api-reference/compute/distance",
+            "api-reference/compute/area",
+            "api-reference/compute/length",
+            "api-reference/compute/contains",
+            "api-reference/compute/within",
+            "api-reference/compute/intersects"
+          ]
+        },
+        {
+          "group": "Verify API",
+          "pages": [
+            "api-reference/verify/stamp",
+            "api-reference/verify/proof",
+            "api-reference/verify/plugins"
+          ]
+        },
+        {
+          "group": "Records API",
+          "pages": [
+            "api-reference/records/overview",
+            "api-reference/records/list",
+            "api-reference/records/get",
+            "api-reference/records/stats",
+            "api-reference/records/config"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "SDK Reference",
+      "pages": [
+        "sdk/overview",
+        "sdk/installation",
+        "sdk/location",
+        "sdk/compute",
+        "sdk/verify",
+        "sdk/eas",
+        "sdk/types",
+        "sdk/migration"
+      ]
+    },
+    {
+      "group": "Trust Model",
+      "pages": [
+        "trust-model/architecture",
+        "trust-model/what-is-verified",
+        "trust-model/what-you-are-trusting",
+        "trust-model/security"
+      ]
+    },
+    {
+      "group": "Resources",
+      "pages": [
+        "resources/playground",
+        "resources/staging",
+        "resources/schemas",
+        "resources/research",
+        "resources/faq",
+        "resources/changelog"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "twitter": "https://twitter.com/AstralProtocol",
+    "github": "https://github.com/AstralProtocol",
+    "telegram": "https://t.me/+UkTOSXnDcDM5ZTBk"
+  }
+}
