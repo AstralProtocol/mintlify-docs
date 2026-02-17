@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "Astral Location Services",
+  "name": "Astral",
   "redirects": [
     {
       "source": "/",
@@ -28,7 +28,7 @@
     },
     {
       "name": "GitHub",
-      "url": "https://github.com/AstralProtocol/astral-location-services"
+      "url": "https://github.com/AstralProtocol"
     }
   ],
   "topbarCtaButton": {
@@ -69,26 +69,32 @@
     {
       "group": "Core Concepts",
       "pages": [
-        "concepts/location-attestations",
+        "concepts/geographic-features",
+        "concepts/geocomputation",
+        "concepts/verifiable-computation",
         "concepts/location-proofs",
-        "concepts/geospatial-operations",
-        "concepts/policy-attestations",
-        "concepts/eas-resolvers",
-        "concepts/verifiable-computation"
+        "concepts/result-format",
+        "concepts/privacy-model"
       ]
     },
     {
       "group": "Guides",
       "pages": [
-        "guides/location-gated-nft",
-        "guides/geofenced-token",
-        "guides/delivery-verification"
+        "guides/local-development",
+        "guides/calling-the-api",
+        "guides/verifying-location-proofs",
+        "guides/blockchain-integration",
+        "guides/agent-integration",
+        "guides/building-plugins"
       ]
     },
     {
       "group": "Use Cases",
       "pages": [
-        "use-cases"
+        "use-cases/delivery-verification",
+        "use-cases/parametric-insurance",
+        "use-cases/geofence-compliance",
+        "use-cases/onchain-attestation"
       ]
     },
     {
@@ -96,20 +102,22 @@
       "pages": [
         "api-reference/overview",
         {
-          "group": "Verify API",
+          "group": "Compute API",
           "pages": [
-            "api-reference/verify"
+            "api-reference/compute/distance",
+            "api-reference/compute/area",
+            "api-reference/compute/length",
+            "api-reference/compute/contains",
+            "api-reference/compute/within",
+            "api-reference/compute/intersects"
           ]
         },
         {
-          "group": "Compute API",
+          "group": "Verify API",
           "pages": [
-            "api-reference/distance",
-            "api-reference/contains",
-            "api-reference/within",
-            "api-reference/intersects",
-            "api-reference/area",
-            "api-reference/length"
+            "api-reference/verify/stamp",
+            "api-reference/verify/proof",
+            "api-reference/verify/plugins"
           ]
         },
         {
@@ -130,10 +138,20 @@
         "sdk/overview",
         "sdk/installation",
         "sdk/location",
-        "sdk/verify",
         "sdk/compute",
+        "sdk/verify",
         "sdk/eas",
+        "sdk/types",
         "sdk/migration"
+      ]
+    },
+    {
+      "group": "Trust Model",
+      "pages": [
+        "trust-model/architecture",
+        "trust-model/what-is-verified",
+        "trust-model/what-you-are-trusting",
+        "trust-model/security"
       ]
     },
     {
@@ -142,9 +160,9 @@
         "resources/playground",
         "resources/staging",
         "resources/schemas",
-        "resources/security",
-        "resources/roadmap",
-        "resources/faq"
+        "resources/research",
+        "resources/faq",
+        "resources/changelog"
       ]
     }
   ],
