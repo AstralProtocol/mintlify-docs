@@ -1,0 +1,72 @@
+---
+title: "GET /verify/plugins"
+description: "List available verification plugins"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# List plugins
+
+List available proof-of-location verification plugins.
+
+```
+GET /v1/verify/plugins
+```
+
+## Example request
+
+```bash
+curl https://api.astral.global/v1/verify/plugins
+```
+
+## Response
+
+<ResponseField name="plugins" type="Plugin[]" required>
+  Array of available plugins.
+</ResponseField>
+
+<ResponseField name="plugins[].name" type="string" required>
+  Plugin identifier (e.g., `"proofmode"`, `"witnesschain"`).
+</ResponseField>
+
+<ResponseField name="plugins[].version" type="string" required>
+  Current plugin version.
+</ResponseField>
+
+<ResponseField name="plugins[].environments" type="string[]" required>
+  Supported runtime environments.
+</ResponseField>
+
+<ResponseField name="plugins[].description" type="string" required>
+  Human-readable description of the plugin.
+</ResponseField>
+
+## Example response
+
+```json
+{
+  "plugins": [
+    {
+      "name": "proofmode",
+      "version": "0.1.0",
+      "environments": ["iOS", "Android", "React Native"],
+      "description": "Device attestation with hardware security (Secure Enclave/Keystore)"
+    },
+    {
+      "name": "witnesschain",
+      "version": "0.1.0",
+      "environments": ["Node.js"],
+      "description": "Infrastructure verification via UDP latency triangulation"
+    }
+  ]
+}
+```
+
+<CardGroup cols={2}>
+  <Card title="Building plugins" icon="puzzle-piece" href="/guides/building-plugins">
+    Create your own proof-of-location plugin
+  </Card>
+  <Card title="Location proofs" icon="map-pin" href="/concepts/location-proofs">
+    Understand how plugins feed into the verification pipeline
+  </Card>
+</CardGroup>

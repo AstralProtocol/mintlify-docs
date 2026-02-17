@@ -1,0 +1,89 @@
+---
+title: "POST /verify/stamp"
+description: "Verify a single location stamp"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Verify stamp
+
+Verify a single location stamp's internal validity (no claim assessment).
+
+```
+POST /v1/verify/stamp
+```
+
+## Request body
+
+<ParamField body="stamp" type="LocationStamp" required>
+  The stamp to verify. See [data types](/api-reference/verify/proof#data-types) for the full schema.
+</ParamField>
+
+## Example request
+
+```bash
+curl -X POST https://api.astral.global/v1/verify/stamp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "stamp": {
+      "lpVersion": "0.2",
+      "locationType": "geojson-point",
+      "location": { "type": "Point", "coordinates": [-122.4194, 37.7749] },
+      "srs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+      "temporalFootprint": {
+        "start": 1706901000,
+        "end": 1706901060
+      },
+      "plugin": "proofmode",
+      "pluginVersion": "0.1.0",
+      "signals": { },
+      "signatures": [{ }]
+    }
+  }'
+```
+
+## Response
+
+<ResponseField name="valid" type="boolean" required>
+  Overall validity of the stamp.
+</ResponseField>
+
+<ResponseField name="signaturesValid" type="boolean" required>
+  Whether cryptographic signatures verified successfully.
+</ResponseField>
+
+<ResponseField name="structureValid" type="boolean" required>
+  Whether the stamp structure conforms to the schema.
+</ResponseField>
+
+<ResponseField name="signalsConsistent" type="boolean" required>
+  Whether internal signals are consistent with each other.
+</ResponseField>
+
+<ResponseField name="pluginResult" type="object" required>
+  Plugin-specific verification output.
+</ResponseField>
+
+## Example response
+
+```json
+{
+  "valid": true,
+  "signaturesValid": true,
+  "structureValid": true,
+  "signalsConsistent": true,
+  "pluginResult": { }
+}
+```
+
+## Errors
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `INVALID_STAMP` | Malformed location stamp |
+| 400 | `UNKNOWN_PLUGIN` | Unrecognized plugin name |
+| 422 | `SIGNATURE_INVALID` | Stamp signature verification failed |
+
+<Card title="SDK method" icon="code" href="/sdk/verify">
+  See `astral.verify.stamp()`
+</Card>

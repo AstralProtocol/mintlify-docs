@@ -1,0 +1,241 @@
+---
+title: "POST /verify/proof"
+description: "Verify a location proof with cross-correlation analysis"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Verify proof
+
+Verify a location proof (claim + stamps) with cross-correlation analysis.
+
+```
+POST /v1/verify/proof
+```
+
+## Request body
+
+<ParamField body="proof" type="LocationProof" required>
+  The proof to verify, containing a claim and one or more stamps.
+</ParamField>
+
+<ParamField body="options.chainId" type="number">
+  Chain ID for attestation signing.
+</ParamField>
+
+<ParamField body="options.submitOnchain" type="boolean">
+  Submit attestation onchain (default: false).
+</ParamField>
+
+## Example request
+
+```bash
+curl -X POST https://api.astral.global/v1/verify/proof \
+  -H "Content-Type: application/json" \
+  -d '{
+    "proof": {
+      "claim": {
+        "lpVersion": "0.2",
+        "locationType": "geojson-point",
+        "location": { "type": "Point", "coordinates": [-122.4194, 37.7749] },
+        "srs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+        "subject": {
+          "scheme": "eth-address",
+          "value": "0x1234..."
+        },
+        "radius": 100,
+        "time": {
+          "start": 1706900000,
+          "end": 1706903600
+        }
+      },
+      "stamps": [
+        { "plugin": "proofmode", "..." : "..." },
+        { "plugin": "witnesschain", "..." : "..." }
+      ]
+    },
+    "options": {
+      "chainId": 84532
+    }
+  }'
+```
+
+## Response
+
+<ResponseField name="proof" type="LocationProof" required>
+  The verified proof.
+</ResponseField>
+
+<ResponseField name="credibility" type="CredibilityAssessment" required>
+  Structured credibility assessment.
+</ResponseField>
+
+<ResponseField name="uid" type="string" required>
+  EAS attestation UID.
+</ResponseField>
+
+<ResponseField name="attester" type="string" required>
+  Astral service address.
+</ResponseField>
+
+<ResponseField name="timestamp" type="number" required>
+  Verification timestamp (Unix seconds).
+</ResponseField>
+
+<ResponseField name="chainId" type="number">
+  Chain ID (present if submitted onchain).
+</ResponseField>
+
+## Example response
+
+```json
+{
+  "proof": { },
+  "credibility": {
+    "confidence": 0.92,
+    "stampResults": [
+      {
+        "stampIndex": 0,
+        "plugin": "proofmode",
+        "signaturesValid": true,
+        "structureValid": true,
+        "signalsConsistent": true,
+        "supportsClaim": true,
+        "claimSupportScore": 0.88,
+        "pluginResult": { }
+      },
+      {
+        "stampIndex": 1,
+        "plugin": "witnesschain",
+        "signaturesValid": true,
+        "structureValid": true,
+        "signalsConsistent": true,
+        "supportsClaim": true,
+        "claimSupportScore": 0.85,
+        "pluginResult": { }
+      }
+    ],
+    "correlation": {
+      "independence": 0.95,
+      "agreement": 0.88,
+      "notes": ["Different physical phenomena", "Spatial footprints align"]
+    }
+  },
+  "uid": "0xdef456...",
+  "attester": "0xastral...",
+  "timestamp": 1706903700,
+  "chainId": 84532
+}
+```
+
+<Note>
+  **Confidence is not probability.** A confidence of 0.92 does not mean "92% probability the claim is true." It means "the evidence is reasonably strong." Calibrating to true probability is future work.
+</Note>
+
+## Errors
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 400 | `INVALID_CLAIM` | Malformed location claim |
+| 400 | `INVALID_STAMP` | Malformed location stamp |
+| 400 | `UNKNOWN_PLUGIN` | Unrecognized plugin name |
+| 400 | `MISSING_RADIUS` | Claim missing required radius field |
+| 422 | `SIGNATURE_INVALID` | Stamp signature verification failed |
+| 500 | `VERIFICATION_FAILED` | Internal verification error |
+
+## Data types
+
+### LocationClaim
+
+Extends [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec).
+
+```typescript
+interface LocationClaim {
+  lpVersion: string;              // "0.2"
+  locationType: string;           // "geojson-point", "h3-index", etc.
+  location: LocationData;         // The asserted location
+  srs: string;                    // Spatial reference system URI
+
+  subject: SubjectIdentifier;
+  radius: number;                 // Meters — required
+  time: {
+    start: number;                // Unix timestamp (seconds)
+    end: number;
+  };
+  eventType?: string;             // "presence", "transaction", "delivery"
+}
+```
+
+### SubjectIdentifier
+
+```typescript
+interface SubjectIdentifier {
+  scheme: string;   // "eth-address" | "device-pubkey" | "did:web"
+  value: string;
+}
+```
+
+### LocationStamp
+
+```typescript
+interface LocationStamp {
+  lpVersion: string;
+  locationType: string;
+  location: LocationData;
+  srs: string;
+
+  temporalFootprint: { start: number; end: number };
+  plugin: string;
+  pluginVersion: string;
+  signals: Record<string, unknown>;
+  signatures: Signature[];
+}
+
+interface Signature {
+  signer: SubjectIdentifier;
+  algorithm: string;              // "secp256k1" | "ed25519"
+  value: string;                  // Hex-encoded
+  timestamp: number;
+}
+```
+
+### LocationProof
+
+```typescript
+interface LocationProof {
+  claim: LocationClaim;
+  stamps: LocationStamp[];
+}
+```
+
+### CredibilityAssessment
+
+```typescript
+interface CredibilityAssessment {
+  confidence: number;             // 0-1 (not calibrated probability)
+  stampResults: StampResult[];
+  correlation?: CorrelationAssessment;
+  dimensions?: Record<string, number>;
+}
+
+interface StampResult {
+  stampIndex: number;
+  plugin: string;
+  signaturesValid: boolean;
+  structureValid: boolean;
+  signalsConsistent: boolean;
+  supportsClaim: boolean;
+  claimSupportScore: number;      // 0-1
+  pluginResult: Record<string, unknown>;
+}
+
+interface CorrelationAssessment {
+  independence: number;           // 0-1
+  agreement: number;              // 0-1
+  notes: string[];
+}
+```
+
+<Card title="SDK reference: Verify" icon="code" href="/sdk/verify">
+  View the SDK documentation for client-side usage
+</Card>

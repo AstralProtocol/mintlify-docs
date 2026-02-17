@@ -1,0 +1,83 @@
+---
+title: "POST /length"
+description: "Calculate length of a line"
+---
+
+<Warning>
+  **Research Preview** — This API is under development.
+</Warning>
+
+# Length
+
+Calculate the length of a line in meters.
+
+```
+POST /compute/v0/length
+```
+
+## Request Body
+
+<ParamField body="chainId" type="number" required>
+  Target chain ID (e.g., 84532 for Base Sepolia, 8453 for Base).
+</ParamField>
+
+<ParamField body="geometry" type="Input" required>
+  The line geometry to measure.
+</ParamField>
+
+<ParamField body="schema" type="string" required>
+  EAS schema UID to issue the attestation against.
+</ParamField>
+
+<ParamField body="recipient" type="string">
+  Ethereum address to receive the attestation. Defaults to zero address if not provided.
+</ParamField>
+
+## Example Request
+
+```bash
+curl -X POST https://api.astral.global/compute/v0/length \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chainId": 84532,
+    "geometry": "0xline...",
+    "schema": "0xschema...",
+    "recipient": "0xdef456..."
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "result": 2345.67,
+  "units": "meters",
+  "operation": "length",
+  "timestamp": 1706400000,
+  "inputRefs": [
+    "0xline..."
+  ],
+  "attestation": {
+    "schema": "0x...",
+    "attester": "0x...",
+    "recipient": "0xdef456...",
+    "data": "0x...",
+    "signature": "0x..."
+  },
+  "delegatedAttestation": {
+    "signature": "0x...",
+    "attester": "0x...",
+    "deadline": 1706403600
+  }
+}
+```
+
+## Notes
+
+- Uses PostGIS `ST_Length` function with geodetic calculation
+- Result is in meters with centimeter precision
+- Valid for LineString and MultiLineString geometries
+
+<Card title="SDK Method" icon="code" href="/sdk/compute#length">
+  See `astral.compute.length()`
+</Card>
