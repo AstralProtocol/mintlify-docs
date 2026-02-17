@@ -1,0 +1,248 @@
+---
+title: "Verifying location proofs"
+description: "Submit location proofs and understand credibility scores"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Verifying location proofs
+
+A location proof is a location claim bundled with evidence — stamps from proof-of-location systems. The proof carries everything needed to assess the claim's credibility.
+
+This guide walks you through creating a claim, collecting stamps, bundling them into a proof, and interpreting the verification result.
+
+## What is a location proof?
+
+A location proof has two parts:
+
+- **Claim** — an assertion that a subject was at a location during a time window
+- **Stamps** — evidence from one or more proof-of-location systems that support (or contradict) the claim
+
+The verification process evaluates the stamps against the claim and produces a credibility assessment — not a simple yes/no, but a structured evaluation of how strong the evidence is.
+
+## Creating a location claim
+
+A claim follows the [Location Protocol](https://github.com/DecentralizedGeo/location-protocol-spec) format and includes the asserted location, time bounds, and spatial uncertainty:
+
+```typescript
+const claim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
+  location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
+  subject: { scheme: 'eth-address', value: '0x1234...abcd' },
+  radius: 100,
+  time: { start: Date.now() / 1000 - 60, end: Date.now() / 1000 },
+  eventType: 'presence'
+};
+```
+
+Key fields:
+
+| Field | Description |
+|-------|-------------|
+| `location` | GeoJSON geometry — where the subject claims to have been |
+| `subject` | Identifier for the entity making the claim (Ethereum address, DID, etc.) |
+| `radius` | Spatial uncertainty in meters — you cannot claim presence at an exact point |
+| `time` | Temporal bounds as Unix timestamps (start and end) |
+| `eventType` | What kind of event: `"presence"`, `"transaction"`, `"delivery"` |
+
+<Info>
+  The `radius` field is required. Every location claim involves spatial uncertainty. Claiming a smaller radius requires stronger evidence to achieve the same credibility score.
+</Info>
+
+## Collecting stamps
+
+Stamps are evidence from proof-of-location plugins. Each plugin collects signals from its PoL system and produces a stamp:
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({ chainId: 84532 });
+
+// Collect signals from ProofMode (device attestation)
+const proofmodeSignals = await astral.stamps.collect({
+  name: 'proofmode',
+  version: '0.1.0',
+  config: { timeout: 5000 }
+});
+
+// Create and sign the stamp
+const unsignedStamp = await astral.stamps.create(
+  { name: 'proofmode', version: '0.1.0', config: {} },
+  proofmodeSignals
+);
+const stamp1 = await astral.stamps.sign(unsignedStamp, deviceSigner);
+```
+
+For stronger verification, collect stamps from multiple independent systems:
+
+```typescript
+// Collect from a second independent system
+const witnessSignals = await astral.stamps.collect({
+  name: 'witnesschain',
+  version: '0.1.0',
+  config: { timeout: 10000 }
+});
+
+const unsignedWitnessStamp = await astral.stamps.create(
+  { name: 'witnesschain', version: '0.1.0', config: {} },
+  witnessSignals
+);
+const stamp2 = await astral.stamps.sign(unsignedWitnessStamp, nodeSigner);
+```
+
+## Bundling into a proof
+
+Combine the claim and stamps into a location proof:
+
+```typescript
+const proof = astral.proofs.create(claim, [stamp1, stamp2]);
+```
+
+A single-stamp proof is valid. Multiple stamps from independent systems enable cross-correlation, which increases confidence.
+
+## Submitting to the verify API
+
+Submit the proof for verification:
+
+```typescript
+const result = await astral.verify.proof(proof);
+```
+
+Or via raw HTTP:
+
+```bash
+curl -X POST https://api.astral.global/verify/proof \
+  -H "Content-Type: application/json" \
+  -d '{
+    "claim": {
+      "lpVersion": "0.2",
+      "locationType": "geojson-point",
+      "location": { "type": "Point", "coordinates": [-122.4194, 37.7749] },
+      "srs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+      "subject": { "scheme": "eth-address", "value": "0x1234...abcd" },
+      "radius": 100,
+      "time": { "start": 1706399940, "end": 1706400000 },
+      "eventType": "presence"
+    },
+    "stamps": [ ... ]
+  }'
+```
+
+## Understanding credibility scores
+
+The verification result is a structured credibility assessment, not a simple pass/fail:
+
+```json
+{
+  "credibility": {
+    "confidence": 0.85,
+    "stampResults": [
+      {
+        "plugin": "proofmode",
+        "valid": true,
+        "spatialAccuracy": 0.9,
+        "temporalIntegrity": 0.8,
+        "forgeryResistance": 0.7
+      },
+      {
+        "plugin": "witnesschain",
+        "valid": true,
+        "spatialAccuracy": 0.85,
+        "temporalIntegrity": 0.9,
+        "forgeryResistance": 0.8
+      }
+    ],
+    "correlation": {
+      "independence": 0.95,
+      "agreement": 0.92
+    }
+  },
+  "uid": "0xabc123...",
+  "attester": "0x590fdb53...",
+  "timestamp": 1706400000
+}
+```
+
+### Credibility dimensions
+
+Credibility scores are a multidimensional assessment. Each stamp is evaluated along several dimensions:
+
+| Dimension | What it measures |
+|-----------|-----------------|
+| **Spatial accuracy** | How precisely the stamp's observed location matches the claimed location |
+| **Temporal integrity** | Whether the stamp's timestamps are consistent and within the claimed time window |
+| **Forgery resistance** | How difficult it would be to fabricate this stamp (depends on the PoL system's threat model) |
+| **Source independence** | Whether the stamp comes from a system that is independent of other stamps in the proof |
+
+### Overall confidence
+
+The top-level `confidence` score (0 to 1) is a summary of the per-stamp assessments and cross-correlation analysis. It reflects the overall strength of evidence for the claim.
+
+<Warning>
+  **Confidence is not probability.** A confidence of 0.85 does not mean "85% chance the claim is true." It means the evidence is strong. Calibrating confidence scores to true probabilities is future work.
+</Warning>
+
+### Cross-correlation
+
+When a proof includes multiple stamps, the verification engine analyzes their relationship:
+
+- **Independence** — are the stamps from truly independent systems? Two stamps from the same underlying data source do not add much.
+- **Agreement** — do the stamps agree on location and time? Independent stamps that corroborate each other significantly boost confidence.
+
+## Multi-factor proofs
+
+Multiple stamps from independent systems increase confidence because an attacker would need to compromise multiple unrelated systems simultaneously:
+
+```typescript
+// Single stamp: moderate confidence
+const singleResult = await astral.verify.proof(
+  astral.proofs.create(claim, [proofmodeStamp])
+);
+// singleResult.credibility.confidence → 0.7
+
+// Multi-stamp from independent systems: higher confidence
+const multiResult = await astral.verify.proof(
+  astral.proofs.create(claim, [proofmodeStamp, witnessStamp])
+);
+// multiResult.credibility.confidence → 0.9
+// multiResult.credibility.correlation.independence → 0.95
+```
+
+The improvement comes from source independence. Redundant stamps from the same system do not meaningfully increase confidence, but they do not decrease it either.
+
+### Choosing the right level of evidence
+
+The level of evidence you need depends on the value of the transaction the proof underpins:
+
+- **Low-stakes** (check-in rewards, social proof) — a single stamp from a device attestation plugin may be sufficient.
+- **Medium-stakes** (delivery verification, access control) — two independent stamps provide meaningful forgery resistance.
+- **High-stakes** (insurance payouts, land records) — multiple independent stamps with high forgery resistance, plus onchain submission for an immutable audit trail.
+
+## Using verified proofs as compute inputs
+
+Verified location proofs can serve as trusted inputs to geocomputation operations. This connects the verification pipeline to the spatial reasoning pipeline:
+
+```typescript
+const verifiedProof = await astral.verify.proof(proof);
+
+// Use the verified proof as input to a spatial operation
+const result = await astral.compute.contains({
+  container: approvedZonePolygonUID,
+  geometry: { verifiedProof: verifiedProof.uid },
+  chainId: 84532,
+  schema: SCHEMA_UID
+});
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Location proofs concept" icon="book" href="/concepts/location-proofs">
+    Deeper dive into claims, stamps, and the verification model
+  </Card>
+  <Card title="Building plugins" icon="puzzle-piece" href="/guides/building-plugins">
+    Connect a new proof-of-location system to Astral
+  </Card>
+</CardGroup>
