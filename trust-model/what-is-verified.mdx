@@ -1,0 +1,64 @@
+---
+title: "What is verified"
+description: "What the signature covers and what computation reproducibility means"
+---
+
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# What is verified
+
+When Astral produces a signed result, that signature makes specific claims. This page spells out exactly what is covered.
+
+## Verifiability properties
+
+| Property | How it's achieved |
+|----------|-------------------|
+| **Input integrity** | Input signatures verified at TEE boundary before processing |
+| **Execution integrity** | TEE ensures code runs as deployed, can't be modified |
+| **Output authenticity** | Signing key held inside TEE, can't be extracted |
+| **Determinism** | Stateless model + fixed precision = same inputs produce same outputs |
+
+## What the signature covers
+
+A signed result from Astral proves three things:
+
+1. **The computation ran inside the TEE.** EigenCompute provides hardware attestation that the expected code is executing in the attested environment.
+2. **The inputs were hashed and recorded.** Every signed result includes `inputRefs` — hashes of the inputs used. You can verify which inputs went into the computation.
+3. **The output was produced by that computation.** The signing key exists only inside the TEE. If the signature is valid, the output came from the attested code running on the referenced inputs.
+
+## Input references (inputRefs)
+
+Every signed result includes an array of `inputRefs` — deterministic references to the inputs used in the computation. These let downstream consumers verify which inputs were used:
+
+- For geographic features referenced by UID, the `inputRef` is the UID itself
+- For raw GeoJSON inputs, the `inputRef` is a hash of the geometry
+
+This means you can check not just *that* a computation was performed, but *what data* it operated on.
+
+## Computation reproducibility
+
+Determinism is what makes signed results meaningful. If someone else runs the same computation on the same inputs, they should get the same answer.
+
+Astral achieves this through:
+
+- **Centimeter precision rounding** before signing — eliminates floating-point variance
+- **Pinned PostGIS version** in the container — no algorithm changes between builds
+- **Stateless execution** — no accumulated state that could affect results
+
+## The signing key
+
+The service holds a signing key **inside** the TEE:
+
+- Key is generated within the TEE or securely provisioned
+- Cannot be extracted by the operator
+- All results are signed with this key
+- Downstream consumers verify that results came from the known Astral signer
+
+```solidity
+// In a resolver contract
+require(attestation.attester == ASTRAL_SIGNER, "Not from Astral");
+```
+
+<Card title="Next: What you are trusting" icon="arrow-right" href="/trust-model/what-you-are-trusting">
+  Honest accounting of current assumptions
+</Card>

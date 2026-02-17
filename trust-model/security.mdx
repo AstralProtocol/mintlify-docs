@@ -1,0 +1,167 @@
+---
+title: "Security considerations"
+description: "Threat model, known limitations, and responsible disclosure"
+---
+
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Security considerations
+
+This page documents the security model, known limitations, and best practices for building with Astral.
+
+## Astral signer address
+
+<Info>
+  **Current Astral Signer (Base Sepolia):** `0x590fdb53ed3f0B52694876d42367192a5336700F`
+
+  Resolver contracts must verify that `attestation.attester` equals this address. See [Staging](/resources/staging) for the full configuration.
+</Info>
+
+## Known considerations
+
+### Replay attacks
+
+**Status:** Documented, resolver responsibility
+
+Signed results could potentially be reused:
+- **Temporal replay:** Old result used for current benefit
+- **Cross-context replay:** Result for one resolver used at another
+
+**Mitigations (your responsibility):**
+
+```solidity
+contract SecureResolver is SchemaResolver {
+    mapping(bytes32 => bool) public usedAttestations;
+
+    function onAttest(Attestation calldata attestation, uint256)
+        internal override returns (bool)
+    {
+        // 1. Check not already used
+        bytes32 attHash = keccak256(abi.encode(attestation.uid));
+        require(!usedAttestations[attHash], "Already used");
+        usedAttestations[attHash] = true;
+
+        // 2. Check timestamp freshness
+        (, , uint64 timestamp, ) = abi.decode(...);
+        require(timestamp > block.timestamp - 1 hours, "Too old");
+
+        // 3. Verify expected inputs
+        (, bytes32[] memory inputRefs, , ) = abi.decode(...);
+        require(inputRefs[1] == EXPECTED_LOCATION, "Wrong location");
+
+        // ... business logic
+    }
+}
+```
+
+### Input trust
+
+**Status:** Raw GeoJSON not verified
+
+Raw GeoJSON inputs are accepted for flexibility, but are **not verified for authenticity**:
+
+```typescript
+// This works but geometry source is unverified
+const result = await astral.compute.contains(
+  { type: 'Polygon', coordinates: [...] },  // Raw, unverified
+  userLocationUID
+);
+```
+
+The signed result proves:
+- "Astral computed the relationship between A and B"
+
+It does **not** prove:
+- "Geometry A came from a trusted source"
+- "User was actually at location B"
+
+**Best practice:** For high-security applications, require attested inputs (UIDs) rather than raw GeoJSON.
+
+### GPS spoofing
+
+**Status:** Out of scope for MVP
+
+Astral can verify that a computation was correct, but cannot verify that the input location represents where the user actually was. GPS can be spoofed.
+
+**Future:** Location proofs with multiple corroborating stamps will make spoofing harder.
+
+## Best practices
+
+### For resolver authors
+
+<AccordionGroup>
+  <Accordion title="Always verify attester" icon="shield-check">
+    ```solidity
+    require(attestation.attester == astralSigner, "Not from Astral");
+    ```
+  </Accordion>
+  <Accordion title="Check timestamp freshness" icon="clock">
+    ```solidity
+    require(timestamp > block.timestamp - MAX_AGE, "Attestation too old");
+    ```
+  </Accordion>
+  <Accordion title="Verify input references" icon="link">
+    ```solidity
+    require(inputRefs[1] == EXPECTED_LANDMARK, "Wrong location checked");
+    ```
+  </Accordion>
+  <Accordion title="Track used results" icon="list-check">
+    ```solidity
+    require(!usedAttestations[uid], "Already used");
+    usedAttestations[uid] = true;
+    ```
+  </Accordion>
+  <Accordion title="Support key rotation" icon="rotate">
+    ```solidity
+    function updateSigner(address newSigner) external onlyOwner {
+        astralSigner = newSigner;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### For application developers
+
+- **Prefer UIDs** over raw GeoJSON for sensitive operations
+- **Set appropriate timeouts** — don't accept stale results
+- **Validate recipient** — ensure the result is for the right user
+- **Handle signature expiry** — delegated attestation signatures have deadlines
+
+## Key management
+
+### Service signing key
+
+- Key generated or provisioned within TEE
+- Cannot be extracted by operators
+- Used to sign all results
+
+### Key rotation
+
+Resolver contracts should support key rotation:
+
+```solidity
+address public astralSigner;
+
+event SignerUpdated(address oldSigner, address newSigner);
+
+function updateAstralSigner(address newSigner) external onlyOwner {
+    emit SignerUpdated(astralSigner, newSigner);
+    astralSigner = newSigner;
+}
+```
+
+<Note>
+  For the research preview, a simple owner-controlled update is sufficient. For production, consider making the owner a multisig.
+</Note>
+
+## Audit status
+
+| Component | Status |
+|-----------|--------|
+| Compute Service | Pending |
+| SDK | Pending |
+| Example Contracts | Pending |
+
+<Note>
+  Full security audit will be conducted before mainnet deployment.
+</Note>

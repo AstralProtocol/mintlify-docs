@@ -1,0 +1,64 @@
+---
+title: "What you are trusting"
+description: "Honest accounting of current assumptions and the path forward"
+---
+
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# What you are trusting
+
+We're transparent about what's verified and what's assumed because trust is the product. This page gives an honest accounting of the current trust assumptions and where they're headed.
+
+## Current trust assumptions
+
+| Assumption | Status | Notes |
+|------------|--------|-------|
+| TEE executes code correctly | Verified | EigenCompute provides hardware attestation |
+| Astral operates service honestly | Required | Single operator in MVP |
+| Signing key held securely in TEE | Verified | Key cannot be extracted by operator |
+| Input locations are truthful | **Not verified** | GPS is spoofable; future work |
+
+The MVP uses a **centralized trust model**: a single service with a known signer, running inside a TEE. The TEE provides execution attestation, and deterministic operations ensure reproducibility. But you are trusting Astral to operate the service honestly.
+
+## Location inputs are not verified
+
+Astral verifies computation, not location. Until location proof plugins are integrated, you are trusting that the GPS coordinates provided as input are honest.
+
+GPS is spoofable. A user can claim to be anywhere. The signed result proves that *if* the user was at location A, *then* they were within 500m of location B. It does not prove the user was actually at location A.
+
+This is why we're developing the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) — to provide evidence-based location claims that feed into Astral for a fully verifiable pipeline. As proof mechanisms mature, they plug directly into the existing system.
+
+**Be direct with your users**: if your application depends on truthful location inputs, communicate that the location data is currently trust-based.
+
+## What verification buys you today
+
+Even with these assumptions, verifiable computation is meaningful:
+
+- **The computation is correct.** You know the spatial relationship was evaluated faithfully, not fabricated.
+- **The inputs are recorded.** `inputRefs` let you audit which data went into the computation.
+- **The result is tamper-evident.** The signature proves the output came from the attested environment.
+
+This is substantially better than trusting an opaque API that returns `true` or `false` with no proof.
+
+## The path forward
+
+<Steps>
+  <Step title="AVS Consensus">
+    Multiple independent operators run the computation. Results must match to be accepted. No single operator can lie.
+  </Step>
+  <Step title="ZK Proofs">
+    Cryptographic proof that the computation was correct. Verifiable by anyone without trusting the prover.
+  </Step>
+  <Step title="Decentralized Signers">
+    Multi-party computation for result signing. No single party holds the full key.
+  </Step>
+  <Step title="Location Proof Integration">
+    Evidence-based location claims replace raw GPS. Multiple corroborating stamps make spoofing harder.
+  </Step>
+</Steps>
+
+Each enhancement reduces the trust surface. AVS consensus removes the single-operator assumption. ZK proofs make verification independent of hardware trust. Decentralized signers eliminate the single key. Location proofs address the input honesty gap.
+
+<Card title="Next: Security considerations" icon="arrow-right" href="/trust-model/security">
+  Threat model, known limitations, and responsible disclosure
+</Card>
