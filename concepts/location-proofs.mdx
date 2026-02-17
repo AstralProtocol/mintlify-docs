@@ -3,9 +3,7 @@ title: "Location Proofs"
 description: "Evidence-based verification of location claims"
 ---
 
-<Warning>
-  **Research Preview** — Under active development.
-</Warning>
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Location Proofs
 
@@ -94,9 +92,9 @@ Single-stamp proofs are valid. Multi-stamp proofs from independent systems enabl
 2. **Assess stamps against claim** — Does the observed location support the asserted location?
 3. **Assess cross-correlation** — Do multiple stamps corroborate each other?
 
-The output is a **Credibility Assessment**.
+The output is a **Credibility Assessment** (credibility scores).
 
-## Credibility Assessment
+## Credibility assessment
 
 Verification outputs a structured assessment, not just a yes/no:
 
@@ -111,9 +109,9 @@ interface CredibilityAssessment {
 }
 ```
 
-<Warning>
-  **Confidence ≠ Probability.** A confidence of 0.8 does NOT mean "80% probability the claim is true." It means "the evidence is reasonably strong." Calibrating to true probability is future work.
-</Warning>
+<Note>
+  **Confidence is not probability.** A confidence of 0.8 does not mean "80% probability the claim is true." It means "the evidence is reasonably strong." Calibrating to true probability is future work.
+</Note>
 
 ### Multi-Factor Proofs
 
@@ -254,22 +252,22 @@ Can be onchain or offchain — no requirement to submit onchain.
 
 ---
 
-## Relationship to Geospatial Operations
+## Relationship to geocomputation
 
-Location Verification is **upstream** of [Geospatial Operations](/concepts/geospatial-operations):
+Location verification is **upstream** of [geocomputation](/concepts/geocomputation):
 
-| Location Verification | Geospatial Operations |
-|----------------------|----------------------|
+| Location verification | Geocomputation |
+|----------------------|----------------|
 | Evaluates evidence credibility | Computes spatial relationships |
 | Input: location proof (claim + stamps) | Input: locations (claimed or verified) |
-| Output: credibility assessment | Output: policy attestation |
+| Output: credibility scores | Output: signed result |
 | "How confident are we that X was at L?" | "Is A inside B?" |
 
 Verified location proofs can serve as **trusted inputs** to geospatial operations, increasing confidence in computed results.
 
-### Integration with Compute
+### Integration with geocomputation
 
-Verified Location Proofs can be used as **inputs** to Geospatial Operations:
+Verified location proofs can be used as **inputs** to geocomputation:
 
 ```typescript
 // Verify user's location
@@ -284,6 +282,6 @@ const result = await astral.compute.contains({
 });
 ```
 
-<Card title="Next: Geospatial Operations" icon="calculator" href="/concepts/geospatial-operations">
-  Learn about spatial computations on location data
+<Card title="Next: Result format" icon="file-signature" href="/concepts/result-format">
+  Learn about the signed outputs of geocomputation
 </Card>

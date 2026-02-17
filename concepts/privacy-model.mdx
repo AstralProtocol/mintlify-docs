@@ -1,0 +1,64 @@
+---
+title: "Privacy model"
+description: "What the operator can see and what stays private"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Privacy model
+
+Astral runs spatial computations inside a Trusted Execution Environment (TEE). The TEE accepts encrypted inputs, decrypts them inside the enclave, computes a result, and returns only the signed result. The operator — whoever runs the Astral service — never sees raw location data.
+
+This is a meaningful privacy guarantee even before zero-knowledge proofs. Your exact coordinates are processed but never exposed outside the enclave.
+
+## What stays private
+
+- **Raw input coordinates** — the exact lat/lng values you submit
+- **Exact geometries** — polygon boundaries, line paths, and other spatial data used in the computation
+
+These values exist only inside the TEE during computation and are discarded after the result is signed.
+
+## What is visible
+
+- **The signed result** — a boolean (true/false) or numeric value (distance, area, length)
+- **Operation type** — which geocomputation was performed (e.g., `contains`, `distance`)
+- **Input references** — hashes of the inputs, not the raw data itself
+
+Anyone who sees the signed result knows *what question was asked* and *what the answer was*, but not *what the exact inputs were*.
+
+## Information leakage from results
+
+The result itself may reveal information. If you ask "is this point inside this polygon?" and the answer is true, an observer learns something about the point's location. This is inherent to the computation, not a limitation of the privacy model.
+
+The amount of leakage depends on the operation and the specificity of the inputs:
+
+| Operation | What the result reveals |
+|-----------|------------------------|
+| `contains` (true) | The point is somewhere inside the polygon |
+| `within` (true, 500m) | The point is within 500m of the target |
+| `distance` (exact value) | The precise distance between two geometries |
+
+More specific operations leak more. A `contains` check against a country-sized polygon reveals less than a `within` check with a 10-meter radius.
+
+## Current guarantees vs future enhancements
+
+The TEE provides **computational privacy** today. Your raw inputs are processed inside hardware-isolated memory that the operator cannot inspect, even with physical access to the machine.
+
+Zero-knowledge proofs are a future enhancement that would allow verification without any trusted hardware. With ZK, a verifier could confirm the computation was correct without the inputs ever entering a trusted enclave — removing the need to trust the TEE manufacturer's security claims.
+
+| | TEE (today) | ZK (future) |
+|---|---|---|
+| Raw inputs hidden from operator | Yes | Yes |
+| No trusted hardware required | No | Yes |
+| Verification without re-execution | No | Yes |
+| Production-ready | Yes | Not yet |
+
+## Limitations
+
+- **TEE trust assumption** — you are trusting that the TEE hardware (Intel SGX / AMD SEV) correctly isolates the enclave. Side-channel attacks on TEEs are an active area of security research.
+- **Result leakage** — as described above, the result itself carries information about the inputs.
+- **Input references** — hashed input references are visible. If an observer knows the possible input space, they could attempt to match hashes.
+
+<Card title="Next: How it works" icon="gear" href="/how-it-works">
+  The architecture behind verifiable spatial computation
+</Card>

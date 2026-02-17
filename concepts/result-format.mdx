@@ -1,0 +1,201 @@
+---
+title: "Result format"
+description: "How signed results are structured, decoded, and verified"
+---
+
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Result format
+
+When you call a compute operation, Astral returns a signed result — a cryptographically signed record of the computation, its inputs, and its output. This is the universal format that any integrator (agent, backend, smart contract) uses to consume and verify Astral's results.
+
+<Info>
+  Signed results are produced by the Astral signing key, held exclusively inside the TEE (trusted execution environment). This is how you know the computation was performed correctly — only code running inside the TEE can produce valid signatures.
+</Info>
+
+## What is a signed result?
+
+When you call a compute operation, Astral returns a signed result:
+
+<Note>
+  **Code snippets need testing** — Verify against actual implementation before use.
+</Note>
+
+```typescript
+const result = await astral.compute.within({
+  geometry: userLocationUID,
+  target: landmarkUID,
+  radius: 500,
+  chainId: 84532,
+  schema: SCHEMA_UID,
+  recipient: userAddress
+});
+
+// result is a PolicyAttestationResult
+console.log(result.result);      // true
+console.log(result.operation);   // "within"
+console.log(result.attestation); // { uid, schema, signature, ... }
+```
+
+The signed result proves:
+- The computation was performed by the Astral signing key
+- The inputs were exactly as specified
+- The result is accurate
+
+## Schema Types
+
+Signed results use per-result-type schemas. The SDK auto-selects based on the operation.
+
+### BooleanPolicyAttestation
+
+For predicates (`contains`, `within`, `intersects`):
+
+```solidity
+// Schema: "bool result, bytes32[] inputRefs, uint64 timestamp, string operation"
+struct BooleanPolicyAttestation {
+    bool result;              // The boolean result
+    bytes32[] inputRefs;      // Input references (UIDs or hashes)
+    uint64 timestamp;         // When computation was performed
+    string operation;         // "contains", "within", "intersects"
+}
+```
+
+### NumericPolicyAttestation
+
+For measurements (`distance`, `length`, `area`):
+
+```solidity
+// Schema: "uint256 result, string units, bytes32[] inputRefs, uint64 timestamp, string operation"
+struct NumericPolicyAttestation {
+    uint256 result;           // Scaled integer (centimeters)
+    string units;             // "meters" or "square_meters"
+    bytes32[] inputRefs;      // Input references
+    uint64 timestamp;         // When computation was performed
+    string operation;         // "distance", "length", "area"
+}
+```
+
+### GeometryPolicyAttestation (Future)
+
+For transformations (`buffer`, `centroid`, `union`):
+
+```solidity
+// Schema: "bytes geometry, string geometryType, bytes32[] inputRefs, uint64 timestamp, string operation"
+struct GeometryPolicyAttestation {
+    bytes geometry;           // Encoded geometry result
+    string geometryType;      // "Point", "Polygon", etc.
+    bytes32[] inputRefs;      // Input references
+    uint64 timestamp;         // When computation was performed
+    string operation;         // "buffer", "centroid", "union"
+}
+```
+
+## Input References
+
+The `inputRefs` array contains a `bytes32` reference for each input:
+
+| Input Type | Reference Value |
+|------------|-----------------|
+| Location record UID | The UID itself |
+| Offchain attestation | The attestation UID |
+| Raw GeoJSON | `keccak256(abi.encode(geojson))` |
+
+This enables verification that specific inputs were used:
+
+```solidity
+// In your resolver
+(bool result, bytes32[] memory inputRefs, , ) = abi.decode(...);
+
+// Verify the expected location was checked
+require(inputRefs[1] == EXPECTED_LANDMARK_UID, "Wrong location checked");
+```
+
+<Note>
+  For raw GeoJSON, the hash allows verification if the original geometry is known, but does not reveal the geometry itself.
+</Note>
+
+## SDK Return Object
+
+```typescript
+interface PolicyAttestationResult<T> {
+  // Decoded result (convenience)
+  result: T;                          // boolean | number | GeoJSON.Geometry
+  units?: string;                     // For measurements
+  operation: string;                  // Operation name
+  timestamp: number;                  // Unix timestamp
+  inputRefs: string[];                // Input references
+
+  // Full attestation data
+  attestation: {
+    uid: string;                      // EAS UID (if submitted onchain)
+    schema: string;                   // Schema UID
+    attester: string;                 // Astral signer address
+    recipient: string;                // Developer-specified recipient
+    data: string;                     // ABI-encoded attestation data
+    signature: string;                // EIP-712 signature
+  };
+
+  // For delegated onchain submission
+  delegatedAttestation: {
+    signature: string;                // Astral's signature
+    attester: string;                 // Astral's address
+    deadline: number;                 // Signature expiry
+  };
+}
+```
+
+## Using Signed Results
+
+### Offchain
+
+Use the result directly in your application:
+
+```typescript
+const result = await astral.compute.within({
+  geometry: uid1,
+  target: uid2,
+  radius: 500,
+  chainId: 84532,
+  schema: SCHEMA_UID
+});
+
+if (result.result) {
+  // User is nearby — enable feature
+  enableFeature();
+}
+```
+
+### Onchain
+
+Signed results can be submitted onchain via EAS delegated attestations to trigger smart contract logic.
+
+For the full blockchain integration flow, see [Blockchain integration](/guides/blockchain-integration).
+
+## Result Scaling
+
+Numeric results are stored as scaled integers for determinism:
+
+| Original | Stored | To Recover |
+|----------|--------|------------|
+| 523.45 meters | 52345 | divide by 100 |
+| 1234.5678 m² | 12345678 | divide by 10000 |
+
+```solidity
+// In your resolver
+(uint256 resultCm, , , , ) = abi.decode(...);
+uint256 meters = resultCm / 100;
+```
+
+## Result Expiry
+
+The `delegatedAttestation.deadline` indicates when the signature expires. Submissions after the deadline will fail.
+
+```typescript
+if (Date.now() / 1000 < result.delegatedAttestation.deadline) {
+  await astral.eas.submitDelegated(result.delegatedAttestation);
+}
+```
+
+<Card title="Next: Location proofs" icon="map-pin" href="/concepts/location-proofs">
+  Learn about verifiable location claims
+</Card>

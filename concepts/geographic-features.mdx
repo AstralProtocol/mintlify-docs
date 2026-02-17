@@ -1,0 +1,193 @@
+---
+title: "Geographic features"
+description: "What the system operates on — the inputs to geocomputation and verification"
+---
+
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Geographic features
+
+Geographic features are what Astral operates on. Every API call starts with geographic features — points, polygons, lines, or references to previously verified locations. The provenance of a feature matters: a raw coordinate and a verified location are both valid inputs, but they carry different trust properties.
+
+## Supported Input Types
+
+Astral currently supports four ways to pass geographic features:
+
+| # | Input Type | Description |
+|---|-----------|-------------|
+| 1 | **Raw GeoJSON** | Unsigned geometry for reference locations or prototyping |
+| 2 | **Attested location (UID)** | EAS attestation with cryptographic proof of origin, referenced by UID |
+| 3 | **Attested location (UID + URI)** | Offchain attestation referenced by UID and storage URI |
+| 4 | **Inline attestation** | Full signed attestation object passed directly |
+
+We plan to expand support for other feature formats in the future, including AT Protocol location lexicon records and other standards.
+
+## Attested Locations
+
+Attested locations are **signed spatial records** stored as EAS attestations. They contain:
+
+- **Geometry**: The spatial data (GeoJSON format)
+- **Metadata**: Optional descriptive information
+- **Signature**: Cryptographic proof of the attester's identity
+
+<Note>
+  **Code snippets need testing** — Verify against actual implementation before use.
+</Note>
+
+```typescript
+// Creating an attested location
+const landmark = await astral.location.create({
+  type: 'Point',
+  coordinates: [2.2945, 48.8584]
+}, {
+  chainId: 84532,
+  submitOnchain: true,
+  metadata: {
+    name: "Eiffel Tower",
+    description: "Iconic Paris landmark"
+  }
+});
+
+console.log(landmark.uid);  // 0xabc123...
+```
+
+## Provenance
+
+The provenance of a geographic feature determines how much trust you can place in it.
+
+**Raw GeoJSON** is fine for reference geometries — official boundaries, well-known landmarks, administrative regions. These are publicly verifiable facts that don't need cryptographic proof of origin. Raw GeoJSON is also useful during prototyping when you want to test computations without creating attestations first. However, raw coordinates are unverified for user positions. A signed result using raw GeoJSON proves "Astral computed the relationship between inputs A and B" but does not prove **who provided** those geometries.
+
+**Attested locations** from location proofs carry evidence of where someone actually was. They include cryptographic signatures tying the location claim to a specific identity. When a signed result references attested locations as inputs, the full chain of trust is preserved: who claimed to be where, when they claimed it, and what the computation determined.
+
+The right choice depends on your use case. A geofencing check against a city boundary can safely use raw GeoJSON for the boundary and an attested location for the user's position.
+
+## Storage Options
+
+For blockchain integrators, see [Blockchain integration](/guides/blockchain-integration) for details on onchain vs offchain storage.
+
+<CardGroup cols={2}>
+  <Card title="Onchain Attestations" icon="link">
+    - Stored on EAS contracts
+    - Referenced by UID alone
+    - Higher gas cost
+    - Permanent, immutable
+  </Card>
+  <Card title="Offchain Attestations" icon="cloud">
+    - Stored on IPFS, servers, etc.
+    - Referenced by UID + URI
+    - No gas cost to create
+    - EIP-712 signed
+  </Card>
+</CardGroup>
+
+### Onchain
+
+```typescript
+// Create onchain attestation
+const feature = await astral.location.create(geojson, {
+  submitOnchain: true
+});
+
+// Reference by UID only
+await astral.compute.distance(feature.uid, otherUID);
+```
+
+### Offchain
+
+```typescript
+// Create offchain attestation
+const feature = await astral.location.create(geojson, {
+  submitOnchain: false,
+  storage: 'ipfs'  // or 'arweave', 'https', etc.
+});
+
+// Reference by UID + URI
+await astral.compute.distance(
+  { uid: feature.uid, uri: feature.uri },
+  otherUID
+);
+```
+
+## Schema
+
+Attested locations follow the [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) schema:
+
+For blockchain integrators, see [Blockchain integration](/guides/blockchain-integration) for details on onchain vs offchain storage.
+
+<Warning>
+  **Verification in progress** — We are actively verifying that deployed schemas conform to Location Protocol v0.2. There may be inconsistencies between the documentation, deployed schemas, and the spec. See [GitHub issue #11](https://github.com/AstralProtocol/astral-location-services/issues/11) for status.
+</Warning>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `lp_version` | string | Location Protocol version (e.g., "0.2") |
+| `location_type` | string | The type of location data (e.g., "GeoJSON") |
+| `location` | bytes | Encoded location data |
+| `srs` | string | Spatial reference system as OGC URI |
+
+## Using Geographic Features
+
+Geographic features serve as **inputs** to geocomputation:
+
+```typescript
+// As direct UID (onchain attestation)
+const result = await astral.compute.distance(
+  '0xabc123...',  // UID of first feature
+  '0xdef456...'   // UID of second feature
+);
+
+// As UID + URI (offchain attestation)
+const result = await astral.compute.contains(
+  { uid: '0xabc123...', uri: 'ipfs://Qm...' },
+  userLocationUID
+);
+
+// As inline attestation object
+const result = await astral.compute.within(
+  { attestation: signedOffchainAttestation },
+  landmarkUID,
+  500
+);
+```
+
+## Raw GeoJSON Alternative
+
+You can also use **raw GeoJSON** without creating an attestation first:
+
+```typescript
+// Raw GeoJSON as input
+const result = await astral.compute.contains(
+  {
+    type: 'Polygon',
+    coordinates: [[[...]]]  // SF Bay Area boundary
+  },
+  userLocationUID
+);
+```
+
+## Fetching Geographic Features
+
+```typescript
+// Get by UID
+const feature = await astral.location.get('0xabc123...');
+console.log(feature.geometry);  // { type: 'Point', coordinates: [...] }
+
+// Query with filters
+const features = await astral.location.query({
+  bbox: [-122.5, 37.7, -122.4, 37.8],  // Bounding box
+  limit: 100
+});
+```
+
+## Coordinate System
+
+Attested locations honor the `srs` field, using OGC URIs per [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft):
+
+- **Default**: `http://www.opengis.net/def/crs/OGC/1.3/CRS84` (WGS84, lon/lat order)
+- **Custom**: Any OGC CRS URI supported by PostGIS
+
+Coordinates should be in **[longitude, latitude]** order (GeoJSON standard).
+
+<Card title="Next: Geocomputation" icon="calculator" href="/concepts/geocomputation">
+  Learn about the spatial computations you can perform
+</Card>
