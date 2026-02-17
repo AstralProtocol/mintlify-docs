@@ -1,17 +1,17 @@
 ---
-title: "How It Works"
-description: "The architecture behind verifiable geospatial computation"
+title: "How it works"
+description: "The architecture behind verifiable spatial computation"
 ---
 
-<Warning>
-  **Research Preview** — Architecture is under active development.
-</Warning>
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
-# How Astral Location Services Work
+# How it works
 
-Astral provides verifiable geospatial computation by combining three key technologies: **PostGIS** for spatial operations, **EigenCompute TEE** for verifiable execution, and **EAS** for attestation management.
+Astral runs spatial computations inside a Trusted Execution Environment and returns signed results. Here's what happens under the hood.
 
-## System Architecture
+The core flow: geometry in, TEE computes, signed result out. The result can go anywhere — an agent, a smart contract, a database, a compliance report.
+
+## System architecture
 
 ```mermaid
 flowchart LR
@@ -20,10 +20,10 @@ flowchart LR
         SDK[Astral SDK]
     end
 
-    subgraph Astral["Astral Services"]
+    subgraph Astral["Astral"]
         API[API Gateway]
         subgraph TEE["EigenCompute TEE"]
-            Engine[Policy Engine + PostGIS]
+            Engine[Compute Engine + PostGIS]
         end
     end
 
@@ -40,43 +40,43 @@ flowchart LR
     EAS --> Resolver
 ```
 
-## Key Architectural Decisions
+## Key architectural decisions
 
 <AccordionGroup>
-  <Accordion title="Self-Contained Container" icon="box">
+  <Accordion title="Self-contained container" icon="box">
     PostGIS runs **inside** the Docker container, not as an external service. This is essential for verifiable computation in the TEE — no external dependencies means the entire execution environment is attested.
   </Accordion>
-  <Accordion title="Stateless Model" icon="rotate">
+  <Accordion title="Stateless model" icon="rotate">
     Each request brings all required inputs. No persistent state between requests. This ensures determinism and simplifies verification — same inputs always produce same outputs. (Note: additional testing is needed to fully validate determinism across different environments.)
   </Accordion>
-  <Accordion title="Delegated Attestations" icon="signature">
-    Developers submit Policy Attestations onchain using EAS's delegated attestation pattern. Astral signs, developer pays gas, Astral is recorded as the attester.
+  <Accordion title="Delegated attestations" icon="signature">
+    Developers submit signed results onchain using EAS's delegated attestation pattern. Astral signs, the developer pays gas, and Astral is recorded as the attester.
   </Accordion>
 </AccordionGroup>
 
-## The Computation Flow
+## The computation flow
 
 <Steps>
-  <Step title="Request Arrives">
+  <Step title="Request arrives">
     Developer's app calls `astral.compute.within(uid1, uid2, 500)` via the SDK
   </Step>
-  <Step title="Input Resolution">
-    The compute service fetches/validates location attestations by UID, or accepts raw GeoJSON
+  <Step title="Input resolution">
+    The compute service fetches and validates location records by UID, or accepts raw GeoJSON
   </Step>
-  <Step title="Spatial Computation">
+  <Step title="Spatial computation">
     PostGIS executes the spatial operation (e.g., `ST_DWithin`) inside the TEE
   </Step>
-  <Step title="Result Signing">
-    The service creates a Policy Attestation and signs it with the TEE-held key
+  <Step title="Result signing">
+    The service creates a signed result using the TEE-held key
   </Step>
   <Step title="Response">
-    Signed attestation returned to SDK, ready for offchain use or onchain submission
+    The signed result is returned to the SDK, ready for offchain use or onchain submission
   </Step>
 </Steps>
 
-## Verifiable Execution with EigenCompute
+## Verifiable execution with EigenCompute
 
-The Geospatial Policy Engine runs in **EigenCompute**, part of the EigenCloud ecosystem:
+The compute engine runs in **EigenCompute**, part of the EigenCloud ecosystem:
 
 ```mermaid
 flowchart LR
@@ -88,27 +88,27 @@ flowchart LR
     end
 
     Input[Request] --> API
-    API --> Output[Signed Attestation]
+    API --> Output[Signed Result]
 ```
 
 <Info>
   PostGIS uses [GEOS](https://libgeos.org/) for geometry operations — the same C++ library used by QGIS, GDAL, and most professional geospatial software. See the [GEOS documentation](https://libgeos.org/usage/download/) for more on its reliability and widespread adoption.
 </Info>
 
-### Verifiability Properties
+### Verifiability properties
 
-| Property | How It's Achieved |
+| Property | How it's achieved |
 |----------|-------------------|
-| **Input Verification** | Attestation signatures verified at TEE boundary |
-| **Deterministic Computation** | Same inputs always produce same result |
-| **Signed Output** | Service key signs Policy Attestation inside TEE |
-| **TEE Attestation** | EigenCompute provides hardware attestation of execution |
+| **Input verification** | Attestation signatures verified at TEE boundary |
+| **Deterministic computation** | Same inputs always produce same result |
+| **Signed output** | Service key signs the result inside the TEE |
+| **TEE attestation** | EigenCompute provides hardware attestation of execution |
 
-## Input Resolution
+## Input resolution
 
 The service accepts multiple input formats:
 
-| Input Format | Resolution |
+| Input format | Resolution |
 |--------------|------------|
 | UID string | Fetch from EAS contracts (onchain attestations) |
 | `{ uid, uri }` | Fetch from URI, verify UID matches, verify signature |
@@ -116,28 +116,12 @@ The service accepts multiple input formats:
 | Raw GeoJSON | Use directly, hash for `inputRefs` |
 
 <Note>
-  For offchain attestations, the UID is deterministically derived from the attestation data. Even when fetching from HTTPS (not content-addressed), we verify the fetched attestation produces the expected UID. Mismatch = reject.
+  For offchain attestations, the UID is deterministically derived from the attestation data. Even when fetching from HTTPS (not content-addressed), Astral verifies the fetched attestation produces the expected UID. Mismatch = reject.
 </Note>
 
-## Delegated Attestation Flow
+## Delegated attestation flow
 
-```mermaid
-sequenceDiagram
-    participant Dev as Developer App
-    participant SDK as Astral SDK
-    participant Svc as Compute Service
-    participant EAS as EAS Contracts
-    participant Res as Resolver
-
-    Dev->>SDK: compute.within(...)
-    SDK->>Svc: POST /compute/within
-    Svc->>Svc: Execute PostGIS operation
-    Svc->>Svc: Sign attestation
-    Svc-->>SDK: Signed attestation + delegated sig
-    SDK->>EAS: Submit with Astral's signature
-    EAS->>Res: onAttest() callback
-    Res->>Res: Execute business logic
-```
+For the full blockchain integration flow, see [Blockchain integration](/guides/blockchain-integration).
 
 The delegated attestation pattern means:
 - **Astral signs** the attestation data offchain
@@ -149,7 +133,7 @@ The delegated attestation pattern means:
   Resolver contracts must be deployed and registered by the developer. Astral does not provide pre-built resolver contracts — you create them to implement your specific business logic. See [EAS Resolvers](/concepts/eas-resolvers) for patterns and examples.
 </Note>
 
-## Trust Model
+## Trust model
 
 There are two distinct trust questions in location-based systems:
 
@@ -157,23 +141,23 @@ There are two distinct trust questions in location-based systems:
 
 This is the **location verification problem** — how do you know a user was actually at the location they claim? GPS is spoofable, and proving physical presence remains an open research problem.
 
-We're actively working on this through our [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323). For now, Astral Location Services trust the location data provided as input.
+We're actively working on this through our [location proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323). For now, Astral trusts the location data provided as input.
 
 ### 2. Was the computation performed correctly?
 
-This is what Astral Location Services solve. Given location inputs, how do you prove the geospatial computation (distance, containment, etc.) was performed correctly?
+This is what Astral solves. Given location inputs, how do you prove the geocomputation (distance, containment, etc.) was performed correctly?
 
 **Current approach:**
 - **Open source code**: The compute service code is public and auditable
 - **TEE execution**: Code runs inside EigenCompute's trusted execution environment
-- **Astral signing key**: Attestations are signed by a key held inside the TEE
+- **Astral signing key**: Results are signed by a key held inside the TEE
 - **Deterministic operations**: Same inputs produce same outputs (additional testing in progress)
 
 **Future improvements:**
-- **AVS Consensus**: Multiple operators verify computations
-- **ZK Proofs**: Cryptographic proof of correct execution
-- **Decentralized Signers**: Multi-party attestation signing
+- **AVS consensus**: Multiple operators verify computations
+- **ZK proofs**: Cryptographic proof of correct execution
+- **Decentralized signers**: Multi-party result signing
 
-<Card title="Next: Core Concepts" icon="book" href="/concepts/location-attestations">
-  Deep dive into Location Attestations
+<Card title="Next: Geographic features" icon="map" href="/concepts/geographic-features">
+  How Astral represents spatial data
 </Card>
