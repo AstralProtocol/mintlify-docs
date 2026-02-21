@@ -70,10 +70,10 @@
       "group": "Core Concepts",
       "pages": [
         "concepts/geographic-features",
-        "concepts/geocomputation",
-        "concepts/verifiable-computation",
         "concepts/location-proofs",
+        "concepts/geocomputation",
         "concepts/result-format",
+        "concepts/verifiable-computation",
         "concepts/privacy-model"
       ]
     },

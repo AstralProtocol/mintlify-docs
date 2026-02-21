@@ -1,58 +1,64 @@
 ---
 title: "Introduction"
-description: "Verifiable spatial computation"
+description: "Verifiable location infrastructure for agents, applications, and smart contracts"
 ---
 
 <Note>
-  **Research preview** — Astral is under active development and not yet production-ready. APIs may change. We're building in public and welcome feedback.
+  **Research Preview** — The Astral Protocol is under active development and not yet production-ready. APIs may change. We're building in public and welcome feedback.
 </Note>
 
-**Astral provides verifiable spatial computation.** Ask a spatial question — how far apart are these two points? Is this location inside that boundary? Do these regions overlap? — and get back a signed, verifiable answer.
+{/* TODO: John to handwrite opening 1-2 paragraphs. Draft below as a starting point — replace freely. */}
 
-The answer comes with cryptographic proof that it was computed correctly inside a Trusted Execution Environment. You can use it in an agent workflow, a backend service, a compliance report, or a smart contract. The result is the same regardless of where it ends up.
+Location data is everywhere, but trust in location data is very brittle. GPS is spoofable. VPNs manipulate IP addresses. In most cases, location data can be edited freely or forged easily. When an agent, an application, or a smart contract needs to answer a spatial question — was this device actually there? Is this point inside that boundary? — there is no way to independently verify the claim or the computation. You're taking someone's word for it.
+
+Location data is becoming more and more important across a range of use cases — so we built the Astral Protocol to introduce verifiable location-based services.
+
+The system rests on two core capabilities:
 
 <CardGroup cols={2}>
-  <Card title="Geocomputation" icon="calculator">
-    Distance, containment, intersection, area, and length — computed with proof of correct execution
+  <Card title="Location Proofs" icon="shield-check">
+    Verify where a device, user, or event actually was — using multi-factor evidence from independent proof-of-location systems
   </Card>
-  <Card title="Location verification" icon="shield-check">
-    Evidence-based verification of location claims using multi-factor location proofs
-  </Card>
-  <Card title="Agent integration" icon="robot">
-    Use Astral as a spatial oracle in autonomous agent workflows
-  </Card>
-  <Card title="Blockchain integration" icon="link-simple">
-    Submit signed results onchain as EAS attestations to trigger smart contract logic
+  <Card title="Verifiable Geocomputation" icon="calculator">
+    Ask spatial questions — distance, containment, intersection, area — and get back signed, cryptographically verifiable answers
   </Card>
 </CardGroup>
 
-## The core flow
+Both produce **signed results** — cryptographic artifacts that any downstream system can verify independently. The result is the same whether it ends up in an autonomous agent's decision loop, a compliance report, a backend database, or a smart contract.
+
+## Two Capabilities, One Pipeline
 
 ```mermaid
 graph LR
-    A[Geographic features] --> B[Astral TEE]
-    B --> C[Signed result]
-    C --> D[Your application]
+    subgraph Inputs
+        direction TB
+        RG[Raw GeoJSON]
+        SL[Signed Location Record]
+        LP[Location Proof]
+    end
+    subgraph Astral Hosted TEE
+        direction TB
+        C[Geospatial Compute]
+        V[Verify]
+    end
+    RG --> C
+    SL --> C
+    LP --> V
+    V --> C
+    C --> SR[Signed Result]
+    SR --> A1[Agent]
+    SR --> A2[Application]
+    SR --> A3[Smart Contract]
 ```
 
-1. **Input**: Geographic features — points, polygons, lines, verified locations
-2. **Compute**: Spatial operations execute inside a TEE with PostGIS
-3. **Output**: A signed result you can verify independently
+1. **Collect + Compose** — Gather location evidence from various sources and compose it into a single, verifiable location proof.
+2. **Verify** — Submit location proofs for evidence-based verification. The system evaluates stamps from independent proof-of-location systems and returns credibility scores.
+3. **Compute** — Run spatial operations (distance, containment, intersection, area, length) inside a Trusted Execution Environment. PostGIS computes; the TEE signs.
+4. **Use the results anywhere** — The signed results carry their own proof of correctness. Use them peer-to-peer, on centralized servers, or in smart contracts.
 
-## Quick example
+## Quick Example
 
-```bash
-# How far is it from point A to point B?
-curl -X POST https://api.astral.global/compute/distance \
-  -H "Content-Type: application/json" \
-  -d '{
-    "from": { "type": "Point", "coordinates": [2.2945, 48.8584] },
-    "to": { "type": "Point", "coordinates": [2.2951, 48.8580] },
-    "chainId": 84532
-  }'
-```
-
-The response includes the distance in meters, a cryptographic signature, and references to the inputs — everything needed to verify the result independently.
+Create a location proof, verify it, then check if the verified position is inside a geofence:
 
 ```typescript
 import { AstralSDK } from '@decentralized-geo/astral-sdk';
@@ -62,48 +68,87 @@ const astral = new AstralSDK({
   apiUrl: 'https://api.astral.global'
 });
 
-const result = await astral.compute.distance({
-  from: { type: 'Point', coordinates: [2.2945, 48.8584] },
-  to: { type: 'Point', coordinates: [2.2951, 48.8580] },
-  chainId: 84532
+// 1. Collect signals from a proof-of-location plugin on the device
+const signals = await astral.stamps.collect({
+  name: 'proofmode', version: '0.1.0'
 });
 
-console.log(`Distance: ${result.result} meters`);
+// 2. Create and sign a stamp from the raw signals
+const unsigned = await astral.stamps.create(
+  { name: 'proofmode', version: '0.1.0' }, signals
+);
+const stamp = await astral.stamps.sign(unsigned, deviceSigner);
+
+// 3. Compose a location proof: a claim ("I was here") bundled with evidence
+const claim = {
+  location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  subject: { scheme: 'eth-address', value: '0x1234...' },
+  radius: 100,
+  time: { start: Date.now() / 1000 - 60, end: Date.now() / 1000 },
+  // lpVersion, locationType, srs — Location Protocol v0.2 defaults
+}
+const proof = astral.proofs.create(
+  claim,
+  [stamp] // multi-stamp location proofs are supported, and more secure
+);
+
+// 4. Verify — the TEE evaluates the stamp's signatures, structure,
+//    and consistency with the claim
+const verified = await astral.verify.proof(proof, { chainId: 84532 });
+console.log(`Credibility: ${verified.credibility.confidence}`);
+
+// 5. Compute — use the verified location in a spatial operation
+const inside = await astral.compute.contains({
+  container: geofencePolygon,
+  geometry: verified.uid,
+  chainId: 84532
+});
+console.log(`Inside geofence: ${inside.result}`);
 ```
 
-And if you want it onchain:
+The response includes the computation result, a cryptographic signature from the TEE, and references to the inputs — everything needed to verify the answer independently.
+
+The signed result is portable. Use it directly in your application:
 
 ```typescript
-// Submit as an EAS attestation
-await astral.eas.submitDelegated(result.delegatedAttestation);
+// In an agent workflow — branch on the verified spatial answer
+if (inside.result) {
+  confirmDelivery(inside);  // the signed result is the audit trail
+}
+
+// In a backend — store the signed result as evidence
+await db.insert({ delivery_id, proof: inside });
 ```
 
-## Why verifiable spatial computation?
+Or submit it onchain to trigger smart contract logic:
 
-### The problem
+```typescript
+// Submit as an EAS attestation — triggers your resolver contract
+await astral.eas.submitDelegated(inside.delegatedAttestation);
+```
 
-Location data is untrusted everywhere. GPS is spoofable. Geocoding APIs are black boxes. When a delivery app says "the courier was within 100 meters," there's no way to independently verify that claim. The computation happened on someone's server, and you're taking their word for it.
+## What You Can Build
 
-### The solution
-
-Astral makes spatial computation verifiable. The same PostGIS operations that power professional geospatial software — distance, containment, intersection — run inside a Trusted Execution Environment. The TEE signs each result with a key that only it holds. Anyone can verify the signature and confirm the computation was performed correctly on the stated inputs.
-
-This matters for any application where spatial answers have consequences: insurance payouts, delivery escrow, geofence compliance, access control, autonomous agent decisions.
-
-## What you can build
+Verified location data and verifiable spatial computation unlock applications that were previously impossible or required blind trust:
 
 <CardGroup cols={2}>
-  <Card title="Delivery verification" icon="truck">
-    Escrow that releases when the courier arrives at the right location
+  <Card title="Delivery Verification" icon="truck">
+    Confirm a courier arrived at the right location — with evidence, not just GPS
   </Card>
-  <Card title="Parametric insurance" icon="umbrella">
-    Policies that trigger based on verified proximity to weather events
+  <Card title="Autonomous Agent Decisions" icon="robot">
+    Give AI agents verifiable spatial reasoning with an auditable trail
   </Card>
-  <Card title="Geofence compliance" icon="map">
+  <Card title="Geofence Compliance" icon="map">
     Prove an asset stayed within an approved corridor
   </Card>
-  <Card title="Location-gated smart contracts" icon="lock">
-    Onchain actions triggered by verified spatial relationships
+  <Card title="Parametric Insurance" icon="umbrella">
+    Trigger policies based on verified proximity to events
+  </Card>
+  <Card title="Location-Gated Access" icon="lock">
+    Gate features, content, or actions on verified presence
+  </Card>
+  <Card title="Onchain Spatial Logic" icon="link-simple">
+    Submit signed results to smart contracts via EAS attestations
   </Card>
 </CardGroup>
 
