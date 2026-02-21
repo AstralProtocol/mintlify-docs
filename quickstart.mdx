@@ -1,341 +1,161 @@
 ---
 title: "Quickstart"
-description: "Build a location-gated smart contract"
+description: "Your first location proof and verified spatial computation in 5 minutes"
 ---
 
-<Warning>
-  **Research Preview** — Code snippets demonstrate the intended API and need testing against the actual implementation.
-</Warning>
+<Note>
+  **Research Preview** — Astral is under active development and not yet production-ready. APIs may change. We're building in public and welcome feedback.
+</Note>
 
-# Build a Location-Gated Smart Contract
+This guide walks through both of Astral's core capabilities: creating and verifying a location proof, then running a verified spatial computation with it.
 
-Create a smart contract that triggers actions when a geospatial policy check passes — "is the user within 500m of the Eiffel Tower?"
+## Step 1: Create a Location Proof
 
-<Info>
-  **About location verification**: This guide uses location data as input, but doesn't verify *where* that data came from. GPS is spoofable. We're working on the first [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) to provide evidence-backed location claims — these are still in development and will integrate with the flow shown here.
-</Info>
-
-## What You'll Learn
-
-<Steps>
-  <Step title="Register a reference location">
-    Create a location attestation for the Eiffel Tower
-  </Step>
-  <Step title="Check the geospatial policy">
-    Use Astral to verify proximity
-  </Step>
-  <Step title="Gate the smart contract">
-    Use EAS resolvers to trigger onchain actions based on the policy result
-  </Step>
-</Steps>
-
-## Prerequisites
-
-```bash
-npm install @decentralized-geo/astral-sdk ethers
-```
-
-You'll need:
-- A wallet with testnet ETH (Base Sepolia)
-- Basic TypeScript and Solidity knowledge
-
----
-
-## Step 1: Initialize the SDK
+A location proof starts on the device. You collect signals from proof-of-location systems, process them into stamps, sign them, and compose the proof.
 
 ```typescript
 import { AstralSDK } from '@decentralized-geo/astral-sdk';
-import { ethers } from 'ethers';
 
-// Connect your wallet
-const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-
-// Initialize SDK
 const astral = new AstralSDK({
-  chainId: 84532,  // Base Sepolia
-  signer: wallet,
+  chainId: 84532,
   apiUrl: 'https://api.astral.global'
 });
-```
 
----
-
-## Step 2: Register the Eiffel Tower
-
-Create a location attestation for the Eiffel Tower that can be referenced by UID.
-
-```typescript
-// Define the Eiffel Tower as a point
-const eiffelTowerLocation = {
-  type: 'Point',
-  coordinates: [2.2945, 48.8584]  // [longitude, latitude]
-};
-
-// Create an onchain location attestation
-const eiffelTower = await astral.location.onchain.create({
-  location: eiffelTowerLocation,
-  memo: 'Eiffel Tower - Iconic Paris landmark'
+// 1. Collect raw signals from a proof-of-location plugin on the device
+//    ProofMode reads GPS, accelerometer, cell towers, and signs with the Secure Enclave
+const signals = await astral.stamps.collect({
+  name: 'proofmode',
+  version: '0.1.0',
+  config: { timeout: 5000 }
 });
 
-console.log('Eiffel Tower UID:', eiffelTower.uid);
-console.log('Transaction hash:', eiffelTower.txHash);
-// Save this UID - it's a reference to this location
-```
-
-<Note>
-  Location attestations follow the [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) schema (verification in progress — see [Location Records](/concepts/location-attestations#schema)).
-  Anyone can now reference the Eiffel Tower by UID instead of hardcoding coordinates.
-</Note>
-
----
-
-## Step 3: Check the Geospatial Policy
-
-<Note>
-  **Prerequisite**: Before running this step, you need to deploy your resolver contract and register your schema with EAS. See the [Prerequisite section](#prerequisite-deploy-resolver-and-register-schema) below — the `RESOLVER_SCHEMA_UID` from that step is required here.
-</Note>
-
-When the user is ready to claim, submit their location to Astral for policy evaluation.
-
-<Warning>
-  **Location source matters**: The `userCoords` below comes from GPS, which is spoofable. We're working on [Location Proof plugins](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) to provide evidence-backed location claims — these are still in development.
-</Warning>
-
-```typescript
-// User's location (from GPS or location proof plugin)
-const userCoords = {
-  type: 'Point',
-  coordinates: [2.2951, 48.8580]
-};
-
-// Create user's location attestation
-const userLocation = await astral.location.onchain.create({
-  location: userCoords
-});
-
-// Check proximity using compute module
-const result = await astral.compute.within(
-  userLocation.uid,      // User's location
-  eiffelTower.uid,       // Target landmark
-  500,                   // Radius in meters
-  {
-    schema: RESOLVER_SCHEMA_UID,
-    recipient: wallet.address
-  }
+// 2. Create an unsigned stamp from the raw signals
+const unsigned = await astral.stamps.create(
+  { name: 'proofmode', version: '0.1.0' },
+  signals
 );
 
-// Behind the scenes:
-// 1. Astral computes ST_DWithin in PostGIS (inside TEE)
-// 2. Signs a policy attestation with the result
-// 3. Returns delegated attestation for you to submit
+// 3. Sign the stamp with the device key
+const stamp = await astral.stamps.sign(unsigned, deviceSigner);
 
-console.log('Within 500m:', result.result);  // true or false
-console.log('Input references:', result.inputRefs);
+// 4. Compose a location proof: a claim ("I was here") bundled with signed stamps
+const claim = {
+  location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  subject: { scheme: 'eth-address', value: '0x1234...' },
+  radius: 100,
+  time: { start: Date.now() / 1000 - 60, end: Date.now() / 1000 },
+  // lpVersion, locationType, srs — Location Protocol v0.2 defaults
+}
+const proof = astral.proofs.create(claim, [stamp]);
+```
 
-// Submit onchain if policy passed
-if (result.result) {
-  const submission = await astral.compute.submit(result.delegatedAttestation);
-  console.log('Policy attestation UID:', submission.uid);
+Each step adds a layer. The signals are raw sensor data. The stamp processes them into a structured artifact. The signature binds the stamp to a specific identity. The proof bundles the claim with the evidence.
+
+<Accordion title="Full Location Protocol v0.2 claim schema">
+```typescript
+const claim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
+  location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
+  subject: { scheme: 'eth-address', value: '0x1234...' },
+  radius: 100,                                              // meters
+  time: { start: Date.now() / 1000 - 60, end: Date.now() / 1000 },
+  eventType: 'presence'                                      // optional
 }
 ```
 
-<Info>
-  The service runs inside EigenCompute's TEE, providing verifiable execution. The signed attestation proves the computation was performed correctly.
-</Info>
+See [Location Proofs](/concepts/location-proofs) for the full data model.
+</Accordion>
 
-<Tip>
-  **For UX feedback**: Use [Turf.js](https://turfjs.org/) for instant client-side distance calculations before submitting to Astral for verified computation.
-</Tip>
+## Step 2: Verify the Proof
 
----
-
-## Step 4: The Smart Contract (EAS Resolver)
-
-So far, we've performed a geospatial policy check in a verifiable computing environment. How do we connect this to smart contracts?
-
-**EAS Resolvers** are smart contracts that receive callbacks when attestations are submitted to the EAS contract. When you submit a Policy Attestation to EAS with a schema that has a resolver attached, EAS automatically calls your resolver's `onAttest` function with the attestation data. This is where you implement your business logic.
-
-Here's an example resolver that gates an action based on the policy result:
-
-```solidity
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-import "@eas/contracts/resolver/SchemaResolver.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-
-contract EiffelTowerNFT is SchemaResolver, ERC721 {
-    address public astralSigner;
-    uint256 public nextTokenId = 1;
-    mapping(address => bool) public hasMinted;
-
-    constructor(IEAS eas, address _astralSigner)
-        SchemaResolver(eas)
-        ERC721("Eiffel Tower Visitor", "EIFFEL")
-    {
-        astralSigner = _astralSigner;
-    }
-
-    function onAttest(
-        Attestation calldata attestation,
-        uint256 /*value*/
-    ) internal override returns (bool) {
-        // 1. Verify attestation is from Astral
-        require(attestation.attester == astralSigner, "Not from Astral");
-
-        // 2. Decode the policy result
-        (
-            bool policyPassed,
-            bytes32[] memory inputRefs,
-            uint64 timestamp,
-            string memory operation
-        ) = abi.decode(
-            attestation.data,
-            (bool, bytes32[], uint64, string)
-        );
-
-        // 3. Verify policy passed
-        require(policyPassed, "Not close enough");
-
-        // 4. One mint per address
-        require(!hasMinted[attestation.recipient], "Already minted");
-
-        // 5. Mint NFT atomically
-        hasMinted[attestation.recipient] = true;
-        _mint(attestation.recipient, nextTokenId++);
-
-        return true;
-    }
-
-    function onRevoke(Attestation calldata, uint256)
-        internal pure override returns (bool)
-    {
-        return false;
-    }
-}
-```
-
----
-
-## Prerequisite: Deploy Resolver and Register Schema
-
-<Warning>
-  You must complete this step **before** running Step 3. The `RESOLVER_SCHEMA_UID` is required for the policy check to trigger your resolver.
-</Warning>
+Submit the location proof to Astral's Verify endpoint. Verification runs inside a TEE — each stamp is checked for signature validity, structural integrity, and consistency with the claim. Multiple stamps from independent systems are cross-correlated to strengthen confidence.
 
 ```typescript
-import { ethers } from 'ethers';
-import { SchemaRegistry } from '@ethereum-attestation-service/eas-sdk';
+const verified = await astral.verify.proof(proof, { chainId: 84532 });
 
-// Deploy resolver
-const EiffelNFT = await ethers.getContractFactory("EiffelTowerNFT");
-const resolver = await EiffelNFT.deploy(
-  EAS_ADDRESS,
-  ASTRAL_SIGNER_ADDRESS  // See security notes for signer management
-);
-await resolver.waitForDeployment();
+console.log(verified.credibility.confidence);  // 0.85
+console.log(verified.uid);                     // 0xabc123...
+```
 
-// Register schema with EAS
-const schemaRegistry = new SchemaRegistry(SCHEMA_REGISTRY_ADDRESS);
-schemaRegistry.connect(wallet);
+The result is a credibility score — not a binary yes/no, but a structured assessment of how strongly the evidence supports the claim. You now have a verified, signed answer to "was this entity actually at this location?"
 
-const schema = "bool result,bytes32[] inputRefs,uint64 timestamp,string operation";
+## Step 3: Run a Spatial Computation
 
-const tx = await schemaRegistry.register({
-  schema,
-  resolverAddress: await resolver.getAddress(),
-  revocable: false
+Now use the verified location in a spatial operation. The computation runs inside the same TEE — PostGIS computes the spatial relationship and the TEE signs the result.
+
+```typescript
+const inside = await astral.compute.contains({
+  container: geofencePolygon,
+  geometry: verified.uid,
+  chainId: 84532
 });
-const receipt = await tx.wait();
 
-const RESOLVER_SCHEMA_UID = receipt.logs[0].args.uid;
-console.log('Schema UID:', RESOLVER_SCHEMA_UID);
-// Use this UID in Step 3 when calling astral.compute.within()
+console.log(`Inside geofence: ${inside.result}`);  // true
 ```
 
----
+The signed result proves the computation was performed correctly on the stated inputs. Because the input was a verified location proof, the full chain of trust is preserved: who claimed to be where, the evidence supporting that claim, and the spatial relationship the system computed.
 
-## The Complete Flow
+Raw GeoJSON also works — useful for reference geometries like official boundaries or known landmarks. But raw coordinates carry no proof of origin. The computation is still verified, but the inputs are unverified.
+
+## Step 4: Use the Result
+
+The signed result is portable. Use it directly in your application:
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+// Agent workflow — branch on the verified spatial answer
+if (inside.result) {
+  confirmDelivery(inside);  // the signed result is the audit trail
+}
+
+// Backend — store as evidence
+await db.insert({ delivery_id, proof: inside });
+```
+
+Or submit it onchain. [EAS](https://docs.attest.org/) (the Ethereum Attestation Service) is an open protocol for structured, signed attestations, plus a smart contract to register attestations onchain. 
+
+Astral's signed results are pre-packaged as EAS attestations. EAS supports **resolver contracts** — smart contracts that execute arbitrary logic when an attestation is created onchain. A verified spatial result can directly trigger token transfers, access grants, escrow releases, or any other onchain action.
+
+```typescript
 import { ethers } from 'ethers';
 
-// Setup
-const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-
+const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 const astral = new AstralSDK({
   chainId: 84532,
   signer: wallet,
   apiUrl: 'https://api.astral.global'
 });
 
-// 0. Deploy resolver and register schema (see Prerequisite section)
-const RESOLVER_SCHEMA_UID = '0x...';  // From schema registration
-
-// 1. Reference location exists (or create it)
-const EIFFEL_TOWER_UID = '0x...';  // Pre-registered landmark
-
-// 2. User arrives — create location attestation
-const userLocation = await astral.location.onchain.create({
-  location: { type: 'Point', coordinates: [2.2951, 48.8580] }
+const result = await astral.compute.within({
+  geometry: verified.uid,
+  target: landmarkUID,
+  radius: 500,
+  chainId: 84532,
+  schema: RESOLVER_SCHEMA_UID,
+  recipient: wallet.address
 });
 
-// 3. Check policy
-const result = await astral.compute.within(
-  userLocation.uid,
-  EIFFEL_TOWER_UID,
-  500,  // 500 meters
-  { schema: RESOLVER_SCHEMA_UID, recipient: wallet.address }
-);
-
-console.log('Policy check result:', result.result);
-
-// 4. Submit to trigger resolver and execute onchain action
-if (result.result) {
-  const submission = await astral.compute.submit(result.delegatedAttestation);
-  console.log('Action triggered! Attestation UID:', submission.uid);
-}
+// Submit to EAS — triggers your resolver contract onchain
+const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
+console.log('Onchain:', tx.hash);
 ```
 
----
-
-## Alternative: Offchain Location Attestations
-
-If you don't need onchain location records, use offchain attestations to save gas:
-
-```typescript
-// Create offchain attestation (no gas)
-const userLocation = await astral.location.offchain.create({
-  location: { type: 'Point', coordinates: [2.2951, 48.8580] }
-});
-
-// Use the offchain attestation UID + URI
-const result = await astral.compute.within(
-  { uid: userLocation.uid, uri: 'ipfs://...' },  // Offchain reference
-  EIFFEL_TOWER_UID,
-  500,
-  { schema: RESOLVER_SCHEMA_UID, recipient: wallet.address }
-);
-```
-
----
+For the full blockchain flow — writing resolver contracts, registering schemas, chain configuration — see [EAS Resolvers](/concepts/eas-resolvers).
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Core Concepts" icon="book" href="/concepts/location-attestations">
-    Understand the building blocks
+  <Card title="Core Concepts" icon="book" href="/concepts/location-proofs">
+    Understand location proofs, attestations, and credibility scores
   </Card>
-  <Card title="Use Cases" icon="lightbulb" href="/use-cases">
-    Explore what you can build
-  </Card>
-  <Card title="SDK Reference" icon="cube" href="/sdk/overview">
-    Full SDK documentation
+  <Card title="Guides" icon="map" href="/guides/location-gated-nft">
+    Walk through common workflows step by step
   </Card>
   <Card title="API Reference" icon="code" href="/api-reference/overview">
-    Dive into the API details
+    Full API documentation
+  </Card>
+  <Card title="SDK Reference" icon="cube" href="/sdk/overview">
+    TypeScript SDK documentation
   </Card>
 </CardGroup>
