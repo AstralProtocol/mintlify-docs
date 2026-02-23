@@ -1,29 +1,26 @@
 ---
-title: "SDK Overview"
-description: "Unified TypeScript SDK for Astral Location Services v0.2.0"
+title: "SDK overview"
+description: "Unified TypeScript SDK for Astral Location Services"
 ---
 
 <Warning>
-  **Development Preview** — The SDK is under development.
+  **Development preview** — The SDK is under active development.
 </Warning>
 
-<Note>
-  **v0.2.0 Unified SDK** — The SDK now provides a unified API with namespaced modules.
-  Location attestations and geospatial computations are now in a single package: `@decentralized-geo/astral-sdk`.
-</Note>
+# SDK overview
 
-# SDK Overview
+The Astral SDK is the official TypeScript client for Astral Location Services. It provides a unified interface for location attestations, verifiable geospatial computations, multifactor location proofs, and an extensible plugin system for proof-of-location integrations.
 
-The Astral SDK is the official TypeScript client for Astral Location Services, providing a unified interface for location attestations and verifiable geospatial computations.
+## Design philosophy
 
-## Design Philosophy
-
-- **Namespaced API**: Clear separation between location and compute operations
+- **Namespaced API**: Clear separation between location, compute, stamps, proofs, and plugin operations
 - **Workflow-oriented**: Distinct offchain and onchain workflows for location attestations
+- **Plugin-extensible**: Register proof-of-location systems and get multifactor evidence bundles
+- **Multidimensional verification**: No single "confidence score" — applications apply their own weighting to a `CredibilityVector`
 - **Type-safe**: Full TypeScript support with comprehensive types
-- **Batteries included**: Handles signing, encoding, and EAS integration
+- **Batteries included**: Handles signing, encoding, EAS integration, and plugin orchestration
 
-## Package Structure
+## Package structure
 
 ```typescript
 import { AstralSDK } from '@decentralized-geo/astral-sdk';
@@ -32,27 +29,28 @@ import { AstralSDK } from '@decentralized-geo/astral-sdk';
 const astral = new AstralSDK({
   chainId: 84532,
   signer: wallet,
-  apiUrl: 'https://api.astral.global'
+  apiUrl: 'https://api.astral.global',
+  apiKey: 'your-api-key'
 });
 
-// Location module - offchain workflow
+// Location module — offchain workflow
 astral.location.offchain.create(input);
 astral.location.offchain.sign(unsigned);
 astral.location.offchain.verify(attestation);
 astral.location.offchain.publish(attestation);
 
-// Location module - onchain workflow
+// Location module — onchain workflow
 astral.location.onchain.create(input);
 astral.location.onchain.register(unsigned);
 astral.location.onchain.verify(attestation);
 astral.location.onchain.revoke(attestation);
 
-// Location module - common operations
+// Location module — common operations
 astral.location.build(input);
 astral.location.encode(attestation);
 astral.location.decode(data);
 
-// Compute module - spatial operations
+// Compute module — spatial operations
 astral.compute.distance(from, to, options);
 astral.compute.area(geometry, options);
 astral.compute.length(geometry, options);
@@ -60,19 +58,33 @@ astral.compute.contains(container, containee, options);
 astral.compute.within(geometry, target, radius, options);
 astral.compute.intersects(a, b, options);
 
-// Compute module - submission
+// Compute module — submission
 astral.compute.submit(delegatedAttestation);
 astral.compute.estimate(delegatedAttestation);
 astral.compute.health();
+
+// Stamps module — evidence collection
+astral.stamps.collect(options);
+astral.stamps.create(options, signals);
+astral.stamps.sign(options, stamp, signer);
+astral.stamps.verify(stamp, options);
+
+// Proofs module — proof construction + verification
+astral.proofs.create(claim, stamps);
+astral.proofs.verify(proof, options);
+
+// Plugins module — plugin registration + discovery
+astral.plugins.register(plugin);
+astral.plugins.get(name);
+astral.plugins.list();
 ```
 
-## Quick Start
+## Quick start
 
 ```typescript
 import { AstralSDK } from '@decentralized-geo/astral-sdk';
 import { ethers } from 'ethers';
 
-// Initialize with signer
 const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
@@ -101,27 +113,7 @@ const distance = await astral.compute.distance(
 );
 
 console.log('Distance:', distance.result, distance.units);
-
-// Submit computation result onchain
-await astral.compute.submit(distance.delegatedAttestation);
 ```
-
-## Key Concepts
-
-<CardGroup cols={2}>
-  <Card title="Namespaced Modules" icon="folder-tree">
-    Clear separation: `location.offchain.*`, `location.onchain.*`, and `compute.*`
-  </Card>
-  <Card title="Flexible Inputs" icon="shuffle">
-    Accept UIDs, raw GeoJSON, or attestation objects interchangeably.
-  </Card>
-  <Card title="Delegated Attestations" icon="signature">
-    SDK handles the delegated attestation pattern — you pay gas, Astral is attester.
-  </Card>
-  <Card title="Type Safety" icon="shield-check">
-    Full TypeScript types for all inputs, outputs, and options.
-  </Card>
-</CardGroup>
 
 ## Configuration
 
@@ -134,6 +126,7 @@ interface AstralConfig {
   signer?: Signer;              // For signing attestations and transactions
   provider?: Provider;          // For read-only blockchain operations
   apiUrl?: string;              // Defaults to 'https://api.astral.global'
+  apiKey?: string;              // API key for authenticated requests
 
   // Advanced
   debug?: boolean;              // Enable debug logging
@@ -153,35 +146,67 @@ interface AstralConfig {
 | Arbitrum | 42161 |
 | Optimism | 10 |
 
-## Module Architecture
+## Module architecture
 
 ```
 AstralSDK
-├── location: LocationModule
+├── location: LocationModule      (offchain + onchain attestation workflows)
 │   ├── offchain: OffchainWorkflow
-│   │   ├── create()    - Build + sign in one step
-│   │   ├── sign()      - Sign unsigned attestation
-│   │   ├── verify()    - Verify signature
-│   │   └── publish()   - Store to IPFS/storage
+│   │   ├── create()    — build + sign in one step
+│   │   ├── sign()      — sign unsigned attestation
+│   │   ├── verify()    — verify signature
+│   │   └── publish()   — store to IPFS/storage
 │   ├── onchain: OnchainWorkflow
-│   │   ├── create()    - Build + register in one step
-│   │   ├── register()  - Register unsigned attestation
-│   │   ├── verify()    - Verify onchain attestation
-│   │   └── revoke()    - Revoke attestation
-│   ├── build()         - Build unsigned attestation
-│   ├── encode()        - Encode for EAS
-│   └── decode()        - Decode from EAS
-└── compute: ComputeModule
-    ├── distance()      - Distance between geometries
-    ├── area()          - Area of polygon
-    ├── length()        - Length of line
-    ├── contains()      - Containment check
-    ├── within()        - Proximity check
-    ├── intersects()    - Intersection check
-    ├── submit()        - Submit delegated attestation
-    ├── estimate()      - Estimate gas
-    └── health()        - Service health check
+│   │   ├── create()    — build + register in one step
+│   │   ├── register()  — register unsigned attestation
+│   │   ├── verify()    — verify onchain attestation
+│   │   └── revoke()    — revoke attestation
+│   ├── build()         — build unsigned attestation
+│   ├── encode()        — encode for EAS
+│   └── decode()        — decode from EAS
+├── compute: ComputeModule        (verifiable geospatial operations)
+│   ├── distance()      — distance between geometries
+│   ├── area()          — area of polygon
+│   ├── length()        — length of line
+│   ├── contains()      — containment check
+│   ├── within()        — proximity check
+│   ├── intersects()    — intersection check
+│   ├── submit()        — submit delegated attestation
+│   ├── estimate()      — estimate gas
+│   └── health()        — service health check
+├── stamps: StampsModule          (evidence collection orchestration)
+│   ├── collect()       — collect raw signals from plugins
+│   ├── create()        — process signals into unsigned stamp
+│   ├── sign()          — sign a stamp
+│   └── verify()        — verify stamp validity
+├── proofs: ProofsModule          (proof construction + verification)
+│   ├── create()        — bundle claim + stamps into proof
+│   └── verify()        — verify proof (local or TEE mode)
+└── plugins: PluginRegistry       (plugin registration + discovery)
+    ├── register()      — register a plugin
+    ├── get()           — get plugin by name
+    ├── has()           — check if plugin exists
+    ├── list()          — list plugin metadata
+    ├── all()           — get all plugins
+    └── withMethod()    — find plugins with a specific method
 ```
+
+## Key concepts
+
+<CardGroup cols={2}>
+  <Card title="Namespaced modules" icon="folder-tree">
+    Clear separation: `location.offchain.*`, `location.onchain.*`, `compute.*`, `stamps.*`, `proofs.*`, and `plugins.*`
+  </Card>
+  <Card title="Flexible inputs" icon="shuffle">
+    Accept UIDs, raw GeoJSON, or attestation objects interchangeably.
+  </Card>
+  <Card title="Delegated attestations" icon="signature">
+    SDK handles the delegated attestation pattern — you pay gas, Astral is attester.
+  </Card>
+  <Card title="Plugin extensibility" icon="plug">
+    Register proof-of-location plugins for multifactor evidence collection and verification.
+  </Card>
+</CardGroup>
 
 ## Pages
 
@@ -189,13 +214,25 @@ AstralSDK
   <Card title="Installation" icon="download" href="/sdk/installation">
     Install and configure the SDK
   </Card>
-  <Card title="Location Module" icon="location-dot" href="/sdk/location">
+  <Card title="Location module" icon="location-dot" href="/sdk/location">
     Offchain and onchain attestation workflows
   </Card>
-  <Card title="Compute Module" icon="calculator" href="/sdk/compute">
+  <Card title="Stamps module" icon="stamp" href="/sdk/stamps">
+    Evidence collection and stamp creation
+  </Card>
+  <Card title="Location proofs" icon="shield-check" href="/sdk/location-proofs">
+    Proof construction and multidimensional verification
+  </Card>
+  <Card title="Plugins" icon="plug" href="/sdk/plugins">
+    Plugin system and registry
+  </Card>
+  <Card title="Compute module" icon="calculator" href="/sdk/compute">
     Geospatial computation methods
   </Card>
-  <Card title="Migration Guide" icon="arrow-right" href="/sdk/migration">
+  <Card title="EAS integration" icon="link" href="/sdk/eas">
+    Ethereum Attestation Service integration
+  </Card>
+  <Card title="Migration guide" icon="arrow-right" href="/sdk/migration">
     Migrate from v0.1.x to v0.2.0
   </Card>
 </CardGroup>
