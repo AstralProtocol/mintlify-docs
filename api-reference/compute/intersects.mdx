@@ -1,0 +1,146 @@
+---
+title: "POST /compute/v0/intersects"
+description: "Check if two geometries overlap"
+---
+
+<Warning>
+  **Research Preview** — This API is under development.
+</Warning>
+
+# Intersects
+
+Check if two geometries intersect (share any portion of space).
+
+```
+POST /compute/v0/intersects
+```
+
+## Request body
+
+<ParamField body="chainId" type="number" required>
+  Target chain ID (e.g., `84532` for Base Sepolia).
+</ParamField>
+
+<ParamField body="geometry1" type="Input" required>
+  First geometry to check. See [Input types](/api-reference/types#input) for accepted formats.
+</ParamField>
+
+<ParamField body="geometry2" type="Input" required>
+  Second geometry to check.
+</ParamField>
+
+<ParamField body="schema" type="string">
+  EAS schema UID. The server uses a default schema if not provided.
+</ParamField>
+
+<ParamField body="recipient" type="string">
+  Ethereum address to receive the attestation. Defaults to the zero address.
+</ParamField>
+
+<ParamField body="proofInputs" type="VerifiedProofInput[]">
+  Optional verified proof inputs to include as additional context.
+</ParamField>
+
+## Example request
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.astral.global/compute/v0/intersects \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "chainId": 84532,
+    "geometry1": "0xpolygon1...",
+    "geometry2": "0xpolygon2...",
+    "recipient": "0xdef456..."
+  }'
+```
+
+```typescript TypeScript
+const response = await fetch('https://api.astral.global/compute/v0/intersects', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'your-api-key'
+  },
+  body: JSON.stringify({
+    chainId: 84532,
+    geometry1: '0xpolygon1...',
+    geometry2: '0xpolygon2...',
+    recipient: '0xdef456...'
+  })
+});
+
+const result = await response.json();
+```
+
+</CodeGroup>
+
+## Response
+
+Returns a [BooleanComputeResponse](/api-reference/types#booleancomputeresponse).
+
+<ResponseField name="result" type="boolean" required>
+  `true` if the geometries share any space.
+</ResponseField>
+
+<ResponseField name="operation" type="string" required>
+  Always `"intersects"`.
+</ResponseField>
+
+<ResponseField name="timestamp" type="number" required>
+  Unix timestamp of computation.
+</ResponseField>
+
+<ResponseField name="inputRefs" type="string[]" required>
+  Array containing `[geometry1Ref, geometry2Ref]`.
+</ResponseField>
+
+<ResponseField name="attestation" type="AttestationData" required>
+  Signed EAS attestation. See [AttestationData](/api-reference/types#attestationdata).
+</ResponseField>
+
+<ResponseField name="delegatedAttestation" type="DelegatedAttestationData" required>
+  Signature for delegated onchain submission. See [DelegatedAttestationData](/api-reference/types#delegatedattestationdata).
+</ResponseField>
+
+## Example response
+
+```json
+{
+  "result": true,
+  "operation": "intersects",
+  "timestamp": 1706400000,
+  "inputRefs": [
+    "0xpolygon1...",
+    "0xpolygon2..."
+  ],
+  "attestation": {
+    "uid": "0x...",
+    "schema": "0x...",
+    "attester": "0x590fdb53ed3f0B52694876d42367192a5336700F",
+    "recipient": "0xdef456...",
+    "data": "0x...",
+    "revocable": true,
+    "refUID": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "signature": "0x..."
+  },
+  "delegatedAttestation": {
+    "signature": "0x...",
+    "attester": "0x590fdb53ed3f0B52694876d42367192a5336700F",
+    "deadline": 1706403600,
+    "nonce": 0
+  }
+}
+```
+
+## Notes
+
+- Uses PostGIS `ST_Intersects` function
+- Returns `true` if geometries share any space (including boundaries)
+- More permissive than [contains](/api-reference/compute/contains) — touching boundaries count as intersection
+
+<Card title="SDK Method" icon="code" href="/sdk/compute#intersects">
+  See `astral.compute.intersects()`
+</Card>
