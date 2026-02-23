@@ -1,0 +1,62 @@
+---
+title: "Composing Location Proofs"
+description: "Bundling location stamps with a location claim into a verifiable artifact"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Composing location proofs
+
+A location proof bundles one or more [location stamps](/concepts/location-stamps) with a [location claim](/concepts/location-claims). It's the verifiable artifact — a claim paired with its supporting evidence.
+
+## Structure
+
+A location proof contains:
+
+- **One location claim** — the assertion being made (where, when, who, what event)
+- **One or more location stamps** — evidence from proof-of-location systems
+
+That's it. The simplicity is intentional. A location proof is a container that brings together the assertion and the evidence so they can be [evaluated](/concepts/location-proof-evaluation) together.
+
+## Single-stamp vs. multi-stamp location proofs
+
+A location proof with a single location stamp is valid. It represents evidence from one proof-of-location system supporting one location claim. The evaluation can still assess the location stamp's internal validity and how well it supports the claim.
+
+Multi-stamp location proofs from independent proof-of-location systems are stronger. When evidence from unrelated sources agrees, the probability that all sources were independently compromised decreases. This is where cross-correlation analysis adds value — a ProofMode device attestation and a WitnessChain latency triangulation agreeing on roughly the same location is substantially harder to forge than either alone.
+
+Important: redundant location stamps from the *same* proof-of-location system don't meaningfully increase confidence. Two GPS readings from the same device aren't independent — they share the same trust assumptions and failure modes. Cross-correlation analysis looks for independence between sources.
+
+## Location proof plugins
+
+**Location proof plugins** are the abstraction layer that makes composition practical. Each plugin wraps a [proof-of-location system](/concepts/pol-systems) behind a common interface with five standard methods:
+
+1. **Collect** — Gather raw signals from the proof-of-location system
+2. **Create** — Structure signals into an unsigned location stamp
+3. **Sign** — Cryptographically sign the location stamp
+4. **Verify** — Check a location stamp's internal validity
+5. **Evaluate** — Assess how well a location stamp supports a location claim
+
+This common interface means a developer can compose evidence from ProofMode, WitnessChain, and any future proof-of-location system using the same SDK patterns. The plugin handles the system-specific details; the SDK handles composition and orchestration.
+
+Currently available plugins:
+
+| Plugin | Proof-of-location system | Environment |
+|--------|------------------------|-------------|
+| [ProofMode](/plugins/proofmode) | Device attestation + sensor fusion | iOS, Android, React Native |
+| [WitnessChain](/plugins/witnesschain) | Infrastructure latency triangulation | Node.js, any HTTP client |
+| [Mock](/plugins/mock) | Configurable test evidence | Any JavaScript/TypeScript environment |
+
+## Composing from multiple plugins
+
+To create a multi-stamp location proof, collect location stamps from each plugin independently, then bundle them with a single location claim. The location stamps don't need to know about each other — they just provide independent evidence that the evaluation process cross-correlates.
+
+<Card title="Next: Location proof evaluation" icon="magnifying-glass-chart" href="/concepts/location-proof-evaluation">
+  How Astral assesses the credibility of a location proof
+</Card>
+
+---
+
+**See also:**
+- [SDK: Location proofs](/sdk/location-proofs) — creating and composing location proofs
+- [Plugins overview](/plugins/overview) — the full plugin ecosystem
+- [Build a custom plugin](/plugins/custom) — implementing the plugin interface

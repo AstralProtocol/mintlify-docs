@@ -1,0 +1,77 @@
+---
+title: "Location Proof Evaluation"
+description: "How Astral assesses the credibility of a location proof"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Location proof evaluation
+
+When a [location proof](/concepts/location-proof-structure) is submitted for verification, Astral evaluates it through a three-phase process. The output is a **credibility vector** — a structured assessment across multiple dimensions, not a binary yes/no.
+
+## The three evaluation phases
+
+### Phase 1: Stamp checks
+
+Each [location stamp](/concepts/location-stamps) is evaluated independently for internal validity:
+
+- **Signatures** — Are the cryptographic signatures valid? Do they chain to a trusted source for this [proof-of-location system](/concepts/pol-systems)?
+- **Structure** — Does the location stamp conform to the expected format for its [plugin](/plugins/overview)?
+- **Signal consistency** — Are the raw signals internally consistent? For example, do GPS coordinates, Wi-Fi access point readings, and cellular tower measurements within a ProofMode location stamp agree with each other?
+
+A location stamp that fails these checks provides no useful evidence — its results are reported but won't contribute positively to the overall credibility.
+
+### Phase 2: Correlation checks (multi-stamp location proofs)
+
+For location proofs with multiple location stamps from independent proof-of-location systems, the evaluator cross-correlates the evidence:
+
+- **Independence** — Are the location stamps from genuinely independent sources? Two location stamps from the same proof-of-location system or the same device aren't independent. Independence is assessed based on plugin type, device identity, and trust model.
+- **Agreement** — Do the independent location stamps agree on location and timing? Evidence from unrelated sources that converges on the same location is substantially more convincing than any single source.
+
+This phase is what makes multi-factor location proofs powerful. Agreement between independent sources is hard to forge because an attacker would need to compromise multiple unrelated systems simultaneously.
+
+### Phase 3: Claim assessment
+
+The evaluator compares the observed evidence (from the location stamps) against the asserted claim:
+
+- **Spatial consistency** — Does the observed location from the location stamps fall within the claimed location and radius?
+- **Temporal consistency** — Does the temporal footprint of the evidence overlap with the claimed time range?
+- **Overall support** — Given the strength of the evidence (phases 1 and 2), how well does it support this specific claim?
+
+## The credibility vector
+
+The output of evaluation is a credibility vector with four dimensions:
+
+| Dimension | What it measures | Range |
+|-----------|-----------------|-------|
+| **Spatial** | How well the observed locations support the claimed location | 0–1 |
+| **Temporal** | How well the observation times support the claimed time range | 0–1 |
+| **Validity** | Internal validity of the location stamps (signatures, structure, signals) | 0–1 |
+| **Independence** | How independent and corroborating the evidence sources are | 0–1 |
+
+An overall **confidence** score (0–1) summarizes across dimensions, but the per-dimension scores are often more useful — they tell you *where* the evidence is strong or weak.
+
+## Confidence is not probability
+
+A confidence score of 0.8 does not mean "80% probability the claim is true." It means "the evidence is reasonably strong based on the available information." Calibrating confidence scores to true probability is an open research problem.
+
+What the confidence score does express: the strength of the evidence relative to what the proof-of-location systems can provide. A 0.8 from a single device attestation reflects different underlying assurance than a 0.8 from three independent proof-of-location systems — which is why the per-dimension breakdown and individual location stamp results matter.
+
+## Application-level decisions
+
+Astral evaluates and reports. Applications decide.
+
+The credibility vector gives applications enough information to make risk-appropriate decisions. A social check-in app might accept a confidence of 0.5. A compliance system might require 0.9 with at least two independent sources. A land title registry might require the maximum available assurance.
+
+The threshold is always the application's choice — Astral does not impose minimum confidence requirements.
+
+<Card title="Next: Geocomputation" icon="calculator" href="/concepts/geocomputation">
+  Spatial operations with proof of correct execution
+</Card>
+
+---
+
+**See also:**
+- [SDK: Location proofs](/sdk/location-proofs) — verifying location proofs programmatically
+- [API: Verify proof](/api-reference/verify/proof) — verification endpoint reference
+- [API: Types](/api-reference/types) — CredibilityVector type reference
