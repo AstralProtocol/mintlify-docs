@@ -98,30 +98,23 @@
         {
           "group": "Verify API",
           "pages": [
-            "api-reference/verify"
+            "api-reference/verify/stamp",
+            "api-reference/verify/proof",
+            "api-reference/verify/plugins"
           ]
         },
         {
           "group": "Compute API",
           "pages": [
-            "api-reference/distance",
-            "api-reference/contains",
-            "api-reference/within",
-            "api-reference/intersects",
-            "api-reference/area",
-            "api-reference/length"
+            "api-reference/compute/distance",
+            "api-reference/compute/area",
+            "api-reference/compute/length",
+            "api-reference/compute/contains",
+            "api-reference/compute/within",
+            "api-reference/compute/intersects"
           ]
         },
-        {
-          "group": "Records API",
-          "pages": [
-            "api-reference/records/overview",
-            "api-reference/records/list",
-            "api-reference/records/get",
-            "api-reference/records/stats",
-            "api-reference/records/config"
-          ]
-        }
+        "api-reference/types"
       ]
     },
     {
