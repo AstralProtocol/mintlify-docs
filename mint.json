@@ -41,12 +41,12 @@
   },
   "tabs": [
     {
-      "name": "SDK",
-      "url": "sdk"
-    },
-    {
       "name": "Plugins",
       "url": "plugins"
+    },
+    {
+      "name": "SDK",
+      "url": "sdk"
     },
     {
       "name": "API Reference",
