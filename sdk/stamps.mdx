@@ -1,0 +1,320 @@
+---
+title: "Stamps module"
+description: "Evidence collection and stamp creation across registered plugins"
+---
+
+<Warning>
+  **Research preview** — The stamps module is under active development.
+</Warning>
+
+# Stamps module
+
+The `StampsModule` orchestrates evidence collection, stamp creation, signing, and verification across registered plugins. Each stamp represents evidence from a single proof-of-location system.
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+// Access via astral.stamps
+astral.stamps.collect(options);
+astral.stamps.create(options, signals);
+astral.stamps.sign(options, stamp, signer);
+astral.stamps.verify(stamp, options);
+```
+
+<Info>
+  For conceptual background, see [Location Proofs](/concepts/location-proofs).
+</Info>
+
+---
+
+## stamps.collect()
+
+Collect raw signals from registered plugins.
+
+```typescript
+astral.stamps.collect(
+  options?: StampsCollectOptions
+): Promise<RawSignals[]>
+```
+
+Returns an **array** of `RawSignals` — one per plugin that implements `collect()`. Not all plugins support collection; ProofMode, for example, collects on-device via its mobile app rather than through the SDK.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `options.plugins` | `string[]` | No | Subset of registered plugins to collect from. Omit to collect from all that implement `collect()`. |
+| `options.timeout` | `number` | No | Collection timeout in milliseconds |
+| `options.signals` | `string[]` | No | Specific signals to request (plugin-dependent) |
+
+### Example
+
+```typescript
+// Collect from all plugins that support it
+const allSignals = await astral.stamps.collect();
+// Returns: [{ plugin: 'mock', timestamp: ..., data: {...} }, ...]
+
+// Collect from specific plugins
+const signals = await astral.stamps.collect({
+  plugins: ['mock'],
+  timeout: 5000
+});
+```
+
+---
+
+## stamps.create()
+
+Process raw signals into an unsigned stamp using a specific plugin.
+
+```typescript
+astral.stamps.create(
+  options: StampsCreateOptions,
+  signals: RawSignals
+): Promise<UnsignedLocationStamp>
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `options.plugin` | `string` | Yes | Name of the plugin to use for stamp creation |
+| `signals` | `RawSignals` | Yes | Raw signals from `collect()` or external source |
+
+### Example
+
+```typescript
+const signals = (await astral.stamps.collect({ plugins: ['mock'] }))[0];
+
+const unsigned = await astral.stamps.create(
+  { plugin: 'mock' },
+  signals
+);
+
+console.log(unsigned.location);          // GeoJSON Point
+console.log(unsigned.temporalFootprint); // { start, end }
+console.log(unsigned.plugin);            // 'mock'
+```
+
+---
+
+## stamps.sign()
+
+Sign an unsigned stamp with a key.
+
+```typescript
+astral.stamps.sign(
+  options: StampsSignOptions,
+  stamp: UnsignedLocationStamp,
+  signer: StampSigner
+): Promise<LocationStamp>
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `options.plugin` | `string` | Yes | Name of the plugin |
+| `stamp` | `UnsignedLocationStamp` | Yes | Output from `create()` |
+| `signer` | `StampSigner` | Yes | Signing key |
+
+### StampSigner
+
+```typescript
+interface StampSigner {
+  algorithm: string;           // e.g., "secp256k1", "ed25519"
+  signer: SubjectIdentifier;   // { scheme, value }
+  sign(data: string): Promise<string>;
+}
+```
+
+### Example
+
+```typescript
+const stamp = await astral.stamps.sign(
+  { plugin: 'mock' },
+  unsigned,
+  {
+    algorithm: 'secp256k1',
+    signer: { scheme: 'eth-address', value: wallet.address },
+    sign: (data) => wallet.signMessage(data)
+  }
+);
+// stamp now has a signatures array and is ready for proofs
+```
+
+---
+
+## stamps.verify()
+
+Verify a stamp's internal validity.
+
+```typescript
+astral.stamps.verify(
+  stamp: LocationStamp,
+  options?: { hosted?: boolean }
+): Promise<StampVerificationResult>
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `stamp` | `LocationStamp` | Yes | The stamp to verify |
+| `options.hosted` | `boolean` | No | If `true`, send to Astral API for verification. Default: local verification via plugin. |
+
+### Example
+
+```typescript
+// Local verification (delegates to the stamp's plugin)
+const result = await astral.stamps.verify(stamp);
+
+console.log(result.valid);              // true
+console.log(result.signaturesValid);    // true
+console.log(result.structureValid);     // true
+console.log(result.signalsConsistent);  // true
+console.log(result.details);            // plugin-specific details
+
+// Hosted verification
+const hosted = await astral.stamps.verify(stamp, { hosted: true });
+```
+
+---
+
+## Types
+
+### RawSignals
+
+```typescript
+interface RawSignals {
+  plugin: string;              // Plugin that produced these signals
+  timestamp: number;           // Unix seconds
+  data: Record<string, unknown>;  // Plugin-specific signal data
+}
+```
+
+### UnsignedLocationStamp
+
+```typescript
+interface UnsignedLocationStamp {
+  lpVersion: string;           // e.g., "0.2"
+  locationType: string;        // e.g., "geojson-point"
+  location: LocationData;      // GeoJSON geometry or string
+  srs: string;                 // Spatial reference system (e.g., "EPSG:4326")
+  temporalFootprint: TimeBounds; // { start, end } — Unix seconds
+  plugin: string;              // Plugin name
+  pluginVersion: string;       // Semver
+  signals: Record<string, unknown>; // Plugin-specific data
+}
+```
+
+### LocationStamp
+
+```typescript
+interface LocationStamp extends UnsignedLocationStamp {
+  signatures: Signature[];     // One or more signatures
+}
+
+interface Signature {
+  signer: SubjectIdentifier;   // { scheme, value }
+  algorithm: string;           // e.g., "secp256k1", "pgp"
+  value: string;               // Hex or base64 encoded
+  timestamp: number;           // Unix seconds
+}
+```
+
+### StampVerificationResult
+
+```typescript
+interface StampVerificationResult {
+  valid: boolean;
+  signaturesValid: boolean;
+  structureValid: boolean;
+  signalsConsistent: boolean;
+  details: Record<string, unknown>;  // Plugin-specific verification details
+}
+```
+
+### StampsCollectOptions
+
+```typescript
+interface StampsCollectOptions {
+  plugins?: string[];          // Subset of plugins, or all
+  timeout?: number;            // Milliseconds
+  signals?: string[];          // Specific signals to request
+}
+```
+
+### StampsCreateOptions
+
+```typescript
+interface StampsCreateOptions {
+  plugin: string;              // Which plugin to use
+}
+```
+
+### StampsSignOptions
+
+```typescript
+interface StampsSignOptions {
+  plugin: string;              // Which plugin to use
+}
+```
+
+---
+
+## Complete example
+
+```typescript
+import { AstralSDK, MockPlugin } from '@decentralized-geo/astral-sdk';
+import { ethers } from 'ethers';
+
+// Setup
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY);
+
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+// Register a plugin
+astral.plugins.register(new MockPlugin({
+  lat: 37.7749,
+  lon: -122.4194,
+  accuracy: 10
+}));
+
+// 1. Collect signals
+const signals = (await astral.stamps.collect({ plugins: ['mock'] }))[0];
+
+// 2. Create unsigned stamp
+const unsigned = await astral.stamps.create({ plugin: 'mock' }, signals);
+
+// 3. Sign the stamp
+const stamp = await astral.stamps.sign(
+  { plugin: 'mock' },
+  unsigned,
+  {
+    algorithm: 'secp256k1',
+    signer: { scheme: 'eth-address', value: wallet.address },
+    sign: (data) => wallet.signMessage(data)
+  }
+);
+
+// 4. Verify
+const result = await astral.stamps.verify(stamp);
+console.log('Valid:', result.valid);
+
+// stamp is now ready to include in a location proof
+```
+
+<Card title="Next: Location proofs" icon="shield-check" href="/sdk/location-proofs">
+  Bundle stamps into proofs and verify with CredibilityVector
+</Card>
