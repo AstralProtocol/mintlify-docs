@@ -54,12 +54,22 @@ A reference to an offchain attestation stored on IPFS or another URI-addressable
 
 ### VerifiedProofInput
 
-A reference to a previously verified location proof, used to chain proof verification with compute operations:
+A previously verified location proof, used to chain proof verification with compute operations. Pass the full `VerifiedLocationProofResponse` object returned by [POST /verify/v0/proof](/api-reference/verify/proof):
+
+```typescript
+interface VerifiedProofInput {
+  verifiedProof: VerifiedLocationProofResponse;
+}
+```
 
 ```json
 {
-  "proofUID": "0xdef456...",
-  "chainId": 84532
+  "verifiedProof": {
+    "proof": { "..." : "..." },
+    "credibility": { "..." : "..." },
+    "evaluationMethod": "multifactor-v0",
+    "evaluatedAt": 1706961600
+  }
 }
 ```
 
