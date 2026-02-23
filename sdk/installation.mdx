@@ -1,17 +1,17 @@
 ---
 title: "Installation"
-description: "Install and configure the Astral SDK v0.2.0"
+description: "Install and configure the Astral SDK"
 ---
 
 <Warning>
-  **Development Preview** — The SDK is under development.
+  **Development preview** — The SDK is under active development.
 </Warning>
 
 # Installation
 
-The Astral SDK v0.2.0 is a unified package that includes both location attestations and geospatial computations.
+The Astral SDK is a unified package that includes location attestations, geospatial computations, stamps, proofs, and the plugin system.
 
-## Package Manager
+## Package manager
 
 <CodeGroup>
 
@@ -29,7 +29,7 @@ pnpm add @decentralized-geo/astral-sdk
 
 </CodeGroup>
 
-## Peer Dependencies
+## Peer dependencies
 
 The SDK requires ethers.js v6:
 
@@ -37,42 +37,60 @@ The SDK requires ethers.js v6:
 npm install ethers@^6.0.0
 ```
 
-## Basic Initialization
+## Basic initialization
 
 ```typescript
 import { AstralSDK } from '@decentralized-geo/astral-sdk';
 import { ethers } from 'ethers';
 
-// Create a provider and signer
 const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-// Initialize the SDK
 const astral = new AstralSDK({
-  chainId: 84532,  // Base Sepolia
+  chainId: 84532,
   signer: wallet,
   apiUrl: 'https://api.astral.global'
 });
 
-// Now you can use both location and compute modules
+// All modules are available
 const attestation = await astral.location.offchain.create({ ... });
 const distance = await astral.compute.distance(uid1, uid2, options);
+const stamps = await astral.stamps.collect();
 ```
 
-## With Browser Wallet
+## Plugin registration
+
+Register plugins at startup before using stamps or proofs:
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { MockPlugin } from '@decentralized-geo/astral-sdk';
+import { ProofModePlugin } from '@location-proofs/plugin-proofmode';
+
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+// Register plugins before using stamps/proofs
+astral.plugins.register(new MockPlugin());
+astral.plugins.register(new ProofModePlugin());
+
+// Now stamps module can orchestrate across registered plugins
+const signals = await astral.stamps.collect();
+```
+
+## With browser wallet
 
 ```typescript
 import { AstralSDK } from '@decentralized-geo/astral-sdk';
 import { ethers } from 'ethers';
 
-// Connect to browser wallet (MetaMask, etc.)
 const provider = new ethers.BrowserProvider(window.ethereum);
 const signer = await provider.getSigner();
-
-// Get the chain ID from the connected wallet
 const network = await provider.getNetwork();
 
-// Initialize the SDK
 const astral = new AstralSDK({
   chainId: Number(network.chainId),
   signer: signer,
@@ -80,7 +98,7 @@ const astral = new AstralSDK({
 });
 ```
 
-## Read-Only Mode
+## Read-only mode
 
 For querying and verification without signing:
 
@@ -88,7 +106,6 @@ For querying and verification without signing:
 import { AstralSDK } from '@decentralized-geo/astral-sdk';
 import { ethers } from 'ethers';
 
-// Provider-only (no signer)
 const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
 
 const astral = new AstralSDK({
@@ -104,64 +121,43 @@ const result = await astral.location.onchain.verify(attestation);
 const distance = await astral.compute.distance(uid1, uid2, options);
 
 // Cannot submit to EAS without signer
-// await astral.compute.submit(attestation); // Would throw error
+// await astral.compute.submit(attestation); // Would throw
 ```
 
-## Configuration Options
+## Configuration options
 
 ```typescript
 interface AstralConfig {
-  /**
-   * Target chain ID. Required.
-   * All operations are scoped to this chain.
-   */
+  /** Target chain ID. Required. */
   chainId: number;
 
-  /**
-   * Ethers signer for signing attestations and transactions.
-   * Required for creating attestations and submitting to EAS.
-   */
+  /** Ethers signer for signing attestations and transactions. */
   signer?: Signer;
 
-  /**
-   * Ethers provider for read-only blockchain operations.
-   * If not provided and signer is present, uses signer's provider.
-   */
+  /** Ethers provider for read-only blockchain operations. */
   provider?: Provider;
 
-  /**
-   * Astral API base URL.
-   * Defaults to 'https://api.astral.global'
-   */
+  /** Astral API base URL. Defaults to 'https://api.astral.global' */
   apiUrl?: string;
 
-  /**
-   * Enable debug logging.
-   * Defaults to false.
-   */
+  /** Required for TEE verification and hosted stamp verification. */
+  apiKey?: string;
+
+  /** Enable debug logging. Defaults to false. */
   debug?: boolean;
 
-  /**
-   * Pre-register custom EAS schemas.
-   * Useful for performance when using multiple schemas.
-   */
+  /** Pre-register custom EAS schemas. */
   schemas?: RuntimeSchemaConfig[];
 
-  /**
-   * Default schema to use when none is specified.
-   * If not provided, uses the built-in location schema.
-   */
+  /** Default schema to use when none is specified. */
   defaultSchema?: RuntimeSchemaConfig;
 
-  /**
-   * Throw errors on schema validation failures.
-   * Defaults to false (logs warnings instead).
-   */
+  /** Throw errors on schema validation failures. Defaults to false. */
   strictSchemaValidation?: boolean;
 }
 ```
 
-## Supported Chains
+## Supported chains
 
 | Network | Chain ID | Status |
 |---------|----------|--------|
@@ -173,35 +169,21 @@ interface AstralConfig {
 | Arbitrum | 42161 | Active |
 | Optimism | 10 | Active |
 
-## Custom Schema Configuration
+## Submodule imports
+
+You can import submodules directly for tree-shaking:
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
-
-// Define a custom schema
-const customSchema = {
-  uid: '0x1234567890abcdef...',
-  rawString: 'uint256 eventTimestamp,string srs,string locationType,string location,string[] recipeType,string[] recipePayload,string[] mediaType,string[] mediaData,string memo'
-};
-
-// Initialize with custom schema
-const astral = new AstralSDK({
-  chainId: 84532,
-  signer: wallet,
-  defaultSchema: customSchema,
-  strictSchemaValidation: true
-});
-
-// Or specify per-operation
-const attestation = await astral.location.offchain.create(
-  { location: geojson },
-  { schema: customSchema }
-);
+import { LocationModule } from '@decentralized-geo/astral-sdk/location';
+import { ComputeModule } from '@decentralized-geo/astral-sdk/compute';
+import { PluginRegistry } from '@decentralized-geo/astral-sdk/plugins';
+import { StampsModule } from '@decentralized-geo/astral-sdk/stamps';
+import { ProofsModule } from '@decentralized-geo/astral-sdk/proofs';
 ```
 
-## TypeScript Support
+## TypeScript support
 
-The SDK is written in TypeScript and ships with full type definitions:
+The SDK ships with full type definitions:
 
 ```typescript
 import {
@@ -218,34 +200,27 @@ import {
   NumericComputeResult,
   BooleanComputeResult,
   DelegatedAttestation,
-  // Configuration types
+  // Plugin types
+  LocationProofPlugin,
+  PluginRegistry,
+  // Stamp/proof types
+  LocationStamp,
+  LocationProof,
+  CredibilityVector,
+  // Configuration
   AstralConfig,
   RuntimeSchemaConfig,
 } from '@decentralized-geo/astral-sdk';
 ```
 
-## Submodule Imports
-
-You can also import submodules directly for tree-shaking:
-
-```typescript
-// Import just what you need
-import { LocationModule } from '@decentralized-geo/astral-sdk/location';
-import { ComputeModule } from '@decentralized-geo/astral-sdk/compute';
-
-// Use independently
-const location = new LocationModule({ chainId: 84532, signer: wallet });
-const compute = new ComputeModule({ apiUrl: 'https://api.astral.global', chainId: 84532 });
-```
-
-## Environment Variables
+## Environment variables
 
 For server-side applications:
 
 ```bash
 # .env
-PRIVATE_KEY=0x...          # Your wallet private key
-CHAIN_ID=84532             # Target chain ID
+PRIVATE_KEY=0x...
+CHAIN_ID=84532
 ASTRAL_API_URL=https://api.astral.global
 ```
 
@@ -263,6 +238,6 @@ const astral = new AstralSDK({
 });
 ```
 
-<Card title="Next: Location Module" icon="location-dot" href="/sdk/location">
+<Card title="Next: Location module" icon="location-dot" href="/sdk/location">
   Learn about location attestation workflows
 </Card>

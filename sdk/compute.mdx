@@ -1,13 +1,13 @@
 ---
-title: "Compute Module"
+title: "Compute module"
 description: "Verifiable geospatial computation methods"
 ---
 
 <Warning>
-  **Research Preview** — The SDK is under development.
+  **Research preview** — The SDK is under active development.
 </Warning>
 
-# Compute Module
+# Compute module
 
 The `ComputeModule` provides verifiable geospatial operations that run in a trusted execution environment. Each operation returns a signed delegated attestation that can be submitted to EAS.
 
@@ -27,24 +27,24 @@ astral.compute.length(geometry, options);
 astral.compute.contains(container, containee, options);
 astral.compute.within(geometry, target, radius, options);
 astral.compute.intersects(a, b, options);
-astral.compute.submit(delegatedAttestation);
-astral.compute.estimate(delegatedAttestation);
+astral.compute.submit(input);
+astral.compute.estimate(attestation);
 astral.compute.health();
 ```
 
 ---
 
-## Input Types
+## Input types
 
 All compute methods accept flexible input types:
 
 ```typescript
 type Input =
-  | string                    // Onchain attestation UID
-  | GeoJSON.Geometry          // Raw GeoJSON geometry
-  | GeoJSON.Feature           // GeoJSON Feature (geometry extracted)
-  | { uid: string }           // Onchain reference
-  | { uid: string, uri: string }  // Offchain reference
+  | string                         // Onchain attestation UID
+  | GeoJSON.Geometry               // Raw GeoJSON geometry
+  | { uid: string }                // Onchain reference
+  | { uid: string; uri: string }   // Offchain reference
+  | { verifiedProof: VerifiedLocationProof }  // Verified proof input
 ```
 
 ### Examples
@@ -52,8 +52,8 @@ type Input =
 ```typescript
 // Using attestation UID
 const result = await astral.compute.distance(
-  '0x1234...abcd',  // UID
-  '0x5678...efgh',  // UID
+  '0x1234...abcd',
+  '0x5678...efgh',
   options
 );
 
@@ -66,8 +66,8 @@ const result = await astral.compute.distance(
 
 // Mixing UIDs and GeoJSON
 const result = await astral.compute.contains(
-  boundaryUID,  // Polygon UID
-  { type: 'Point', coordinates: [lon, lat] },  // Raw point
+  boundaryUID,
+  { type: 'Point', coordinates: [lon, lat] },
   options
 );
 ```
@@ -78,9 +78,9 @@ const result = await astral.compute.contains(
 
 ---
 
-## Compute Options
+## Compute options
 
-All methods require options:
+All spatial methods **require** options:
 
 ```typescript
 interface ComputeOptions {
@@ -89,26 +89,26 @@ interface ComputeOptions {
 }
 ```
 
-### Schema Requirements
+### Schema requirements
 
 <Warning>
-  **Use the correct schema type** - Compute operations encode data differently than Location attestations. Using the wrong schema UID causes a data/schema mismatch where the attestation is stored but cannot be decoded correctly.
+  **Use the correct schema type** — Compute operations encode data differently than location attestations. Using the wrong schema UID causes a data/schema mismatch where the attestation is stored but cannot be decoded correctly.
 </Warning>
 
-| Operation | Required Schema Type |
+| Operation | Required schema type |
 |-----------|---------------------|
 | `distance`, `area`, `length` | NumericPolicyAttestation |
 | `contains`, `within`, `intersects` | BooleanPolicyAttestation |
 
 ```typescript
-// CORRECT: Boolean operation with Boolean schema
+// CORRECT: Boolean operation with boolean schema
 await compute.within(point, target, 500, {
-  schema: BOOLEAN_POLICY_SCHEMA_UID  // bool result, bytes32[] inputRefs, ...
+  schema: BOOLEAN_POLICY_SCHEMA_UID
 });
 
-// WRONG: Boolean operation with Location schema
+// WRONG: Boolean operation with location schema
 await compute.within(point, target, 500, {
-  schema: LOCATION_SCHEMA_UID  // bytes geometry, string geometryType, ...
+  schema: LOCATION_SCHEMA_UID
 });
 // The attestation is created but data is unreadable!
 ```
@@ -117,7 +117,7 @@ See [Schemas](/resources/schemas) for schema definitions and default UIDs.
 
 ---
 
-## Numeric Operations
+## Numeric operations
 
 ### distance()
 
@@ -131,8 +131,6 @@ astral.compute.distance(
 ): Promise<NumericComputeResult>
 ```
 
-#### Example
-
 ```typescript
 const result = await astral.compute.distance(
   userLocationUID,
@@ -140,15 +138,10 @@ const result = await astral.compute.distance(
   { schema: SCHEMA_UID }
 );
 
-console.log(result.result);  // 523.45
-console.log(result.units);   // 'meters'
+console.log(result.result);     // 523.45
+console.log(result.units);      // 'meters'
 console.log(result.operation);  // 'distance'
-
-// Submit onchain
-await astral.compute.submit(result.delegatedAttestation);
 ```
-
----
 
 ### area()
 
@@ -161,8 +154,6 @@ astral.compute.area(
 ): Promise<NumericComputeResult>
 ```
 
-#### Example
-
 ```typescript
 const result = await astral.compute.area(
   propertyBoundaryUID,
@@ -172,8 +163,6 @@ const result = await astral.compute.area(
 console.log(result.result);  // 5432.10
 console.log(result.units);   // 'square_meters'
 ```
-
----
 
 ### length()
 
@@ -185,8 +174,6 @@ astral.compute.length(
   options: ComputeOptions
 ): Promise<NumericComputeResult>
 ```
-
-#### Example
 
 ```typescript
 const result = await astral.compute.length(
@@ -200,7 +187,7 @@ console.log(result.units);   // 'meters'
 
 ---
 
-## Boolean Operations
+## Boolean operations
 
 ### contains()
 
@@ -213,8 +200,6 @@ astral.compute.contains(
   options: ComputeOptions
 ): Promise<BooleanComputeResult>
 ```
-
-#### Example
 
 ```typescript
 const result = await astral.compute.contains(
@@ -229,8 +214,6 @@ if (result.result) {
 }
 ```
 
----
-
 ### within()
 
 Check if a geometry is within a specified radius of a target.
@@ -239,33 +222,28 @@ Check if a geometry is within a specified radius of a target.
 astral.compute.within(
   geometry: Input,
   target: Input,
-  radius: number,  // meters
+  radius: number,           // meters
   options: ComputeOptions
 ): Promise<BooleanComputeResult>
 ```
-
-#### Example
 
 ```typescript
 const result = await astral.compute.within(
   userLocationUID,
   landmarkUID,
-  500,  // 500 meters
+  500,
   { schema: SCHEMA_UID, recipient: userAddress }
 );
 
 if (result.result) {
   console.log('User is within 500m of the landmark!');
-  // Submit to trigger resolver action
   await astral.compute.submit(result.delegatedAttestation);
 }
 ```
 
----
-
 ### intersects()
 
-Check if two geometries intersect (overlap).
+Check if two geometries intersect.
 
 ```typescript
 astral.compute.intersects(
@@ -274,8 +252,6 @@ astral.compute.intersects(
   options: ComputeOptions
 ): Promise<BooleanComputeResult>
 ```
-
-#### Example
 
 ```typescript
 const result = await astral.compute.intersects(
@@ -289,37 +265,37 @@ console.log('Territories overlap:', result.result);
 
 ---
 
-## Submission Methods
+## Submission methods
 
 ### submit()
 
-Submit a delegated attestation to EAS. You pay gas; Astral remains the attester.
+Submit a delegated attestation to EAS. Accepts two input formats:
 
 ```typescript
+// Format 1: DelegatedAttestation directly
 astral.compute.submit(
   attestation: DelegatedAttestation
 ): Promise<AttestationResult>
+
+// Format 2: Object with both attestation types
+astral.compute.submit(
+  input: {
+    attestation: AttestationObject;
+    delegatedAttestation: DelegatedAttestationObject;
+  }
+): Promise<AttestationResult>
 ```
 
-#### Example
-
 ```typescript
-// Compute first
 const result = await astral.compute.within(
-  userLocationUID,
-  landmarkUID,
-  500,
-  { schema: SCHEMA_UID }
+  userLocationUID, landmarkUID, 500, { schema: SCHEMA_UID }
 );
 
-// Submit if the check passed
 if (result.result) {
   const submission = await astral.compute.submit(result.delegatedAttestation);
   console.log('Attestation UID:', submission.uid);
 }
 ```
-
----
 
 ### estimate()
 
@@ -331,19 +307,14 @@ astral.compute.estimate(
 ): Promise<bigint>
 ```
 
-#### Example
-
 ```typescript
 const gas = await astral.compute.estimate(result.delegatedAttestation);
 console.log('Estimated gas:', gas.toString());
 
-// Proceed if acceptable
 if (gas < 200000n) {
   await astral.compute.submit(result.delegatedAttestation);
 }
 ```
-
----
 
 ### health()
 
@@ -353,8 +324,6 @@ Check the compute service health status.
 astral.compute.health(): Promise<HealthStatus>
 ```
 
-#### Example
-
 ```typescript
 const status = await astral.compute.health();
 console.log('Service status:', status.status);
@@ -363,29 +332,20 @@ console.log('Database status:', status.database);
 
 ---
 
-## Return Types
+## Return types
 
 ### NumericComputeResult
 
 ```typescript
 interface NumericComputeResult {
-  result: number;           // The computed value
-  units: string;            // 'meters' or 'square_meters'
-  operation: string;        // 'distance', 'area', or 'length'
-  timestamp: number;        // Unix timestamp
-  inputRefs: string[];      // UIDs or hashes of inputs
-  attestation: {
-    schema: string;
-    attester: string;
-    recipient: string;
-    data: string;
-    signature: string;
-  };
-  delegatedAttestation: {
-    message: DelegatedAttestationMessage;
-    signature: { v: number; r: string; s: string };
-    attester: string;
-  };
+  result: number;
+  units: string;               // 'meters' or 'square_meters'
+  operation: string;           // 'distance', 'area', or 'length'
+  timestamp: number;
+  inputRefs: string[];         // UIDs or hashes of inputs
+  attestation: AttestationObject;
+  delegatedAttestation: DelegatedAttestationObject;
+  proofInputs?: ProofInputContext[];  // When using VerifiedLocationProof inputs
 }
 ```
 
@@ -393,22 +353,13 @@ interface NumericComputeResult {
 
 ```typescript
 interface BooleanComputeResult {
-  result: boolean;          // The computed boolean
-  operation: string;        // 'contains', 'within', or 'intersects'
-  timestamp: number;        // Unix timestamp
-  inputRefs: string[];      // UIDs or hashes of inputs
-  attestation: {
-    schema: string;
-    attester: string;
-    recipient: string;
-    data: string;
-    signature: string;
-  };
-  delegatedAttestation: {
-    message: DelegatedAttestationMessage;
-    signature: { v: number; r: string; s: string };
-    attester: string;
-  };
+  result: boolean;
+  operation: string;           // 'contains', 'within', or 'intersects'
+  timestamp: number;
+  inputRefs: string[];
+  attestation: AttestationObject;
+  delegatedAttestation: DelegatedAttestationObject;
+  proofInputs?: ProofInputContext[];
 }
 ```
 
@@ -438,57 +389,9 @@ interface DelegatedAttestation {
 
 ---
 
-## Complete Example
+## How delegated attestations work
 
-```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
-import { ethers } from 'ethers';
-
-// Setup
-const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-
-const astral = new AstralSDK({
-  chainId: 84532,
-  signer: wallet,
-  apiUrl: 'https://api.astral.global'
-});
-
-// Create a location attestation
-const location = await astral.location.onchain.create({
-  location: { type: 'Point', coordinates: [2.2951, 48.8580] },
-  memo: 'Near Eiffel Tower'
-});
-
-// Check proximity to landmark
-const EIFFEL_TOWER_UID = '0x...';  // Pre-registered landmark
-const SCHEMA_UID = '0x...';       // Your resolver schema
-
-const result = await astral.compute.within(
-  location.uid,
-  EIFFEL_TOWER_UID,
-  500,  // 500 meters
-  { schema: SCHEMA_UID, recipient: wallet.address }
-);
-
-console.log('Within 500m:', result.result);
-console.log('Input refs:', result.inputRefs);
-
-// Submit to trigger resolver
-if (result.result) {
-  const gas = await astral.compute.estimate(result.delegatedAttestation);
-  console.log('Estimated gas:', gas.toString());
-
-  const submission = await astral.compute.submit(result.delegatedAttestation);
-  console.log('Attestation submitted:', submission.uid);
-}
-```
-
----
-
-## How Delegated Attestations Work
-
-| Step | Who | Does What |
+| Step | Who | Does what |
 |------|-----|-----------|
 | 1 | **Developer** | Calls `compute.within()` or other method |
 | 2 | **Astral API** | Runs computation in TEE, signs attestation |
@@ -504,26 +407,71 @@ This pattern means:
 
 ---
 
-## Signature Expiry
+## Signature expiry
 
 Delegated attestation signatures have a deadline:
 
 ```typescript
 const result = await astral.compute.within(uid1, uid2, 500, options);
 
-// Check deadline (Unix timestamp)
 const deadline = result.delegatedAttestation.message.deadline;
 const now = BigInt(Math.floor(Date.now() / 1000));
 
 if (now < deadline) {
   await astral.compute.submit(result.delegatedAttestation);
 } else {
-  // Signature expired - request new computation
+  // Signature expired — request new computation
   const newResult = await astral.compute.within(uid1, uid2, 500, options);
   await astral.compute.submit(newResult.delegatedAttestation);
 }
 ```
 
-<Card title="Next: EAS Integration" icon="arrow-right" href="/sdk/eas">
+---
+
+## Complete example
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { ethers } from 'ethers';
+
+const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+// Create a location attestation
+const location = await astral.location.onchain.create({
+  location: { type: 'Point', coordinates: [2.2951, 48.8580] },
+  memo: 'Near Eiffel Tower'
+});
+
+// Check proximity to a landmark
+const LANDMARK_UID = '0x...';
+const SCHEMA_UID = '0x...';
+
+const result = await astral.compute.within(
+  location.uid,
+  LANDMARK_UID,
+  500,
+  { schema: SCHEMA_UID, recipient: wallet.address }
+);
+
+console.log('Within 500m:', result.result);
+
+// Estimate gas and submit if check passed
+if (result.result) {
+  const gas = await astral.compute.estimate(result.delegatedAttestation);
+  console.log('Estimated gas:', gas.toString());
+
+  const submission = await astral.compute.submit(result.delegatedAttestation);
+  console.log('Attestation submitted:', submission.uid);
+}
+```
+
+<Card title="Next: EAS integration" icon="arrow-right" href="/sdk/eas">
   Learn how the SDK integrates with EAS
 </Card>
