@@ -4,23 +4,22 @@ description: "Mobile device proofs via the ProofMode app"
 ---
 
 <Warning>
-  **Alpha** — The ProofMode plugin is in early development. Bundle parsing, stamp creation, and `verify()` are available. See below for what's coming next.
+  **Alpha** — The ProofMode plugin is in early development. See below for what's available and what's coming next.
 </Warning>
 
 # ProofMode plugin
 
-[ProofMode](https://proofmode.org) is a mobile app (iOS and Android) that collects device evidence — GPS coordinates, network context, device metadata, PGP signatures, and SafetyNet/Play Integrity attestations. The `@location-proofs/plugin-proofmode` package parses ProofMode's export bundles into Astral location stamps and verifies their internal consistency.
+[ProofMode](https://proofmode.org) is a mobile app (iOS and Android) that collects device evidence — GPS coordinates, network context, device metadata, PGP signatures, and SafetyNet/Play Integrity attestations. The `@location-proofs/plugin-proofmode` package integrates ProofMode into the Astral SDK's standard plugin pipeline and verifies stamp consistency.
 
-## How it works today
+## How it works
 
 1. The user captures evidence in the ProofMode app on their phone
 2. They export a ZIP bundle from the app
-3. Your application passes the ZIP bundle to the plugin
+3. Your application passes the ZIP data through the standard SDK pipeline
 4. The plugin parses it into an `UnsignedLocationStamp` and can verify its structure and signals
 
 ```
-ProofMode App → ZIP export → plugin.parseBundle() → plugin.createStampFromBundle() → UnsignedLocationStamp
-                                                   → plugin.verify() → StampVerificationResult
+ProofMode App → ZIP export → stamps.create() → stamps.sign() → stamps.verify()
 ```
 
 ## Installation
@@ -53,63 +52,37 @@ plugin.description // 'ProofMode device-based location proofs with PGP signature
 
 ---
 
-## Available methods
+## Standard pipeline
 
-### parseBundle()
+ProofMode implements the standard `create()` and `verify()` interface methods, so it works with the SDK's `StampsModule`.
 
-Parse a ProofMode ZIP export into a structured bundle.
+### create()
 
-```typescript
-const plugin = new ProofModePlugin();
-const bundle = plugin.parseBundle(zipData);
-```
-
-**Parameters:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `zipData` | `Uint8Array` | Raw ZIP file data from ProofMode export |
-
-**Returns:** `ParsedBundle`
+Pass the ZIP bundle as `signals.data.zipData`:
 
 ```typescript
-interface ParsedBundle {
-  metadata: ProofModeMetadata;   // Parsed signal data
-  publicKey?: string;            // ASCII-armored PGP public key
-  metadataSignature?: Uint8Array; // PGP detached signature of metadata
-  mediaSignature?: Uint8Array;   // PGP detached signature of media
-  safetyNetToken?: string;       // Google SafetyNet/Play Integrity JWT
-  otsProof?: Uint8Array;         // OpenTimestamps proof
-  mediaFile?: Uint8Array;        // The media file data
-  mediaFileName?: string;
-  expectedHash?: string;         // SHA-256 hash from bundle filename
-  files: BundleFile[];           // All raw files in bundle
-}
+import { readFileSync } from 'fs';
+
+const zipData = new Uint8Array(readFileSync('proofmode-export.zip'));
+
+const unsigned = await astral.stamps.create(
+  { plugin: 'proofmode' },
+  {
+    plugin: 'proofmode',
+    timestamp: Math.floor(Date.now() / 1000),
+    data: { zipData }
+  }
+);
 ```
 
-### createStampFromBundle()
-
-Create an unsigned location stamp from a parsed bundle.
-
-```typescript
-const unsigned = plugin.createStampFromBundle(bundle);
-```
-
-The resulting stamp contains:
-- Location as a GeoJSON Point from GPS coordinates
-- Temporal footprint from device timestamps
-- All parsed signals including SafetyNet JWT, PGP key presence, file hashes
-
-<Note>
-  ProofMode does **not** implement the standard `create(signals)` interface method. Use `parseBundle()` + `createStampFromBundle()` instead. This means `astral.stamps.create({ plugin: 'proofmode' }, signals)` is not supported — use the plugin's bundle-based workflow directly.
-</Note>
+Under the hood, `create()` parses the ZIP and extracts GPS coordinates, timestamps, PGP signatures, SafetyNet tokens, and device metadata into a structured `UnsignedLocationStamp`.
 
 ### verify()
 
-Verify a ProofMode stamp's internal validity.
+Verify a ProofMode stamp's internal validity:
 
 ```typescript
-const result = await plugin.verify(stamp);
+const result = await astral.stamps.verify(stamp);
 ```
 
 Checks performed:
@@ -132,6 +105,52 @@ Returns `StampVerificationResult`:
   details: { ... }   // ProofMode-specific verification details
 }
 ```
+
+---
+
+## Lower-level API
+
+For more control over the parsing step, you can use the plugin's helpers directly:
+
+### parseBundle()
+
+Parse a ProofMode ZIP export into a structured bundle.
+
+```typescript
+const plugin = new ProofModePlugin();
+const bundle = plugin.parseBundle(zipData);
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `zipData` | `Uint8Array` | Raw ZIP file data from ProofMode export |
+
+Returns `ParsedBundle`:
+
+```typescript
+interface ParsedBundle {
+  metadata: ProofModeMetadata;   // Parsed signal data
+  publicKey?: string;            // ASCII-armored PGP public key
+  metadataSignature?: Uint8Array; // PGP detached signature of metadata
+  mediaSignature?: Uint8Array;   // PGP detached signature of media
+  safetyNetToken?: string;       // Google SafetyNet/Play Integrity JWT
+  otsProof?: Uint8Array;         // OpenTimestamps proof
+  mediaFile?: Uint8Array;        // The media file data
+  mediaFileName?: string;
+  expectedHash?: string;         // SHA-256 hash from bundle filename
+  files: BundleFile[];           // All raw files in bundle
+}
+```
+
+### createStampFromBundle()
+
+Create an unsigned location stamp from a parsed bundle:
+
+```typescript
+const unsigned = plugin.createStampFromBundle(bundle);
+```
+
+This is what `create()` calls internally after parsing.
 
 ---
 
@@ -196,27 +215,21 @@ import { ProofModePlugin } from '@location-proofs/plugin-proofmode';
 import { readFileSync } from 'fs';
 
 const astral = new AstralSDK({ chainId: 84532, signer: wallet });
-const plugin = new ProofModePlugin();
-astral.plugins.register(plugin);
+astral.plugins.register(new ProofModePlugin());
 
 // Load a ProofMode ZIP export
 const zipData = new Uint8Array(readFileSync('proofmode-export.zip'));
 
-// Parse the bundle
-const bundle = plugin.parseBundle(zipData);
-
-console.log('Location:', bundle.metadata.signals['Location.Latitude'],
-            bundle.metadata.signals['Location.Longitude']);
-console.log('Has PGP key:', !!bundle.publicKey);
-console.log('Has SafetyNet:', !!bundle.safetyNetToken);
-
-// Create a stamp
-const unsigned = plugin.createStampFromBundle(bundle);
+// Create stamp through the standard pipeline
+const unsigned = await astral.stamps.create(
+  { plugin: 'proofmode' },
+  { plugin: 'proofmode', timestamp: Math.floor(Date.now() / 1000), data: { zipData } }
+);
 
 console.log('Stamp location:', unsigned.location);
 console.log('Stamp time:', unsigned.temporalFootprint);
 
-// Sign the stamp (with your own key, since ProofMode's sign is handled on-device)
+// Sign the stamp
 const stamp = await astral.stamps.sign(
   { plugin: 'proofmode' },
   unsigned,
@@ -228,4 +241,8 @@ const result = await astral.stamps.verify(stamp);
 console.log('Valid:', result.valid);
 console.log('Structure:', result.structureValid);
 console.log('Signals consistent:', result.signalsConsistent);
+
+// Use in a proof with stamps from other plugins
+const proof = astral.proofs.create(claim, [stamp, otherStamp]);
+const vector = await astral.proofs.verify(proof);
 ```
