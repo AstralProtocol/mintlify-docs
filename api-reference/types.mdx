@@ -232,11 +232,10 @@ interface StampResult {
 
 ## AttestationData
 
-EAS attestation data returned by compute and verify endpoints.
+EAS attestation data returned by compute endpoints.
 
 ```typescript
 interface AttestationData {
-  uid: string;                    // Attestation UID
   schema: string;                 // Schema UID
   attester: string;               // Attester address
   recipient: string;              // Recipient address
@@ -246,6 +245,10 @@ interface AttestationData {
   signature: string;              // Hex-encoded signature
 }
 ```
+
+<Note>
+  The verify proof endpoint returns an extended attestation that also includes `uid`, `time`, `expirationTime`, and `revocationTime`. See [VerifiedLocationProofResponse](#verifiedlocationproofresponse) for details.
+</Note>
 
 ---
 
@@ -309,7 +312,20 @@ interface VerifiedLocationProofResponse {
   credibility: CredibilityVector;
   evaluationMethod: string;
   evaluatedAt: number;            // Unix timestamp (seconds)
-  attestation?: AttestationData;
+  attestation?: {
+    uid: string;                  // Attestation UID
+    schema: string;
+    attester: string;
+    recipient: string;
+    data: string;
+    revocable: boolean;
+    refUID: string;
+    time: number;                 // Attestation creation time
+    expirationTime: number;       // 0 = no expiration
+    revocationTime: number;       // 0 = not revoked
+    signature?: string;
+  };
   delegatedAttestation?: DelegatedAttestationData;
+  chainId?: number;
 }
 ```
