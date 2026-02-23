@@ -202,8 +202,8 @@ interface CredibilityVector {
   stampResults: StampResult[];
   meta: {
     stampCount: number;
-    evaluatedAt: string;                // ISO 8601
-    evaluationMode: string;
+    evaluatedAt: number;                // Unix timestamp (seconds)
+    evaluationMode: 'local' | 'tee' | 'zk';
   };
 }
 ```
@@ -308,7 +308,7 @@ interface VerifiedLocationProofResponse {
   proof: LocationProof;
   credibility: CredibilityVector;
   evaluationMethod: string;
-  evaluatedAt: string;            // ISO 8601
+  evaluatedAt: number;            // Unix timestamp (seconds)
   attestation?: AttestationData;
   delegatedAttestation?: DelegatedAttestationData;
 }

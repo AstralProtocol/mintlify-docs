@@ -128,8 +128,8 @@ The response contains the verified proof, a credibility vector, and optional EAS
   The evaluation method used (e.g., `"multifactor-v0"`).
 </ResponseField>
 
-<ResponseField name="evaluatedAt" type="string" required>
-  ISO 8601 timestamp of when the evaluation was performed.
+<ResponseField name="evaluatedAt" type="number" required>
+  Unix timestamp (seconds) of when the evaluation was performed.
 </ResponseField>
 
 <ResponseField name="attestation" type="AttestationData">
@@ -203,12 +203,12 @@ The response contains the verified proof, a credibility vector, and optional EAS
     ],
     "meta": {
       "stampCount": 2,
-      "evaluatedAt": "2024-02-03T12:00:00Z",
-      "evaluationMode": "multifactor"
+      "evaluatedAt": 1706961600,
+      "evaluationMode": "local"
     }
   },
   "evaluationMethod": "multifactor-v0",
-  "evaluatedAt": "2024-02-03T12:00:00Z",
+  "evaluatedAt": 1706961600,
   "attestation": {
     "uid": "0xdef456...",
     "schema": "0x...",
@@ -281,8 +281,8 @@ Per-stamp verification results. See [StampResult](/api-reference/types#stampresu
 | Field | Type | Description |
 |-------|------|-------------|
 | `stampCount` | `number` | Number of stamps evaluated |
-| `evaluatedAt` | `string` | ISO 8601 timestamp |
-| `evaluationMode` | `string` | Evaluation mode used |
+| `evaluatedAt` | `number` | Unix timestamp (seconds) |
+| `evaluationMode` | `string` | Evaluation mode: `"local"`, `"tee"`, or `"zk"` |
 
 ## Errors
 
