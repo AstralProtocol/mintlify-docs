@@ -1,0 +1,71 @@
+---
+title: "Signed Results"
+description: "Output formats from verification and computation — and how to use them"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Signed results
+
+Both the [verify](/concepts/verify) and [compute](/concepts/compute) endpoints return signed results — cryptographically signed records of what was computed, what inputs were used, and what the answer was. The signature comes from the Astral signing key, held exclusively inside the [TEE](/concepts/astral-location-services).
+
+## What a signed result proves
+
+A signed result proves three things:
+
+1. **Correct execution** — The computation was performed by attested code inside the TEE
+2. **Specific inputs** — The result references the exact inputs that were used (via hashes or UIDs)
+3. **Authentic output** — The signing key that produced the signature cannot be extracted by the operator
+
+Any downstream consumer can verify these properties by checking the signature against the known Astral public key — without re-executing the computation or trusting an intermediary.
+
+## Result types
+
+The signed result format depends on the operation:
+
+| Operation type | Result schema | Result value |
+|---------------|--------------|-------------|
+| **Predicates** (contains, within, intersects) | Boolean | `true` or `false` |
+| **Measurements** (distance, area, length) | Numeric | Scaled integer (centimeters or cm²) |
+| **Verification** | Credibility | Credibility vector with dimensional scores |
+
+Each result also includes: input references (UIDs or hashes), a timestamp, the operation name, and the Astral signing key's signature.
+
+## Using signed results offchain
+
+A signed result is immediately usable in any application:
+
+- **Agent workflows** — An autonomous agent branches on the spatial answer. The signed result is the audit trail.
+- **Backend storage** — Store the signed result as evidence alongside the business action it triggered.
+- **Compliance reports** — The signed result proves what was computed and when, with cryptographic backing.
+- **Peer-to-peer** — Share the signed result with a counterparty who can verify it independently.
+
+A verified location proof (from the verify endpoint) is valuable on its own — it doesn't need to flow into a compute operation. Many applications only need to know "how credible is this location claim?" and can act on that directly.
+
+## Using signed results onchain
+
+Signed results can be submitted onchain via EAS (Ethereum Attestation Service) delegated attestations. The flow:
+
+1. **Astral signs** the result inside the TEE
+2. **The developer submits** the signed result onchain with Astral's signature (developer pays gas)
+3. **EAS verifies** the signature and records Astral as the attester
+4. **Resolver contracts** execute business logic based on the result
+
+This is the **delegated attestation pattern** — Astral produces the attestation offchain, and the developer submits it when ready. The signed result includes a deadline for submission; after the deadline, the signature expires.
+
+Resolver contracts can verify that the result came from Astral by checking `attestation.attester == astralSigner`, and can inspect the input references to confirm the expected locations were checked.
+
+## Not every result needs to go onchain
+
+The onchain path is available but not required. Most applications will use signed results offchain — the cryptographic signature provides verifiability regardless of whether the result is submitted to a blockchain.
+
+<Card title="Next: Privacy" icon="eye-slash" href="/concepts/privacy">
+  Privacy properties of the system
+</Card>
+
+---
+
+**See also:**
+- [SDK: EAS module](/sdk/eas) — submitting delegated attestations onchain
+- [SDK: Compute module](/sdk/compute) — working with compute results
+- [API: Types](/api-reference/types) — result type schemas
