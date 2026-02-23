@@ -1,233 +1,51 @@
 ---
 title: "Geocomputation"
-description: "Spatial computations with proof of correct execution"
+description: "Processing location data with proof of correct execution"
 ---
 
-<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Geocomputation
 
-Astral provides verifiable spatial computations backed by **PostGIS** — the gold standard in geospatial databases with 20+ years of production use.
+Geocomputation is the processing of geospatial data to answer spatial questions: How far apart are these two locations? Is this point inside that boundary? Do these regions overlap? The answers seem simple, but computing them correctly — on a curved, non-Euclidean surface, with consistent precision and deterministic results — is harder than it appears.
 
-All operations return [signed results](/concepts/result-format) with proof of correct execution — results that can be used offchain or submitted onchain to trigger smart contract logic.
+## The computational challenge
 
-<Info>
-  PostGIS uses [GEOS](https://libgeos.org/) (Geometry Engine Open Source) under the hood for geometry operations. GEOS is the C++ library that powers most professional geospatial software.
-</Info>
+Spatial computation involves real complexity:
 
-## Available Operations
+- **Reference systems** — The Earth is not flat, and different coordinate systems represent it differently. Computing distance on a sphere vs. a projected plane gives different results.
+- **Computational geometry** — Operations like polygon containment, intersection detection, and area calculation require robust algorithms that handle edge cases (self-intersecting polygons, antipodal points, degenerate geometries).
+- **Precision and determinism** — Floating-point arithmetic is not associative. The same computation can produce different results depending on operation order, hardware, or library version. For verifiable results, computation must be deterministic.
 
-### Measurements
+Professional geospatial software (QGIS, GDAL, PostGIS) has spent decades solving these problems. Astral builds on that foundation rather than reimplementing it.
 
-Operations that return **numeric** results (as [NumericResults](/concepts/result-format#numericpolicyattestation)):
+## Scope of geocomputation in Astral
 
-| Operation | Description | Unit | Geometry Types | PostGIS Function |
-|-----------|-------------|------|----------------|------------------|
-| `distance` | Nearest distance between two geometries | meters | Any | `ST_Distance` |
-| `area` | Area of a polygon | square meters | Polygon, MultiPolygon | `ST_Area` |
-| `length` | Length of a line | meters | LineString, MultiLineString | `ST_Length` |
+Astral's geocomputation capabilities span three areas, at different stages of maturity:
 
-### Predicates
+| Capability | Status | What it does |
+|-----------|--------|-------------|
+| **[Location proof verification](/concepts/verify)** | Shipping | Evaluates location proof credibility |
+| **[Geospatial operations](/concepts/compute)** | Shipping | Distance, containment, intersection, area, length |
+| **Geospatial AI/ML** | Planned | Spatial analysis, prediction, pattern detection |
 
-Operations that return **boolean** results (as [BooleanResults](/concepts/result-format#booleanpolicyattestation)):
+## Verifiable geocomputation
 
-| Operation | Description | PostGIS Function |
-|-----------|-------------|------------------|
-| `contains` | Is geometry B **entirely** inside geometry A? | `ST_Contains` |
-| `within` | Is geometry within a specified radius of target? | `ST_DWithin` |
-| `intersects` | Do geometries share any space? | `ST_Intersects` |
+Computation is only useful if you can trust the result. For most applications, that means running code on a server and trusting the operator. For applications where the spatial answer triggers real-world consequences — a smart contract execution, a compliance determination, an autonomous agent decision — that trust model isn't sufficient.
 
-## Operation Examples
+Astral makes geocomputation verifiable through three approaches, at different stages of development:
 
-<Note>
-  **Code snippets need testing** — Verify against actual implementation before use.
-</Note>
+**Trusted Execution Environments (v0 — shipping today).** The compute engine runs inside a TEE (currently [EigenCompute](https://blog.eigencloud.xyz/eigencloud-brings-verifiable-ai-to-mass-market-with-eigenai-and-eigencompute-launches/)), which provides hardware-level isolation. The TEE guarantees that the attested code executed on the attested inputs, and that the signing key never left the enclave. This is the foundation of [Astral Location Services](/concepts/astral-location-services).
 
-### Distance
+**Zero-knowledge circuits (research).** ZK proofs would allow verification of correct computation without any trusted hardware — a verifier could confirm the result was computed correctly without re-executing the computation or trusting a TEE manufacturer. This is an active research direction, not yet implemented.
 
-Calculate the nearest distance between two geometries in meters. For polygons, this returns the minimum distance between their boundaries.
+**Smart contract verification (limited).** Some spatial operations could theoretically run onchain, but gas costs and computational limitations make this impractical for most geospatial operations today.
 
-```typescript
-const result = await astral.compute.distance({
-  from: userLocationUID,
-  to: landmarkUID,
-  chainId: 84532,
-  schema: SCHEMA_UID
-});
-
-console.log(result.result);  // 523.45 (meters)
-console.log(result.units);   // "meters"
-```
-
-### Contains
-
-Check if a geometry is **entirely** inside a container geometry.
-
-```typescript
-const result = await astral.compute.contains({
-  container: sfBayAreaPolygonUID,  // Container polygon
-  geometry: userLocationUID,        // Geometry to check
-  chainId: 84532,
-  schema: SCHEMA_UID
-});
-
-console.log(result.result);  // true or false
-```
-
-### Within
-
-Check if a geometry is within a specified radius of a target — essentially a **radius check**.
-
-```typescript
-const result = await astral.compute.within({
-  geometry: userLocationUID,   // Geometry to check
-  target: landmarkUID,         // Target location
-  radius: 500,                 // Radius in meters
-  chainId: 84532,
-  schema: SCHEMA_UID
-});
-
-console.log(result.result);  // true if within 500m
-```
-
-### Intersects
-
-Check if two geometries share any space (overlap, touch, or cross).
-
-```typescript
-const result = await astral.compute.intersects({
-  geometry1: polygon1UID,
-  geometry2: polygon2UID,
-  chainId: 84532,
-  schema: SCHEMA_UID
-});
-
-console.log(result.result);  // true if they share space
-```
-
-### Area
-
-Calculate the area of a polygon (must be Polygon or MultiPolygon).
-
-```typescript
-const result = await astral.compute.area({
-  geometry: propertyBoundaryUID,
-  chainId: 84532,
-  schema: SCHEMA_UID
-});
-
-console.log(result.result);  // 5432.10 (square meters)
-console.log(result.units);   // "square_meters"
-```
-
-### Length
-
-Calculate the length of a line (must be LineString or MultiLineString).
-
-```typescript
-const result = await astral.compute.length({
-  geometry: routeUID,
-  chainId: 84532,
-  schema: SCHEMA_UID
-});
-
-console.log(result.result);  // 2345.67 (meters)
-console.log(result.units);   // "meters"
-```
-
-## Units
-
-All measurements use **metric units only**:
-
-| Measurement | Unit |
-|-------------|------|
-| Distance | meters |
-| Length | meters |
-| Area | square meters |
-| Radius (in `within`) | meters |
-
-<Note>
-  No unit conversion options are provided. Developers should convert client-side if needed.
-</Note>
-
-## Precision
-
-Results are stored with centimeter precision to enable **deterministic, reproducible** computation:
-
-| Type | Precision | Storage |
-|------|-----------|---------|
-| Distance/Length | 0.01m | Scaled integer (cm) |
-| Area | 0.0001 m² | Scaled integer (cm²) |
-
-```
-523.45 meters → stored as 52345 (centimeters)
-1234.5678 m² → stored as 12345678 (cm²)
-```
-
-<Info>
-  We're actively testing the reliability of deterministic geospatial computation with this precision approach. This is an area of ongoing research in the beta implementation.
-</Info>
-
-## Compute Options
-
-All operations require these parameters:
-
-```typescript
-interface ComputeOptions {
-  chainId: number;        // Target chain for result signing
-  schema: string;         // EAS schema UID (required)
-  recipient?: string;     // Result recipient address
-}
-```
-
-<Warning>
-  **`chainId` is required.** The service needs to know which chain to sign the result for.
-</Warning>
-
-<Note>
-  We only support official EAS deployments on supported chains. See the SDK overview for the chain list.
-</Note>
-
-## Future Operations
-
-Post-MVP, we plan to add:
-
-| Operation | Type | Description |
-|-----------|------|-------------|
-| `disjoint` | Predicate | Do geometries not touch? |
-| `buffer` | Transformation | Create buffer zone around geometry |
-| `centroid` | Transformation | Find center point |
-| `union` | Transformation | Merge geometries |
-| `intersection` | Transformation | Overlapping area |
-
-We're also exploring **nested/composable operations** — combining multiple predicates in a single result, such as "is inside region A AND within 500m of landmark B".
-
-## Client-Side Operations with Turf.js
-
-We recommend **[Turf.js](https://turfjs.org/)** for client-side geospatial operations. Use Turf.js for instant UX feedback, and Astral for verifiable results:
-
-```typescript
-import * as turf from '@turf/turf';
-
-// Client-side: instant UX feedback (unverified, but instant)
-const localDistance = turf.distance(point1, point2);
-showUI(`${localDistance}km away`);
-
-// Verifiable: signed result for onchain use
-const attestedResult = await astral.compute.distance({
-  from: uid1,
-  to: uid2,
-  chainId: 84532,
-  schema: SCHEMA_UID
-});
-await astral.eas.submitDelegated(attestedResult.delegatedAttestation);
-```
-
-| Use Case | Tool | Why |
-|----------|------|-----|
-| Real-time UI feedback | Turf.js | Instant, free, runs client-side |
-| Verifiable computation | Astral | Signed result for onchain actions |
-
-<Card title="Next: Result format" icon="file-signature" href="/concepts/result-format">
-  Learn about the signed outputs of geocomputation
+<Card title="Next: Astral Location Services" icon="server" href="/concepts/astral-location-services">
+  The hosted TEE service that runs verification and computation
 </Card>
+
+---
+
+**See also:**
+- [API Reference](/api-reference/overview) — full endpoint documentation
