@@ -1,5 +1,5 @@
 ---
-title: "POST /area"
+title: "POST /compute/v0/area"
 description: "Calculate area of a polygon"
 ---
 
@@ -15,38 +15,91 @@ Calculate the area of a polygon in square meters.
 POST /compute/v0/area
 ```
 
-## Request Body
+## Request body
 
 <ParamField body="chainId" type="number" required>
-  Target chain ID (e.g., 84532 for Base Sepolia, 8453 for Base).
+  Target chain ID (e.g., `84532` for Base Sepolia).
 </ParamField>
 
 <ParamField body="geometry" type="Input" required>
-  The polygon geometry to measure.
+  The polygon geometry to measure. See [Input types](/api-reference/types#input) for accepted formats.
 </ParamField>
 
-<ParamField body="schema" type="string" required>
-  EAS schema UID to issue the attestation against.
+<ParamField body="schema" type="string">
+  EAS schema UID. The server uses a default schema if not provided.
 </ParamField>
 
 <ParamField body="recipient" type="string">
-  Ethereum address to receive the attestation. Defaults to zero address if not provided.
+  Ethereum address to receive the attestation. Defaults to the zero address.
 </ParamField>
 
-## Example Request
+## Example request
 
-```bash
+<CodeGroup>
+
+```bash cURL
 curl -X POST https://api.astral.global/compute/v0/area \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
   -d '{
     "chainId": 84532,
     "geometry": "0xpolygon...",
-    "schema": "0xschema...",
     "recipient": "0xdef456..."
   }'
 ```
 
-## Example Response
+```typescript TypeScript
+const response = await fetch('https://api.astral.global/compute/v0/area', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'your-api-key'
+  },
+  body: JSON.stringify({
+    chainId: 84532,
+    geometry: '0xpolygon...',
+    recipient: '0xdef456...'
+  })
+});
+
+const result = await response.json();
+```
+
+</CodeGroup>
+
+## Response
+
+Returns a [NumericComputeResponse](/api-reference/types#numericcomputeresponse).
+
+<ResponseField name="result" type="number" required>
+  Area in square meters (e.g., `5432.10`).
+</ResponseField>
+
+<ResponseField name="units" type="string" required>
+  Always `"square_meters"`.
+</ResponseField>
+
+<ResponseField name="operation" type="string" required>
+  Always `"area"`.
+</ResponseField>
+
+<ResponseField name="timestamp" type="number" required>
+  Unix timestamp of computation.
+</ResponseField>
+
+<ResponseField name="inputRefs" type="string[]" required>
+  Array of input references.
+</ResponseField>
+
+<ResponseField name="attestation" type="AttestationData" required>
+  Signed EAS attestation. See [AttestationData](/api-reference/types#attestationdata).
+</ResponseField>
+
+<ResponseField name="delegatedAttestation" type="DelegatedAttestationData" required>
+  Signature for delegated onchain submission. See [DelegatedAttestationData](/api-reference/types#delegatedattestationdata).
+</ResponseField>
+
+## Example response
 
 ```json
 {
@@ -59,23 +112,27 @@ curl -X POST https://api.astral.global/compute/v0/area \
   ],
   "attestation": {
     "schema": "0x...",
-    "attester": "0x...",
+    "attester": "0x590fdb53ed3f0B52694876d42367192a5336700F",
     "recipient": "0xdef456...",
     "data": "0x...",
+    "revocable": true,
+    "refUID": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "signature": "0x..."
   },
   "delegatedAttestation": {
     "signature": "0x...",
-    "attester": "0x...",
-    "deadline": 1706403600
+    "attester": "0x590fdb53ed3f0B52694876d42367192a5336700F",
+    "deadline": 1706403600,
+    "nonce": 0
   }
 }
 ```
 
 ## Notes
 
-- Uses PostGIS `ST_Area` function with geodetic calculation
+- Uses PostGIS `ST_Area` with geodetic calculation
 - Result is in square meters with square centimeter precision
+- The onchain attested value is scaled to **square centimeters** (integer) for EVM compatibility
 - Only valid for polygon geometries
 
 <Card title="SDK Method" icon="code" href="/sdk/compute#area">

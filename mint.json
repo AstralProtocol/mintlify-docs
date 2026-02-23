@@ -5,6 +5,10 @@
     {
       "source": "/",
       "destination": "/introduction"
+    },
+    {
+      "source": "/sdk/verify",
+      "destination": "/sdk/stamps"
     }
   ],
   "logo": {
@@ -36,6 +40,10 @@
     "url": "/quickstart"
   },
   "tabs": [
+    {
+      "name": "Plugins",
+      "url": "plugins"
+    },
     {
       "name": "SDK",
       "url": "sdk"
@@ -102,6 +110,14 @@
       "pages": [
         "api-reference/overview",
         {
+          "group": "Verify API",
+          "pages": [
+            "api-reference/verify/stamp",
+            "api-reference/verify/proof",
+            "api-reference/verify/plugins"
+          ]
+        },
+        {
           "group": "Compute API",
           "pages": [
             "api-reference/compute/distance",
@@ -112,24 +128,7 @@
             "api-reference/compute/intersects"
           ]
         },
-        {
-          "group": "Verify API",
-          "pages": [
-            "api-reference/verify/stamp",
-            "api-reference/verify/proof",
-            "api-reference/verify/plugins"
-          ]
-        },
-        {
-          "group": "Records API",
-          "pages": [
-            "api-reference/records/overview",
-            "api-reference/records/list",
-            "api-reference/records/get",
-            "api-reference/records/stats",
-            "api-reference/records/config"
-          ]
-        }
+        "api-reference/types"
       ]
     },
     {
@@ -138,11 +137,23 @@
         "sdk/overview",
         "sdk/installation",
         "sdk/location",
+        "sdk/stamps",
+        "sdk/location-proofs",
+        "sdk/plugins",
         "sdk/compute",
-        "sdk/verify",
         "sdk/eas",
         "sdk/types",
         "sdk/migration"
+      ]
+    },
+    {
+      "group": "Plugins",
+      "pages": [
+        "plugins/overview",
+        "plugins/mock",
+        "plugins/proofmode",
+        "plugins/witnesschain",
+        "plugins/custom"
       ]
     },
     {

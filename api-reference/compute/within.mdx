@@ -1,5 +1,5 @@
 ---
-title: "POST /within"
+title: "POST /compute/v0/within"
 description: "Check if a geometry is within a radius of another"
 ---
 
@@ -15,14 +15,14 @@ Check if a geometry is within a specified radius of a target geometry.
 POST /compute/v0/within
 ```
 
-## Request Body
+## Request body
 
 <ParamField body="chainId" type="number" required>
-  Target chain ID (e.g., 84532 for Base Sepolia, 8453 for Base).
+  Target chain ID (e.g., `84532` for Base Sepolia).
 </ParamField>
 
 <ParamField body="geometry" type="Input" required>
-  The geometry to check (typically a point).
+  The geometry to check (typically a point). See [Input types](/api-reference/types#input) for accepted formats.
 </ParamField>
 
 <ParamField body="target" type="Input" required>
@@ -33,27 +33,27 @@ POST /compute/v0/within
   Maximum distance in **meters**.
 </ParamField>
 
-<ParamField body="schema" type="string" required>
-  EAS schema UID to issue the attestation against.
+<ParamField body="schema" type="string">
+  EAS schema UID. The server uses a default schema if not provided.
 </ParamField>
 
 <ParamField body="recipient" type="string">
-  Ethereum address to receive the attestation. Defaults to zero address if not provided.
+  Ethereum address to receive the attestation. Defaults to the zero address.
 </ParamField>
 
-## Example Request
+## Example request
 
 <CodeGroup>
 
 ```bash cURL
 curl -X POST https://api.astral.global/compute/v0/within \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
   -d '{
     "chainId": 84532,
     "geometry": "0xpoint...",
     "target": "0xlandmark...",
     "radius": 500,
-    "schema": "0xschema...",
     "recipient": "0xdef456..."
   }'
 ```
@@ -61,21 +61,53 @@ curl -X POST https://api.astral.global/compute/v0/within \
 ```typescript TypeScript
 const response = await fetch('https://api.astral.global/compute/v0/within', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'your-api-key'
+  },
   body: JSON.stringify({
     chainId: 84532,
     geometry: '0xpoint...',
     target: '0xlandmark...',
     radius: 500,
-    schema: '0xschema...',
     recipient: '0xdef456...'
   })
 });
+
+const result = await response.json();
 ```
 
 </CodeGroup>
 
-## Example Response
+## Response
+
+Returns a [BooleanComputeResponse](/api-reference/types#booleancomputeresponse).
+
+<ResponseField name="result" type="boolean" required>
+  `true` if the geometry is within the radius of the target.
+</ResponseField>
+
+<ResponseField name="operation" type="string" required>
+  Encodes the radius in centimeters: `"within:RADIUS_CM"` (e.g., `"within:50000"` for a 500m radius).
+</ResponseField>
+
+<ResponseField name="timestamp" type="number" required>
+  Unix timestamp of computation.
+</ResponseField>
+
+<ResponseField name="inputRefs" type="string[]" required>
+  Array containing `[geometryRef, targetRef]`.
+</ResponseField>
+
+<ResponseField name="attestation" type="AttestationData" required>
+  Signed EAS attestation. See [AttestationData](/api-reference/types#attestationdata).
+</ResponseField>
+
+<ResponseField name="delegatedAttestation" type="DelegatedAttestationData" required>
+  Signature for delegated onchain submission. See [DelegatedAttestationData](/api-reference/types#delegatedattestationdata).
+</ResponseField>
+
+## Example response
 
 ```json
 {
@@ -88,15 +120,18 @@ const response = await fetch('https://api.astral.global/compute/v0/within', {
   ],
   "attestation": {
     "schema": "0x...",
-    "attester": "0x...",
+    "attester": "0x590fdb53ed3f0B52694876d42367192a5336700F",
     "recipient": "0xdef456...",
     "data": "0x...",
+    "revocable": true,
+    "refUID": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "signature": "0x..."
   },
   "delegatedAttestation": {
     "signature": "0x...",
-    "attester": "0x...",
-    "deadline": 1706403600
+    "attester": "0x590fdb53ed3f0B52694876d42367192a5336700F",
+    "deadline": 1706403600,
+    "nonce": 0
   }
 }
 ```
@@ -104,9 +139,9 @@ const response = await fetch('https://api.astral.global/compute/v0/within', {
 ## Notes
 
 - Uses PostGIS `ST_DWithin` function
-- Radius is always in **meters** (no unit conversion)
+- Radius is always in **meters** in the request (no unit conversion needed)
+- The `operation` field encodes the radius in **centimeters**: `within:50000` means 500 meters. Resolver contracts should use prefix matching, not exact string comparison
 - Returns `true` if the distance between geometries is less than or equal to the radius
-- The `operation` field includes the radius in **centimeters**: `within:RADIUS_CM` (e.g., `within:50000` for a 500m radius). Resolver contracts should use prefix matching, not exact string comparison
 
 <Card title="SDK Method" icon="code" href="/sdk/compute#within">
   See `astral.compute.within()`

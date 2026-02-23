@@ -1,0 +1,392 @@
+---
+title: "Location proofs"
+description: "Proof construction and multidimensional verification"
+---
+
+<Warning>
+  **Research preview** — The proofs module is under active development.
+</Warning>
+
+# Location proofs
+
+The `ProofsModule` handles proof construction and multidimensional verification. A location proof bundles a claim ("I was at location X at time T") with one or more stamps (evidence from proof-of-location systems). Verification produces a `CredibilityVector` — not a single score.
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+// Access via astral.proofs
+astral.proofs.create(claim, stamps);
+astral.proofs.verify(proof, options);
+```
+
+<Info>
+  For conceptual background, see [Location Proofs](/concepts/location-proofs).
+</Info>
+
+---
+
+## proofs.create()
+
+Bundle a claim with stamps into a location proof. This is a **synchronous** operation.
+
+```typescript
+astral.proofs.create(
+  claim: LocationClaim,
+  stamps: LocationStamp[]
+): LocationProof
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `claim` | `LocationClaim` | Yes | The location claim to prove |
+| `stamps` | `LocationStamp[]` | Yes | One or more signed stamps as evidence |
+
+Requires at least one stamp.
+
+### Example
+
+```typescript
+const claim: LocationClaim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
+  location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  srs: 'EPSG:4326',
+  subject: { scheme: 'eth-address', value: '0x...' },
+  radius: 100,
+  time: { start: Math.floor(Date.now() / 1000) - 60, end: Math.floor(Date.now() / 1000) }
+};
+
+const proof = astral.proofs.create(claim, [stamp1, stamp2]);
+```
+
+---
+
+## proofs.verify()
+
+Verify a location proof. Two modes available:
+
+### Local mode (default)
+
+Runs verification in-process. Free and fast. Returns a `CredibilityVector`.
+
+```typescript
+astral.proofs.verify(
+  proof: LocationProof,
+  options?: { mode?: 'local' }
+): Promise<CredibilityVector>
+```
+
+```typescript
+const vector = await astral.proofs.verify(proof);
+// or explicitly:
+const vector = await astral.proofs.verify(proof, { mode: 'local' });
+
+console.log(vector.dimensions.spatial.meanDistanceMeters);
+console.log(vector.dimensions.temporal.meanOverlap);
+console.log(vector.dimensions.validity.signaturesValidFraction);
+console.log(vector.dimensions.independence.uniquePluginRatio);
+```
+
+Local verification:
+- Verifies each stamp via its plugin's `verify()` method
+- Measures spatial alignment between each stamp and the claim
+- Measures temporal overlap between each stamp and the claim
+- Assesses independence across stamps from different plugins
+
+### TEE mode
+
+Runs in a hosted Trusted Execution Environment. Returns a `VerifiedLocationProof` with an EAS attestation.
+
+```typescript
+astral.proofs.verify(
+  proof: LocationProof,
+  options: {
+    mode: 'tee';
+    chainId?: number;
+    submitOnchain?: boolean;
+    schema?: string;
+    recipient?: string;
+  }
+): Promise<VerifiedLocationProof>
+```
+
+```typescript
+const verified = await astral.proofs.verify(proof, {
+  mode: 'tee',
+  chainId: 84532,
+  submitOnchain: true
+});
+
+console.log(verified.attestation.uid);
+console.log(verified.credibility.dimensions.spatial);
+console.log(verified.remoteAttestation?.platform); // "sgx", "tdx", "sev"
+```
+
+### Type guard
+
+Use `isVerifiedLocationProof()` to narrow the return type:
+
+```typescript
+import { isVerifiedLocationProof } from '@decentralized-geo/astral-sdk';
+
+const result = await astral.proofs.verify(proof, options);
+
+if (isVerifiedLocationProof(result)) {
+  // TEE mode — has attestation
+  console.log(result.attestation.uid);
+} else {
+  // Local mode — CredibilityVector
+  console.log(result.dimensions.spatial);
+}
+```
+
+---
+
+## ProofsModule.exampleWeighting()
+
+Static helper demonstrating how to collapse a `CredibilityVector` into a single decision value. This is provided as an **example** — applications should implement their own weighting functions.
+
+```typescript
+const score = ProofsModule.exampleWeighting(vector);
+
+// Example: reject if score is below threshold
+if (score > 0.7) {
+  console.log('Proof accepted');
+}
+```
+
+<Warning>
+  `CredibilityVector` intentionally has no single score. The example weighting is for demonstration only. Applications should define their own weighting based on their risk tolerance and use case.
+</Warning>
+
+---
+
+## CredibilityVector
+
+The core verification output. Four dimensions, no opinionated scoring.
+
+```typescript
+interface CredibilityVector {
+  dimensions: {
+    spatial: {
+      meanDistanceMeters: number;       // Average distance from stamps to claim
+      maxDistanceMeters: number;        // Worst-case distance
+      withinRadiusFraction: number;     // 0-1, fraction of stamps within claim radius
+    };
+    temporal: {
+      meanOverlap: number;             // 0-1, average temporal overlap with claim
+      minOverlap: number;              // 0-1, worst-case overlap
+      fullyOverlappingFraction: number; // Fraction of stamps fully within claim time
+    };
+    validity: {
+      signaturesValidFraction: number;  // 0-1, fraction with valid signatures
+      structureValidFraction: number;   // 0-1, fraction with valid structure
+      signalsConsistentFraction: number; // 0-1, fraction with consistent signals
+    };
+    independence: {
+      uniquePluginRatio: number;        // 0-1, 1.0 = all stamps from different plugins
+      spatialAgreement: number;         // 0-1, how much independent sources agree
+      pluginNames: string[];            // List of plugins used
+    };
+  };
+  stampResults: StampResult[];
+  meta: {
+    stampCount: number;
+    evaluatedAt: number;               // Unix seconds
+    evaluationMode: 'local' | 'tee' | 'zk';
+  };
+}
+```
+
+### StampResult
+
+Per-stamp assessment within the `CredibilityVector`:
+
+```typescript
+interface StampResult {
+  stampIndex: number;
+  plugin: string;
+  signaturesValid: boolean;
+  structureValid: boolean;
+  signalsConsistent: boolean;
+  distanceMeters: number;         // Haversine distance to claim
+  temporalOverlap: number;        // 0-1 fraction
+  withinRadius: boolean;
+  details: Record<string, unknown>; // Plugin-specific
+}
+```
+
+---
+
+## VerifiedLocationProof
+
+Returned by TEE mode verification. Contains the full credibility vector plus an EAS attestation.
+
+```typescript
+interface VerifiedLocationProof {
+  proof: LocationProof;
+  credibility: CredibilityVector;
+  attestation: {
+    uid: string;
+    schema: string;
+    attester: string;
+    recipient: string;
+    revocable: boolean;
+    refUID: string;
+    data: string;
+    time: number;
+    expirationTime: number;        // 0 = never
+    revocationTime: number;        // 0 = not revoked
+    signature?: string;
+  };
+  delegatedAttestation?: {
+    signature: string;             // EIP-712
+    attester: string;
+    deadline: number;
+    nonce: number;
+  };
+  chainId?: number;
+  remoteAttestation?: {
+    quote: string;
+    platform: string;              // "sgx", "tdx", "sev"
+    metadata?: Record<string, unknown>;
+  };
+  evaluationMethod: string;
+  evaluatedAt: number;
+}
+```
+
+---
+
+## LocationClaim
+
+Defines what the proof is asserting.
+
+```typescript
+interface LocationClaim {
+  lpVersion: string;               // e.g., "0.2"
+  locationType: string;            // e.g., "geojson-point", "h3-index"
+  location: LocationData;          // GeoJSON geometry or string
+  srs: string;                     // e.g., "EPSG:4326"
+  subject: SubjectIdentifier;      // Who/what was at the location
+  radius: number;                  // Spatial uncertainty in meters
+  time: TimeBounds;                // { start, end } — Unix seconds
+  eventType?: string;              // Optional event classification
+}
+
+interface SubjectIdentifier {
+  scheme: string;                  // "eth-address", "device-pubkey", "did:pkh"
+  value: string;
+}
+```
+
+---
+
+## Multi-stamp cross-correlation
+
+Independent plugins increase credibility. When stamps from different proof-of-location systems agree, the `independence` dimension reflects this:
+
+```typescript
+import { AstralSDK, MockPlugin } from '@decentralized-geo/astral-sdk';
+import { ProofModePlugin } from '@location-proofs/plugin-proofmode';
+
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+astral.plugins.register(new MockPlugin({ lat: 37.7749, lon: -122.4194 }));
+astral.plugins.register(new ProofModePlugin());
+
+// Stamps from different systems
+const mockStamp = /* ... collect, create, sign with mock plugin ... */;
+const proofmodeStamp = /* ... create from ProofMode ZIP bundle ... */;
+
+// Bundle into proof with multiple stamps
+const proof = astral.proofs.create(claim, [mockStamp, proofmodeStamp]);
+
+// Verify — cross-correlation is reflected in the vector
+const vector = await astral.proofs.verify(proof);
+
+console.log(vector.dimensions.independence.uniquePluginRatio); // 1.0 (all different)
+console.log(vector.dimensions.independence.spatialAgreement);  // 0-1
+console.log(vector.dimensions.independence.pluginNames);       // ['mock', 'proofmode']
+console.log(vector.meta.stampCount);                           // 2
+```
+
+<Info>
+  Independent, corroborating evidence from different proof systems strengthens the proof. Redundant stamps from the same plugin don't add independence — but they don't subtract either.
+</Info>
+
+---
+
+## Complete example
+
+```typescript
+import { AstralSDK, MockPlugin } from '@decentralized-geo/astral-sdk';
+import { ethers } from 'ethers';
+
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY);
+
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+astral.plugins.register(new MockPlugin({
+  lat: 37.7749,
+  lon: -122.4194,
+  accuracy: 10
+}));
+
+// 1. Collect and create a stamp
+const signals = (await astral.stamps.collect({ plugins: ['mock'] }))[0];
+const unsigned = await astral.stamps.create({ plugin: 'mock' }, signals);
+const stamp = await astral.stamps.sign(
+  { plugin: 'mock' },
+  unsigned,
+  {
+    algorithm: 'secp256k1',
+    signer: { scheme: 'eth-address', value: wallet.address },
+    sign: (data) => wallet.signMessage(data)
+  }
+);
+
+// 2. Define the claim
+const claim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
+  location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  srs: 'EPSG:4326',
+  subject: { scheme: 'eth-address', value: wallet.address },
+  radius: 100,
+  time: { start: Math.floor(Date.now() / 1000) - 60, end: Math.floor(Date.now() / 1000) }
+};
+
+// 3. Bundle into proof
+const proof = astral.proofs.create(claim, [stamp]);
+
+// 4. Verify locally
+const vector = await astral.proofs.verify(proof);
+
+console.log('Spatial:', vector.dimensions.spatial.meanDistanceMeters, 'm');
+console.log('Temporal overlap:', vector.dimensions.temporal.meanOverlap);
+console.log('Signatures valid:', vector.dimensions.validity.signaturesValidFraction);
+
+// 5. Or verify in TEE for attestation
+const verified = await astral.proofs.verify(proof, {
+  mode: 'tee',
+  chainId: 84532
+});
+
+console.log('Attestation UID:', verified.attestation.uid);
+```
+
+<Card title="Next: Plugins" icon="plug" href="/sdk/plugins">
+  Learn about the plugin system and registry
+</Card>

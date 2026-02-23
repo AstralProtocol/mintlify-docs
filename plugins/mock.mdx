@@ -1,0 +1,210 @@
+---
+title: "MockPlugin"
+description: "Built-in test plugin for development and testing"
+---
+
+# MockPlugin
+
+The MockPlugin is built into the Astral SDK and implements all four plugin methods (collect, create, sign, verify). It generates deterministic location data for testing and development. Runs in all environments: Node.js, browser, and React Native.
+
+## Installation
+
+No separate installation needed — MockPlugin ships with the SDK:
+
+```typescript
+import { MockPlugin } from '@decentralized-geo/astral-sdk';
+```
+
+## Configuration
+
+```typescript
+interface MockPluginOptions {
+  name?: string;            // Must start with 'mock-' (default: 'mock')
+  lat?: number;             // Latitude (default: 40.7484 — Empire State Building)
+  lon?: number;             // Longitude (default: -73.9857)
+  jitterMeters?: number;    // Random offset in meters (default: 0)
+  accuracy?: number;        // Accuracy in meters (default: 10)
+  timestamp?: number;       // Unix seconds (default: current time)
+  durationSeconds?: number; // Temporal footprint duration (default: 60)
+  privateKey?: string;      // Deterministic signing key (optional)
+}
+```
+
+```typescript
+const mock = new MockPlugin({
+  lat: 37.7749,
+  lon: -122.4194,
+  accuracy: 10,
+  jitterMeters: 5,
+  durationSeconds: 120
+});
+```
+
+## Plugin properties
+
+```typescript
+mock.name        // 'mock'
+mock.version     // '0.1.0'
+mock.runtimes    // ['react-native', 'node', 'browser']
+mock.description // 'Mock location proof plugin for testing'
+```
+
+---
+
+## collect()
+
+Returns simulated GPS-like signals.
+
+```typescript
+const signals = await mock.collect();
+```
+
+Returns `RawSignals`:
+
+```typescript
+{
+  plugin: 'mock',
+  timestamp: 1700000000,
+  data: {
+    latitude: 37.7749,
+    longitude: -122.4194,
+    accuracy: 10,
+    altitude: 0,
+    provider: 'mock',
+    speed: 0,
+    bearing: 0
+  }
+}
+```
+
+When `jitterMeters` is set, coordinates will vary randomly within the specified radius on each call.
+
+---
+
+## create()
+
+Converts signals into an `UnsignedLocationStamp`.
+
+```typescript
+const unsigned = await mock.create(signals);
+```
+
+Returns:
+
+```typescript
+{
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
+  location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  srs: 'EPSG:4326',
+  temporalFootprint: { start: 1700000000, end: 1700000060 },
+  plugin: 'mock',
+  pluginVersion: '0.1.0',
+  signals: { latitude: 37.7749, longitude: -122.4194, ... }
+}
+```
+
+---
+
+## sign()
+
+Signs a stamp. If `privateKey` was provided in options, uses that key. Otherwise uses the provided signer.
+
+```typescript
+const stamp = await mock.sign(unsigned, signer);
+```
+
+---
+
+## verify()
+
+Validates stamp structure and signals.
+
+```typescript
+const result = await mock.verify(stamp);
+```
+
+Returns `StampVerificationResult`:
+
+```typescript
+{
+  valid: true,
+  signaturesValid: true,
+  structureValid: true,
+  signalsConsistent: true,
+  details: {}
+}
+```
+
+---
+
+## Full pipeline example
+
+```typescript
+import { AstralSDK, MockPlugin } from '@decentralized-geo/astral-sdk';
+import { ethers } from 'ethers';
+
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY);
+
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+// Register MockPlugin
+astral.plugins.register(new MockPlugin({
+  lat: 48.8584,
+  lon: 2.2945,
+  accuracy: 15,
+  jitterMeters: 10
+}));
+
+// 1. Collect
+const signals = (await astral.stamps.collect({ plugins: ['mock'] }))[0];
+
+// 2. Create
+const unsigned = await astral.stamps.create({ plugin: 'mock' }, signals);
+
+// 3. Sign
+const stamp = await astral.stamps.sign(
+  { plugin: 'mock' },
+  unsigned,
+  {
+    algorithm: 'secp256k1',
+    signer: { scheme: 'eth-address', value: wallet.address },
+    sign: (data) => wallet.signMessage(data)
+  }
+);
+
+// 4. Verify
+const result = await astral.stamps.verify(stamp);
+console.log('Valid:', result.valid);
+
+// 5. Build a proof
+const claim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
+  location: { type: 'Point', coordinates: [2.2945, 48.8584] },
+  srs: 'EPSG:4326',
+  subject: { scheme: 'eth-address', value: wallet.address },
+  radius: 50,
+  time: {
+    start: Math.floor(Date.now() / 1000) - 120,
+    end: Math.floor(Date.now() / 1000)
+  }
+};
+
+const proof = astral.proofs.create(claim, [stamp]);
+const vector = await astral.proofs.verify(proof);
+
+console.log('Spatial:', vector.dimensions.spatial.meanDistanceMeters, 'm');
+console.log('Temporal:', vector.dimensions.temporal.meanOverlap);
+```
+
+## Use cases
+
+- **Unit testing** — Deterministic stamps for testing proof verification logic
+- **Integration testing** — End-to-end pipeline testing without real devices
+- **Development** — Build applications against the full stamp/proof pipeline
+- **Demos** — Show the location proof workflow without hardware dependencies

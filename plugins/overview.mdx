@@ -1,0 +1,71 @@
+---
+title: "Plugins overview"
+description: "Location proof plugins for the Astral SDK"
+---
+
+<Warning>
+  **Research preview** — The plugin ecosystem is under active development.
+</Warning>
+
+# Location proof plugins
+
+Location proof plugins are the extensibility layer of the Astral SDK. Each plugin integrates a proof-of-location system — a technology that produces evidence about where something was at a given time. Plugins follow a standard interface so the SDK can orchestrate across multiple independent evidence sources.
+
+## How plugins fit in
+
+The Astral location proof pipeline has four stages:
+
+1. **Collect** — Gather raw signals from a proof-of-location system (GPS, network latency, device attestation, etc.)
+2. **Create** — Parse raw signals into a structured `UnsignedLocationStamp` conforming to Location Protocol v0.2
+3. **Sign** — Add a cryptographic signature to produce a `LocationStamp`
+4. **Verify** — Check a stamp's internal validity (signatures, structure, signal consistency)
+
+Not every plugin implements every stage. ProofMode, for example, collects evidence on-device via its mobile app — the plugin handles parsing and verification, not collection. WitnessChain collects via an API. The MockPlugin implements all four for testing.
+
+Once you have signed stamps, the SDK's `ProofsModule` bundles them with a claim and verifies the proof as a whole, producing a multidimensional `CredibilityVector`.
+
+## Plugin status
+
+| Plugin | Package | Status | collect | create | sign | verify |
+|--------|---------|--------|---------|--------|------|--------|
+| [Mock](/plugins/mock) | Built into SDK | Complete | Yes | Yes | Yes | Yes |
+| [ProofMode](/plugins/proofmode) | `@location-proofs/plugin-proofmode` | Alpha | Coming soon | Yes | — | Yes (structural) |
+| [WitnessChain](/plugins/witnesschain) | `@location-proofs/plugin-witnesschain` | In development | Coming soon | Coming soon | Coming soon | Coming soon |
+
+## Quick start
+
+```typescript
+import { AstralSDK, MockPlugin } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+// Register plugins at startup
+astral.plugins.register(new MockPlugin({ lat: 37.7749, lon: -122.4194 }));
+
+// Collect → Create → Sign → Verify
+const signals = (await astral.stamps.collect({ plugins: ['mock'] }))[0];
+const unsigned = await astral.stamps.create({ plugin: 'mock' }, signals);
+const stamp = await astral.stamps.sign({ plugin: 'mock' }, unsigned, signer);
+const result = await astral.stamps.verify(stamp);
+
+// Bundle into a proof
+const proof = astral.proofs.create(claim, [stamp]);
+const vector = await astral.proofs.verify(proof);
+```
+
+## Plugin pages
+
+<CardGroup cols={2}>
+  <Card title="MockPlugin" icon="flask" href="/plugins/mock">
+    Built-in test plugin for development
+  </Card>
+  <Card title="ProofMode" icon="mobile" href="/plugins/proofmode">
+    Mobile device proofs via the ProofMode app
+  </Card>
+  <Card title="WitnessChain" icon="tower-broadcast" href="/plugins/witnesschain">
+    Infrastructure-based proofs via network triangulation
+  </Card>
+  <Card title="Custom plugins" icon="plug" href="/plugins/custom">
+    Build your own proof-of-location plugin
+  </Card>
+</CardGroup>

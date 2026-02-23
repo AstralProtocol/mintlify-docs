@@ -1,5 +1,5 @@
 ---
-title: "POST /contains"
+title: "POST /compute/v0/contains"
 description: "Check if a geometry is inside another geometry"
 ---
 
@@ -15,40 +15,40 @@ Check if a geometry is inside a container geometry.
 POST /compute/v0/contains
 ```
 
-## Request Body
+## Request body
 
 <ParamField body="chainId" type="number" required>
-  Target chain ID (e.g., 84532 for Base Sepolia, 8453 for Base).
+  Target chain ID (e.g., `84532` for Base Sepolia).
 </ParamField>
 
 <ParamField body="container" type="Input" required>
-  The containing geometry (typically a polygon). Can be a UID, GeoJSON, or offchain attestation reference.
+  The containing geometry (typically a polygon). See [Input types](/api-reference/types#input) for accepted formats.
 </ParamField>
 
-<ParamField body="geometry" type="Input" required>
-  The geometry to check. Can be a UID, GeoJSON, or offchain attestation reference.
+<ParamField body="containee" type="Input" required>
+  The geometry to check — is this inside the container?
 </ParamField>
 
-<ParamField body="schema" type="string" required>
-  EAS schema UID to issue the attestation against.
+<ParamField body="schema" type="string">
+  EAS schema UID. The server uses a default schema if not provided.
 </ParamField>
 
 <ParamField body="recipient" type="string">
-  Ethereum address to receive the attestation. Defaults to zero address if not provided.
+  Ethereum address to receive the attestation. Defaults to the zero address.
 </ParamField>
 
-## Example Request
+## Example request
 
 <CodeGroup>
 
 ```bash cURL
 curl -X POST https://api.astral.global/compute/v0/contains \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
   -d '{
     "chainId": 84532,
     "container": "0xpolygon...",
-    "geometry": "0xpoint...",
-    "schema": "0xschema...",
+    "containee": "0xpoint...",
     "recipient": "0xdef456..."
   }'
 ```
@@ -56,38 +56,52 @@ curl -X POST https://api.astral.global/compute/v0/contains \
 ```typescript TypeScript
 const response = await fetch('https://api.astral.global/compute/v0/contains', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'your-api-key'
+  },
   body: JSON.stringify({
     chainId: 84532,
     container: '0xpolygon...',
-    geometry: '0xpoint...',
-    schema: '0xschema...',
+    containee: '0xpoint...',
     recipient: '0xdef456...'
   })
 });
+
+const result = await response.json();
 ```
 
 </CodeGroup>
 
 ## Response
 
+Returns a [BooleanComputeResponse](/api-reference/types#booleancomputeresponse).
+
 <ResponseField name="result" type="boolean" required>
-  `true` if the geometry is inside the container, `false` otherwise
+  `true` if the containee is inside the container, `false` otherwise.
 </ResponseField>
 
 <ResponseField name="operation" type="string" required>
-  Always "contains"
+  Always `"contains"`.
 </ResponseField>
 
 <ResponseField name="timestamp" type="number" required>
-  Unix timestamp of computation
+  Unix timestamp of computation.
 </ResponseField>
 
 <ResponseField name="inputRefs" type="string[]" required>
-  Array containing [containerRef, geometryRef]
+  Array containing `[containerRef, containeeRef]`.
 </ResponseField>
 
-## Example Response
+<ResponseField name="attestation" type="AttestationData" required>
+  Signed EAS attestation. See [AttestationData](/api-reference/types#attestationdata).
+</ResponseField>
+
+<ResponseField name="delegatedAttestation" type="DelegatedAttestationData" required>
+  Signature for delegated onchain submission. See [DelegatedAttestationData](/api-reference/types#delegatedattestationdata).
+</ResponseField>
+
+## Example response
 
 ```json
 {
@@ -100,15 +114,18 @@ const response = await fetch('https://api.astral.global/compute/v0/contains', {
   ],
   "attestation": {
     "schema": "0x...",
-    "attester": "0x...",
+    "attester": "0x590fdb53ed3f0B52694876d42367192a5336700F",
     "recipient": "0xdef456...",
     "data": "0x...",
+    "revocable": true,
+    "refUID": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "signature": "0x..."
   },
   "delegatedAttestation": {
     "signature": "0x...",
-    "attester": "0x...",
-    "deadline": 1706403600
+    "attester": "0x590fdb53ed3f0B52694876d42367192a5336700F",
+    "deadline": 1706403600,
+    "nonce": 0
   }
 }
 ```
@@ -117,7 +134,11 @@ const response = await fetch('https://api.astral.global/compute/v0/contains', {
 
 - Uses PostGIS `ST_Contains` function
 - The container must completely contain the geometry for `true`
-- Points on the boundary may return `false` (use `intersects` for boundary cases)
+- Points on the boundary may return `false` — use [intersects](/api-reference/compute/intersects) for boundary cases
+
+<Note>
+  The field for the inner geometry is `containee`, not `geometry`. This naming distinguishes the two inputs unambiguously.
+</Note>
 
 <Card title="SDK Method" icon="code" href="/sdk/compute#contains">
   See `astral.compute.contains()`

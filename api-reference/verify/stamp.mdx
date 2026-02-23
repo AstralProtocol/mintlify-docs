@@ -1,29 +1,36 @@
 ---
-title: "POST /verify/stamp"
-description: "Verify a single location stamp"
+title: "POST /verify/v0/stamp"
+description: "Verify a single location stamp's internal validity"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Warning>
+  **Research Preview** — This API is under development.
+</Warning>
 
 # Verify stamp
 
-Verify a single location stamp's internal validity (no claim assessment).
+Verify a single location stamp's internal validity — checks cryptographic signatures, structure, and signal consistency. This endpoint does not assess how well the stamp supports a claim; use [verify proof](/api-reference/verify/proof) for that.
 
 ```
-POST /v1/verify/stamp
+POST /verify/v0/stamp
 ```
 
 ## Request body
 
 <ParamField body="stamp" type="LocationStamp" required>
-  The stamp to verify. See [data types](/api-reference/verify/proof#data-types) for the full schema.
+  The location stamp to verify. See [LocationStamp](/api-reference/types#locationstamp) for the full type definition.
+
+  Key fields: `lpVersion`, `locationType`, `location`, `srs`, `temporalFootprint`, `plugin`, `pluginVersion`, `signals`, `signatures`.
 </ParamField>
 
 ## Example request
 
-```bash
-curl -X POST https://api.astral.global/v1/verify/stamp \
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.astral.global/verify/v0/stamp \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
   -d '{
     "stamp": {
       "lpVersion": "0.2",
@@ -36,32 +43,69 @@ curl -X POST https://api.astral.global/v1/verify/stamp \
       },
       "plugin": "proofmode",
       "pluginVersion": "0.1.0",
-      "signals": { },
-      "signatures": [{ }]
+      "signals": { "sensorData": "..." },
+      "signatures": [{
+        "signer": { "scheme": "device-pubkey", "value": "0xabcd..." },
+        "algorithm": "secp256k1",
+        "value": "0x...",
+        "timestamp": 1706901030
+      }]
     }
   }'
 ```
 
+```typescript TypeScript
+const response = await fetch('https://api.astral.global/verify/v0/stamp', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'your-api-key'
+  },
+  body: JSON.stringify({
+    stamp: {
+      lpVersion: '0.2',
+      locationType: 'geojson-point',
+      location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+      srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
+      temporalFootprint: { start: 1706901000, end: 1706901060 },
+      plugin: 'proofmode',
+      pluginVersion: '0.1.0',
+      signals: { sensorData: '...' },
+      signatures: [{
+        signer: { scheme: 'device-pubkey', value: '0xabcd...' },
+        algorithm: 'secp256k1',
+        value: '0x...',
+        timestamp: 1706901030
+      }]
+    }
+  })
+});
+
+const result = await response.json();
+```
+
+</CodeGroup>
+
 ## Response
 
 <ResponseField name="valid" type="boolean" required>
-  Overall validity of the stamp.
+  Overall validity — `true` only if all checks pass.
 </ResponseField>
 
 <ResponseField name="signaturesValid" type="boolean" required>
-  Whether cryptographic signatures verified successfully.
+  Whether all cryptographic signatures verified successfully.
 </ResponseField>
 
 <ResponseField name="structureValid" type="boolean" required>
-  Whether the stamp structure conforms to the schema.
+  Whether the stamp conforms to the expected structure for its plugin.
 </ResponseField>
 
 <ResponseField name="signalsConsistent" type="boolean" required>
-  Whether internal signals are consistent with each other.
+  Whether internal signals are self-consistent.
 </ResponseField>
 
-<ResponseField name="pluginResult" type="object" required>
-  Plugin-specific verification output.
+<ResponseField name="details" type="object" required>
+  Plugin-specific verification details. Contents vary by plugin.
 </ResponseField>
 
 ## Example response
@@ -72,18 +116,35 @@ curl -X POST https://api.astral.global/v1/verify/stamp \
   "signaturesValid": true,
   "structureValid": true,
   "signalsConsistent": true,
-  "pluginResult": { }
+  "details": {
+    "plugin": "proofmode",
+    "hashVerified": true,
+    "certificateChainValid": true
+  }
 }
 ```
 
 ## Errors
 
-| Status | Code | Description |
-|--------|------|-------------|
-| 400 | `INVALID_STAMP` | Malformed location stamp |
-| 400 | `UNKNOWN_PLUGIN` | Unrecognized plugin name |
-| 422 | `SIGNATURE_INVALID` | Stamp signature verification failed |
+Errors follow [RFC 7807](https://tools.ietf.org/html/rfc7807):
 
-<Card title="SDK method" icon="code" href="/sdk/verify">
-  See `astral.verify.stamp()`
+```json
+{
+  "type": "https://astral.global/errors/invalid-input",
+  "title": "Invalid Input",
+  "status": 400,
+  "detail": "stamp.signatures is required"
+}
+```
+
+| Type | Status | Description |
+|------|--------|-------------|
+| `invalid-input` | 400 | Malformed stamp or missing required fields |
+| `not-implemented` | 501 | Plugin not supported |
+| `internal` | 500 | Internal verification error |
+| `rate-limited` | 429 | Too many requests |
+| `unauthorized` | 401 | Invalid or missing API key |
+
+<Card title="SDK: Verify" icon="code" href="/sdk/verify">
+  See the SDK documentation for client-side usage
 </Card>

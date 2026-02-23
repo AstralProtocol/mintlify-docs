@@ -1,37 +1,46 @@
 ---
-title: "POST /verify/proof"
+title: "POST /verify/v0/proof"
 description: "Verify a location proof with cross-correlation analysis"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Warning>
+  **Research Preview** — This API is under development.
+</Warning>
 
 # Verify proof
 
-Verify a location proof (claim + stamps) with cross-correlation analysis.
+Verify a location proof (a claim bundled with one or more stamps). This endpoint verifies each stamp individually, then cross-correlates them to produce a [CredibilityVector](/api-reference/types#credibilityvector) — a multidimensional assessment of how well the evidence supports the claim.
 
 ```
-POST /v1/verify/proof
+POST /verify/v0/proof
 ```
+
+<Note>
+  The Verify API does **not** return a single summary score. The `CredibilityVector` provides spatial, temporal, validity, and independence dimensions so your application can define its own trust model.
+</Note>
 
 ## Request body
 
 <ParamField body="proof" type="LocationProof" required>
-  The proof to verify, containing a claim and one or more stamps.
+  The proof to verify. Contains a `claim` ([LocationClaim](/api-reference/types#locationclaim)) and an array of `stamps` ([LocationStamp](/api-reference/types#locationstamp)).
 </ParamField>
 
 <ParamField body="options.chainId" type="number">
-  Chain ID for attestation signing.
+  Chain ID for EAS attestation signing (e.g., `84532` for Base Sepolia).
 </ParamField>
 
 <ParamField body="options.submitOnchain" type="boolean">
-  Submit attestation onchain (default: false).
+  Whether to submit the attestation onchain. Defaults to `false`.
 </ParamField>
 
 ## Example request
 
-```bash
-curl -X POST https://api.astral.global/v1/verify/proof \
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.astral.global/verify/v0/proof \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
   -d '{
     "proof": {
       "claim": {
@@ -39,19 +48,33 @@ curl -X POST https://api.astral.global/v1/verify/proof \
         "locationType": "geojson-point",
         "location": { "type": "Point", "coordinates": [-122.4194, 37.7749] },
         "srs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
-        "subject": {
-          "scheme": "eth-address",
-          "value": "0x1234..."
-        },
+        "subject": { "scheme": "eth-address", "value": "0x1234..." },
         "radius": 100,
-        "time": {
-          "start": 1706900000,
-          "end": 1706903600
-        }
+        "time": { "start": 1706900000, "end": 1706903600 }
       },
       "stamps": [
-        { "plugin": "proofmode", "..." : "..." },
-        { "plugin": "witnesschain", "..." : "..." }
+        {
+          "lpVersion": "0.2",
+          "locationType": "geojson-point",
+          "location": { "type": "Point", "coordinates": [-122.4195, 37.7750] },
+          "srs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+          "temporalFootprint": { "start": 1706901000, "end": 1706901060 },
+          "plugin": "proofmode",
+          "pluginVersion": "0.1.0",
+          "signals": {},
+          "signatures": [{ "signer": { "scheme": "device-pubkey", "value": "0x..." }, "algorithm": "secp256k1", "value": "0x...", "timestamp": 1706901030 }]
+        },
+        {
+          "lpVersion": "0.2",
+          "locationType": "geojson-point",
+          "location": { "type": "Point", "coordinates": [-122.4193, 37.7748] },
+          "srs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+          "temporalFootprint": { "start": 1706901000, "end": 1706901120 },
+          "plugin": "witnesschain",
+          "pluginVersion": "0.1.0",
+          "signals": {},
+          "signatures": [{ "signer": { "scheme": "eth-address", "value": "0x..." }, "algorithm": "secp256k1", "value": "0x...", "timestamp": 1706901060 }]
+        }
       ]
     },
     "options": {
@@ -60,39 +83,94 @@ curl -X POST https://api.astral.global/v1/verify/proof \
   }'
 ```
 
+```typescript TypeScript
+const response = await fetch('https://api.astral.global/verify/v0/proof', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': 'your-api-key'
+  },
+  body: JSON.stringify({
+    proof: {
+      claim: {
+        lpVersion: '0.2',
+        locationType: 'geojson-point',
+        location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+        srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
+        subject: { scheme: 'eth-address', value: '0x1234...' },
+        radius: 100,
+        time: { start: 1706900000, end: 1706903600 }
+      },
+      stamps: [
+        // ... stamps array
+      ]
+    },
+    options: { chainId: 84532 }
+  })
+});
+```
+
+</CodeGroup>
+
 ## Response
 
+The response contains the verified proof, a credibility vector, and optional EAS attestation data.
+
 <ResponseField name="proof" type="LocationProof" required>
-  The verified proof.
+  The verified proof object.
 </ResponseField>
 
-<ResponseField name="credibility" type="CredibilityAssessment" required>
-  Structured credibility assessment.
+<ResponseField name="credibility" type="CredibilityVector" required>
+  Multidimensional assessment of how well the stamps support the claim. See [CredibilityVector](/api-reference/types#credibilityvector) for the full type.
 </ResponseField>
 
-<ResponseField name="uid" type="string" required>
-  EAS attestation UID.
+<ResponseField name="evaluationMethod" type="string" required>
+  The evaluation method used (e.g., `"multifactor-v0"`).
 </ResponseField>
 
-<ResponseField name="attester" type="string" required>
-  Astral service address.
+<ResponseField name="evaluatedAt" type="number" required>
+  Unix timestamp (seconds) of when the evaluation was performed.
 </ResponseField>
 
-<ResponseField name="timestamp" type="number" required>
-  Verification timestamp (Unix seconds).
+<ResponseField name="attestation" type="AttestationData">
+  EAS attestation data. Present when `chainId` is provided. See [AttestationData](/api-reference/types#attestationdata).
 </ResponseField>
 
-<ResponseField name="chainId" type="number">
-  Chain ID (present if submitted onchain).
+<ResponseField name="delegatedAttestation" type="DelegatedAttestationData">
+  Delegated attestation for onchain submission. See [DelegatedAttestationData](/api-reference/types#delegatedattestationdata).
 </ResponseField>
 
 ## Example response
 
 ```json
 {
-  "proof": { },
+  "proof": {
+    "claim": { "..." : "..." },
+    "stamps": ["..."]
+  },
   "credibility": {
-    "confidence": 0.92,
+    "dimensions": {
+      "spatial": {
+        "meanDistanceMeters": 12.5,
+        "maxDistanceMeters": 18.3,
+        "withinRadiusFraction": 1.0
+      },
+      "temporal": {
+        "meanOverlap": 0.95,
+        "minOverlap": 0.90,
+        "fullyOverlappingFraction": 0.5
+      },
+      "validity": {
+        "signaturesValidFraction": 1.0,
+        "structureValidFraction": 1.0,
+        "signalsConsistentFraction": 1.0
+      },
+      "independence": {
+        "uniquePluginRatio": 1.0,
+        "spatialAgreement": 0.88,
+        "pluginNames": ["proofmode", "witnesschain"]
+      }
+    },
     "stampResults": [
       {
         "stampIndex": 0,
@@ -100,9 +178,13 @@ curl -X POST https://api.astral.global/v1/verify/proof \
         "signaturesValid": true,
         "structureValid": true,
         "signalsConsistent": true,
-        "supportsClaim": true,
-        "claimSupportScore": 0.88,
-        "pluginResult": { }
+        "distanceMeters": 12.5,
+        "temporalOverlap": 0.95,
+        "withinRadius": true,
+        "details": {
+          "hashVerified": true,
+          "certificateChainValid": true
+        }
       },
       {
         "stampIndex": 1,
@@ -110,132 +192,111 @@ curl -X POST https://api.astral.global/v1/verify/proof \
         "signaturesValid": true,
         "structureValid": true,
         "signalsConsistent": true,
-        "supportsClaim": true,
-        "claimSupportScore": 0.85,
-        "pluginResult": { }
+        "distanceMeters": 18.3,
+        "temporalOverlap": 0.90,
+        "withinRadius": true,
+        "details": {
+          "latencyVerified": true,
+          "nodeCount": 3
+        }
       }
     ],
-    "correlation": {
-      "independence": 0.95,
-      "agreement": 0.88,
-      "notes": ["Different physical phenomena", "Spatial footprints align"]
+    "meta": {
+      "stampCount": 2,
+      "evaluatedAt": 1706961600,
+      "evaluationMode": "local"
     }
   },
-  "uid": "0xdef456...",
-  "attester": "0xastral...",
-  "timestamp": 1706903700,
-  "chainId": 84532
+  "evaluationMethod": "multifactor-v0",
+  "evaluatedAt": 1706961600,
+  "attestation": {
+    "uid": "0xdef456...",
+    "schema": "0x...",
+    "attester": "0x590fdb53ed3f0B52694876d42367192a5336700F",
+    "recipient": "0x1234...",
+    "data": "0x...",
+    "revocable": true,
+    "refUID": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "signature": "0x..."
+  },
+  "delegatedAttestation": {
+    "signature": "0x...",
+    "attester": "0x590fdb53ed3f0B52694876d42367192a5336700F",
+    "deadline": 1706403600,
+    "nonce": 0
+  }
 }
 ```
 
-<Note>
-  **Confidence is not probability.** A confidence of 0.92 does not mean "92% probability the claim is true." It means "the evidence is reasonably strong." Calibrating to true probability is future work.
-</Note>
+## Credibility vector
+
+The `credibility` field is a `CredibilityVector` with four dimension groups:
+
+### `dimensions.spatial`
+
+How close each stamp's observed location is to the claimed location.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `meanDistanceMeters` | `number` | Average distance between stamp locations and claimed location |
+| `maxDistanceMeters` | `number` | Largest distance from any stamp to the claim |
+| `withinRadiusFraction` | `number` | Fraction of stamps within the claim's radius (0-1) |
+
+### `dimensions.temporal`
+
+How well each stamp's temporal footprint overlaps with the claimed time window.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `meanOverlap` | `number` | Average temporal overlap ratio (0-1) |
+| `minOverlap` | `number` | Smallest overlap of any stamp |
+| `fullyOverlappingFraction` | `number` | Fraction of stamps fully within the claim's time window |
+
+### `dimensions.validity`
+
+Fraction of stamps passing each verification check.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `signaturesValidFraction` | `number` | Fraction with valid signatures (0-1) |
+| `structureValidFraction` | `number` | Fraction with valid structure (0-1) |
+| `signalsConsistentFraction` | `number` | Fraction with consistent signals (0-1) |
+
+### `dimensions.independence`
+
+How independent and corroborative the evidence sources are.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `uniquePluginRatio` | `number` | Ratio of unique plugins to total stamps (0-1) |
+| `spatialAgreement` | `number` | How well stamps agree spatially (0-1) |
+| `pluginNames` | `string[]` | List of plugins that contributed stamps |
+
+### `stampResults`
+
+Per-stamp verification results. See [StampResult](/api-reference/types#stampresult) for the full type.
+
+### `meta`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `stampCount` | `number` | Number of stamps evaluated |
+| `evaluatedAt` | `number` | Unix timestamp (seconds) |
+| `evaluationMode` | `string` | Evaluation mode: `"local"`, `"tee"`, or `"zk"` |
 
 ## Errors
 
-| Status | Code | Description |
-|--------|------|-------------|
-| 400 | `INVALID_CLAIM` | Malformed location claim |
-| 400 | `INVALID_STAMP` | Malformed location stamp |
-| 400 | `UNKNOWN_PLUGIN` | Unrecognized plugin name |
-| 400 | `MISSING_RADIUS` | Claim missing required radius field |
-| 422 | `SIGNATURE_INVALID` | Stamp signature verification failed |
-| 500 | `VERIFICATION_FAILED` | Internal verification error |
+Errors follow [RFC 7807](https://tools.ietf.org/html/rfc7807):
 
-## Data types
+| Type | Status | Description |
+|------|--------|-------------|
+| `invalid-input` | 400 | Malformed proof, missing claim fields |
+| `validation` | 400 | Claim validation failed (e.g., missing radius) |
+| `not-implemented` | 501 | Plugin not supported |
+| `internal` | 500 | Internal verification error |
+| `rate-limited` | 429 | Too many requests |
+| `unauthorized` | 401 | Invalid or missing API key |
 
-### LocationClaim
-
-Extends [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec).
-
-```typescript
-interface LocationClaim {
-  lpVersion: string;              // "0.2"
-  locationType: string;           // "geojson-point", "h3-index", etc.
-  location: LocationData;         // The asserted location
-  srs: string;                    // Spatial reference system URI
-
-  subject: SubjectIdentifier;
-  radius: number;                 // Meters — required
-  time: {
-    start: number;                // Unix timestamp (seconds)
-    end: number;
-  };
-  eventType?: string;             // "presence", "transaction", "delivery"
-}
-```
-
-### SubjectIdentifier
-
-```typescript
-interface SubjectIdentifier {
-  scheme: string;   // "eth-address" | "device-pubkey" | "did:web"
-  value: string;
-}
-```
-
-### LocationStamp
-
-```typescript
-interface LocationStamp {
-  lpVersion: string;
-  locationType: string;
-  location: LocationData;
-  srs: string;
-
-  temporalFootprint: { start: number; end: number };
-  plugin: string;
-  pluginVersion: string;
-  signals: Record<string, unknown>;
-  signatures: Signature[];
-}
-
-interface Signature {
-  signer: SubjectIdentifier;
-  algorithm: string;              // "secp256k1" | "ed25519"
-  value: string;                  // Hex-encoded
-  timestamp: number;
-}
-```
-
-### LocationProof
-
-```typescript
-interface LocationProof {
-  claim: LocationClaim;
-  stamps: LocationStamp[];
-}
-```
-
-### CredibilityAssessment
-
-```typescript
-interface CredibilityAssessment {
-  confidence: number;             // 0-1 (not calibrated probability)
-  stampResults: StampResult[];
-  correlation?: CorrelationAssessment;
-  dimensions?: Record<string, number>;
-}
-
-interface StampResult {
-  stampIndex: number;
-  plugin: string;
-  signaturesValid: boolean;
-  structureValid: boolean;
-  signalsConsistent: boolean;
-  supportsClaim: boolean;
-  claimSupportScore: number;      // 0-1
-  pluginResult: Record<string, unknown>;
-}
-
-interface CorrelationAssessment {
-  independence: number;           // 0-1
-  agreement: number;              // 0-1
-  notes: string[];
-}
-```
-
-<Card title="SDK reference: Verify" icon="code" href="/sdk/verify">
-  View the SDK documentation for client-side usage
+<Card title="SDK: Verify" icon="code" href="/sdk/verify">
+  See the SDK documentation for client-side usage
 </Card>

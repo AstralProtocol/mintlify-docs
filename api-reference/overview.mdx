@@ -1,81 +1,85 @@
 ---
-title: "API Overview"
-description: "REST APIs for geospatial operations and location records"
+title: "API overview"
+description: "REST APIs for location proof verification and geospatial operations"
 ---
 
 <Warning>
   **Research Preview** — This API specification is under development.
 </Warning>
 
-# API Reference
+# API reference
 
-Astral provides two REST APIs:
+Astral provides two REST APIs for working with location proofs and geospatial data:
 
 | API | Purpose | Base URL |
 |-----|---------|----------|
+| **Verify API** | Verify location proofs and stamps | `/verify/v0` |
 | **Compute API** | Verifiable geospatial operations | `/compute/v0` |
-| **Records API** | Query location attestations | `/api/v0` |
+
+<Note>
+  The **Records API** (query location attestations across chains) is not yet integrated into the service. See the [roadmap](/resources/roadmap) for timeline.
+</Note>
 
 <CardGroup cols={2}>
-  <Card title="Compute API" icon="calculator" href="#compute-api">
-    Distance, containment, proximity checks with signed attestations
+  <Card title="Verify API" icon="shield-check" href="/api-reference/verify/stamp">
+    Verify stamps, evaluate proofs, list plugins
   </Card>
-  <Card title="Records API" icon="database" href="/api-reference/records/overview">
-    Query existing location attestations across chains
+  <Card title="Compute API" icon="calculator" href="/api-reference/compute/distance">
+    Distance, containment, proximity checks with signed attestations
   </Card>
 </CardGroup>
 
 ---
 
-# Compute API
-
-The Compute API performs verifiable geospatial operations and returns signed attestations.
-
-## Base URL
+## Base URLs
 
 ```
+https://api.astral.global/verify/v0
 https://api.astral.global/compute/v0
 ```
 
 ## Authentication
 
-### Phase 1 (MVP)
-
-No authentication required. Rate limiting by IP address.
+All requests require an API key, passed as a header:
 
 ```bash
-# No auth headers needed
-curl https://api.astral.global/compute/v0/distance \
-  -H "Content-Type: application/json" \
-  -d '{"chainId": 84532, "from": "0xabc...", "to": "0xdef...", "schema": "0x..."}'
+# Either header works
+-H "X-API-Key: your-api-key"
+-H "Authorization: Bearer your-api-key"
 ```
 
-### Phase 2 (Future)
+### Rate limits
 
-Wallet-based authentication with signed requests.
+| Tier | Limit | How to get |
+|------|-------|------------|
+| **Public** | 100 requests/hour | Default — no signup required |
+| **Developer** | 1,000 requests/hour | Request a developer key |
+| **Internal** | 10,000 requests/hour | Astral team only |
 
-```bash
-curl https://api.astral.global/compute/v0/distance \
-  -H "Content-Type: application/json" \
-  -H "X-Wallet-Address: 0x..." \
-  -H "X-Signature: 0x..." \
-  -d '...'
+Rate limit headers are included in every response:
+
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 97
+X-RateLimit-Reset: 1706403600
 ```
 
-## Input Types
+## Input types
 
-All endpoints accept geometry inputs in these formats:
+All compute endpoints accept geometry inputs in these formats:
 
 | Format | Description | Example |
 |--------|-------------|---------|
-| UID string | Onchain attestation | `"0xabc123..."` |
+| Onchain UID | Onchain attestation reference | `{"uid": "0xabc123..."}` |
 | GeoJSON | Raw geometry | `{"type": "Point", "coordinates": [2.29, 48.85]}` |
-| UID + URI | Offchain attestation | `{"uid": "0xabc...", "uri": "ipfs://Qm..."}` |
-| Inline attestation | Full offchain object | `{"attestation": {...}}` |
+| UID + URI | Offchain attestation (not yet implemented) | `{"uid": "0xabc...", "uri": "ipfs://Qm..."}` |
+| Verified proof | Full verified proof response object | `{"verifiedProof": { ... }}` |
 
-## Response Format
+See [Input](/api-reference/types#input) for the full type definition.
 
-All successful responses include:
+## Response format
+
+### Numeric operations (distance, area, length)
 
 ```json
 {
@@ -89,77 +93,94 @@ All successful responses include:
     "attester": "0x...",
     "recipient": "0x...",
     "data": "0x...",
+    "revocable": true,
+    "refUID": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "signature": "0x..."
   },
   "delegatedAttestation": {
     "signature": "0x...",
     "attester": "0x...",
-    "deadline": 1706403600
+    "deadline": 1706403600,
+    "nonce": 0
   }
 }
 ```
 
-## Error Format
+See [NumericComputeResponse](/api-reference/types#numericcomputeresponse) and [BooleanComputeResponse](/api-reference/types#booleancomputeresponse) for the full type definitions.
+
+### Boolean operations (contains, within, intersects)
+
+Same shape, but `result` is `true`/`false` and there is no `units` field.
+
+## Error format
 
 Errors follow [RFC 7807](https://tools.ietf.org/html/rfc7807) (Problem Details for HTTP APIs):
 
 ```json
 {
-  "type": "https://api.astral.global/errors/attestation-not-found",
-  "title": "Attestation Not Found",
-  "status": 404,
-  "detail": "Location attestation with UID 0xabc123... not found on chain 84532"
+  "type": "https://astral.global/errors/invalid-input",
+  "title": "Invalid Input",
+  "status": 400,
+  "detail": "geometry field is required"
 }
 ```
 
-### Error Types
+### Error types
 
 | Type | Status | Description |
 |------|--------|-------------|
+| `bad-request` | 400 | Malformed request body |
 | `invalid-input` | 400 | Bad request data, missing fields, invalid geometry |
-| `attestation-not-found` | 404 | UID doesn't exist on specified chain |
-| `verification-failed` | 401 | Signature verification failed |
-| `computation-error` | 500 | PostGIS operation failed |
-| `rate-limited` | 429 | Too many requests |
+| `validation` | 400 | Input validation failed |
+| `unauthorized` | 401 | Invalid or missing API key |
+| `not-implemented` | 501 | Requested operation or plugin not yet supported |
+| `internal` | 500 | Internal server error |
+| `database` | 500 | Database operation failed |
+| `rate-limited` | 429 | Too many requests — check rate limit headers |
 
-## Rate Limits
+## Chain configuration
 
-| Auth Level | Limit |
-|------------|-------|
-| Unauthenticated | 100 requests/hour per IP |
-| Wallet authenticated | 1000 requests/hour |
-
-<Note>
-During development and testing, you may hit rate limits quickly. Consider caching results or using a test wallet for higher limits.
-</Note>
-
-## Chain Configuration
-
-The following table shows addresses for supported chains. The **Attester Address** is the address that signs delegated attestations—resolver contracts must verify attestations come from this address.
+The **Attester Address** is the address that signs delegated attestations. Resolver contracts must verify attestations come from this address.
 
 | Chain | Chain ID | EAS | Schema Registry | Attester Address |
 |-------|----------|-----|-----------------|------------------|
 | Base Sepolia | 84532 | `0x4200000000000000000000000000000000000021` | `0x4200000000000000000000000000000000000020` | `0x590fdb53ed3f0B52694876d42367192a5336700F` |
 
-## Available Endpoints
+## Endpoints
+
+### Verify API
 
 <CardGroup cols={2}>
-  <Card title="POST /distance" href="/api-reference/distance">
+  <Card title="POST /verify/v0/stamp" href="/api-reference/verify/stamp">
+    Verify a single stamp's internal validity
+  </Card>
+  <Card title="POST /verify/v0/proof" href="/api-reference/verify/proof">
+    Verify a proof with cross-correlation analysis
+  </Card>
+  <Card title="GET /verify/v0/plugins" href="/api-reference/verify/plugins">
+    List available verification plugins
+  </Card>
+</CardGroup>
+
+### Compute API
+
+<CardGroup cols={2}>
+  <Card title="POST /compute/v0/distance" href="/api-reference/compute/distance">
     Distance between two geometries
   </Card>
-  <Card title="POST /contains" href="/api-reference/contains">
-    Is geometry B inside geometry A?
-  </Card>
-  <Card title="POST /within" href="/api-reference/within">
-    Is point within radius of target?
-  </Card>
-  <Card title="POST /intersects" href="/api-reference/intersects">
-    Do geometries overlap?
-  </Card>
-  <Card title="POST /area" href="/api-reference/area">
+  <Card title="POST /compute/v0/area" href="/api-reference/compute/area">
     Area of a polygon
   </Card>
-  <Card title="POST /length" href="/api-reference/length">
+  <Card title="POST /compute/v0/length" href="/api-reference/compute/length">
     Length of a line
+  </Card>
+  <Card title="POST /compute/v0/contains" href="/api-reference/compute/contains">
+    Is geometry B inside geometry A?
+  </Card>
+  <Card title="POST /compute/v0/within" href="/api-reference/compute/within">
+    Is point within radius of target?
+  </Card>
+  <Card title="POST /compute/v0/intersects" href="/api-reference/compute/intersects">
+    Do geometries overlap?
   </Card>
 </CardGroup>
