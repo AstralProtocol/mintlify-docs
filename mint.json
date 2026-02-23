@@ -5,6 +5,10 @@
     {
       "source": "/",
       "destination": "/introduction"
+    },
+    {
+      "source": "/sdk/verify",
+      "destination": "/sdk/stamps"
     }
   ],
   "logo": {
@@ -39,6 +43,10 @@
     {
       "name": "SDK",
       "url": "sdk"
+    },
+    {
+      "name": "Plugins",
+      "url": "plugins"
     },
     {
       "name": "API Reference",
@@ -130,10 +138,22 @@
         "sdk/overview",
         "sdk/installation",
         "sdk/location",
-        "sdk/verify",
+        "sdk/stamps",
+        "sdk/location-proofs",
+        "sdk/plugins",
         "sdk/compute",
         "sdk/eas",
         "sdk/migration"
+      ]
+    },
+    {
+      "group": "Plugins",
+      "pages": [
+        "plugins/overview",
+        "plugins/mock",
+        "plugins/proofmode",
+        "plugins/witnesschain",
+        "plugins/custom"
       ]
     },
     {
