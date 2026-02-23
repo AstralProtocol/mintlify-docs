@@ -70,10 +70,10 @@ All compute endpoints accept geometry inputs in these formats:
 
 | Format | Description | Example |
 |--------|-------------|---------|
-| UID string | Onchain attestation | `"0xabc123..."` |
+| Onchain UID | Onchain attestation reference | `{"uid": "0xabc123..."}` |
 | GeoJSON | Raw geometry | `{"type": "Point", "coordinates": [2.29, 48.85]}` |
-| UID + URI | Offchain attestation | `{"uid": "0xabc...", "uri": "ipfs://Qm..."}` |
-| Verified proof | Previously verified proof | `{"verifiedProof": { ... }}` |
+| UID + URI | Offchain attestation (not yet implemented) | `{"uid": "0xabc...", "uri": "ipfs://Qm..."}` |
+| Verified proof | Full verified proof response object | `{"verifiedProof": { ... }}` |
 
 See [Input](/api-reference/types#input) for the full type definition.
 

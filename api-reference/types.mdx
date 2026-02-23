@@ -15,12 +15,15 @@ All compute endpoints accept geometry inputs as a discriminated union. The serve
 
 ```typescript
 type Input =
-  | string                    // UID string — onchain attestation
   | GeoJSON.Geometry          // Raw GeoJSON geometry
-  | OnchainInput              // Explicit onchain reference
-  | OffchainInput             // Offchain attestation reference
+  | OnchainInput              // Onchain attestation reference
+  | OffchainInput             // Offchain attestation reference (not yet implemented)
   | VerifiedProofInput;       // Verified location proof
 ```
+
+<Note>
+  The SDK accepts bare UID strings (e.g., `"0xabc123..."`) and normalizes them to `OnchainInput` before sending to the API. When calling the API directly, always use the `{ uid: string }` object form.
+</Note>
 
 ### RawGeometryInput
 
@@ -35,13 +38,19 @@ A standard GeoJSON geometry object:
 
 ### OnchainInput
 
-A UID string referencing an onchain EAS attestation:
+A reference to an onchain EAS attestation:
 
 ```json
-"0xabc123..."
+{
+  "uid": "0xabc123..."
+}
 ```
 
 ### OffchainInput
+
+<Warning>
+  Not yet implemented. Planned for a future release.
+</Warning>
 
 A reference to an offchain attestation stored on IPFS or another URI-addressable store:
 
