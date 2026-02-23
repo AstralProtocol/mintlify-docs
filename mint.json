@@ -77,12 +77,36 @@
     {
       "group": "Core Concepts",
       "pages": [
-        "concepts/geographic-features",
-        "concepts/location-proofs",
-        "concepts/geocomputation",
-        "concepts/result-format",
-        "concepts/verifiable-computation",
-        "concepts/privacy-model"
+        {
+          "group": "Location Data",
+          "pages": [
+            "concepts/location-data",
+            "concepts/geojson",
+            "concepts/location-records"
+          ]
+        },
+        {
+          "group": "Location Proofs",
+          "pages": [
+            "concepts/location-proofs",
+            "concepts/pol-systems",
+            "concepts/location-stamps",
+            "concepts/location-claims",
+            "concepts/location-proof-structure",
+            "concepts/location-proof-evaluation"
+          ]
+        },
+        {
+          "group": "Geocomputation",
+          "pages": [
+            "concepts/geocomputation",
+            "concepts/astral-location-services",
+            "concepts/verify",
+            "concepts/compute"
+          ]
+        },
+        "concepts/signed-results",
+        "concepts/privacy"
       ]
     },
     {
