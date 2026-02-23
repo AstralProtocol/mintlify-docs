@@ -1,0 +1,58 @@
+---
+title: "GeoJSON"
+description: "Raw unsigned geospatial data — the simplest input format"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# GeoJSON
+
+GeoJSON is raw, unsigned geospatial data. It's the simplest way to pass location data into Astral — and the least verifiable.
+
+## What GeoJSON provides
+
+GeoJSON ([RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946)) is a standard format for encoding geographic data structures. Astral's v0 implementation uses GeoJSON as the universal geometry format across all inputs and outputs. Expansion to other geospatial formats is planned.
+
+A GeoJSON geometry carries:
+- **Shape** — Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, GeometryCollection
+- **Coordinates** — `[longitude, latitude]` pairs in WGS84
+
+## What GeoJSON does not provide
+
+- **Attribution** — No record of who created it
+- **Integrity** — No way to detect if it's been modified
+- **Correspondence** — No evidence that it reflects reality
+
+A signed result that uses raw GeoJSON as input proves "Astral computed the relationship between geometry A and geometry B" — but it does not prove who provided those geometries or whether they correspond to anything in the physical world.
+
+## When to use raw GeoJSON
+
+Raw GeoJSON is appropriate for:
+
+- **Reference geometries** — Official boundaries, well-known landmarks, administrative regions. These are publicly verifiable facts that don't need cryptographic proof of origin.
+- **Prototyping** — Testing computations without creating signed records first.
+- **Static inputs** — Geometries that represent fixed, known locations (a building footprint, a city boundary).
+
+For user positions, device locations, or any input where provenance matters, use [signed location records](/concepts/location-records) or [location proofs](/concepts/location-proofs) instead.
+
+## Coordinate conventions
+
+| Convention | Value |
+|-----------|-------|
+| **Format** | GeoJSON (RFC 7946) |
+| **CRS** | WGS84 (`http://www.opengis.net/def/crs/OGC/1.3/CRS84`) |
+| **Coordinate order** | `[longitude, latitude]` |
+| **Altitude** | Optional third coordinate, meters above WGS84 ellipsoid |
+
+<Warning>
+  Many mapping APIs use `[latitude, longitude]` order. GeoJSON uses `[longitude, latitude]`. Mixing these up is a common source of bugs — your point ends up in the wrong hemisphere.
+</Warning>
+
+<Card title="Next: Location records" icon="file-signature" href="/concepts/location-records">
+  Signed, verifiable location data
+</Card>
+
+---
+
+**See also:**
+- [API: Types — Input](/api-reference/types) — how raw GeoJSON is passed to API endpoints
