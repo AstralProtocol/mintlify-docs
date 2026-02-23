@@ -1,0 +1,306 @@
+---
+title: "Data types"
+description: "Shared data types used across the Astral API"
+---
+
+# Data types
+
+This page defines all shared types referenced by the [Verify API](/api-reference/verify/stamp) and [Compute API](/api-reference/compute/distance) endpoints.
+
+---
+
+## Input
+
+All compute endpoints accept geometry inputs as a discriminated union. The server resolves the input format automatically.
+
+```typescript
+type Input =
+  | string                    // UID string — onchain attestation
+  | GeoJSON.Geometry          // Raw GeoJSON geometry
+  | OnchainInput              // Explicit onchain reference
+  | OffchainInput             // Offchain attestation reference
+  | VerifiedProofInput;       // Verified location proof
+```
+
+### RawGeometryInput
+
+A standard GeoJSON geometry object:
+
+```json
+{
+  "type": "Point",
+  "coordinates": [2.2945, 48.8584]
+}
+```
+
+### OnchainInput
+
+A UID string referencing an onchain EAS attestation:
+
+```json
+"0xabc123..."
+```
+
+### OffchainInput
+
+A reference to an offchain attestation stored on IPFS or another URI-addressable store:
+
+```json
+{
+  "uid": "0xabc...",
+  "uri": "ipfs://Qm..."
+}
+```
+
+### VerifiedProofInput
+
+A reference to a previously verified location proof, used to chain proof verification with compute operations:
+
+```json
+{
+  "proofUID": "0xdef456...",
+  "chainId": 84532
+}
+```
+
+---
+
+## LocationClaim
+
+A claim that a subject was at a location during a time window. Extends [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec).
+
+```typescript
+interface LocationClaim {
+  lpVersion: string;              // "0.2"
+  locationType: string;           // "geojson-point", "h3-index", etc.
+  location: GeoJSON.Geometry;     // The asserted location
+  srs: string;                    // Spatial reference system URI
+
+  subject: SubjectIdentifier;     // Who is making the claim
+  radius: number;                 // Meters — required
+  time: {
+    start: number;                // Unix timestamp (seconds)
+    end: number;
+  };
+  eventType?: string;             // "presence", "transaction", "delivery"
+}
+```
+
+---
+
+## LocationStamp
+
+Evidence from a single proof-of-location system — one observation. Uses LP format for the observed location.
+
+```typescript
+interface LocationStamp {
+  lpVersion: string;
+  locationType: string;
+  location: GeoJSON.Geometry;     // The OBSERVED location
+  srs: string;
+
+  temporalFootprint: {
+    start: number;                // Unix timestamp (seconds)
+    end: number;
+  };
+
+  plugin: string;                 // "proofmode", "witnesschain", "mock"
+  pluginVersion: string;
+  signals: Record<string, unknown>;
+  signatures: Signature[];
+}
+```
+
+---
+
+## LocationProof
+
+A claim bundled with one or more stamps.
+
+```typescript
+interface LocationProof {
+  claim: LocationClaim;
+  stamps: LocationStamp[];
+}
+```
+
+---
+
+## SubjectIdentifier
+
+Identifies the subject of a claim. Follows a scheme/value pattern similar to [DIDs](https://www.w3.org/TR/did-core/).
+
+```typescript
+interface SubjectIdentifier {
+  scheme: string;   // "eth-address" | "device-pubkey" | "did:web"
+  value: string;
+}
+```
+
+**Examples:**
+
+```json
+{ "scheme": "eth-address", "value": "0x1234..." }
+{ "scheme": "device-pubkey", "value": "0xabcd..." }
+```
+
+---
+
+## Signature
+
+A cryptographic signature on a stamp.
+
+```typescript
+interface Signature {
+  signer: SubjectIdentifier;
+  algorithm: string;              // "secp256k1" | "ed25519"
+  value: string;                  // Hex-encoded
+  timestamp: number;              // Unix timestamp (seconds)
+}
+```
+
+---
+
+## CredibilityVector
+
+Multidimensional assessment of how well stamps support a claim. Returned by [POST /verify/v0/proof](/api-reference/verify/proof).
+
+```typescript
+interface CredibilityVector {
+  dimensions: {
+    spatial: {
+      meanDistanceMeters: number;
+      maxDistanceMeters: number;
+      withinRadiusFraction: number;     // 0-1
+    };
+    temporal: {
+      meanOverlap: number;              // 0-1
+      minOverlap: number;               // 0-1
+      fullyOverlappingFraction: number; // 0-1
+    };
+    validity: {
+      signaturesValidFraction: number;  // 0-1
+      structureValidFraction: number;   // 0-1
+      signalsConsistentFraction: number; // 0-1
+    };
+    independence: {
+      uniquePluginRatio: number;        // 0-1
+      spatialAgreement: number;         // 0-1
+      pluginNames: string[];
+    };
+  };
+  stampResults: StampResult[];
+  meta: {
+    stampCount: number;
+    evaluatedAt: string;                // ISO 8601
+    evaluationMode: string;
+  };
+}
+```
+
+---
+
+## StampResult
+
+Per-stamp verification result within a `CredibilityVector`.
+
+```typescript
+interface StampResult {
+  stampIndex: number;
+  plugin: string;
+  valid: boolean;
+  signaturesValid: boolean;
+  structureValid: boolean;
+  signalsConsistent: boolean;
+  distanceMeters: number;         // Distance from stamp to claim location
+  temporalOverlap: number;       // 0-1
+  withinRadius: boolean;
+  details: Record<string, unknown>; // Plugin-specific
+}
+```
+
+---
+
+## AttestationData
+
+EAS attestation data returned by compute and verify endpoints.
+
+```typescript
+interface AttestationData {
+  uid: string;                    // Attestation UID
+  schema: string;                 // Schema UID
+  attester: string;               // Attester address
+  recipient: string;              // Recipient address
+  data: string;                   // ABI-encoded attestation data
+  revocable: boolean;             // Whether the attestation can be revoked
+  refUID: string;                 // Referenced attestation UID (zero bytes if none)
+  signature: string;              // Hex-encoded signature
+}
+```
+
+---
+
+## DelegatedAttestationData
+
+Signature and metadata for submitting a delegated attestation onchain.
+
+```typescript
+interface DelegatedAttestationData {
+  signature: string;              // Hex-encoded EIP-712 signature
+  attester: string;               // Attester address
+  deadline: number;               // Unix timestamp — signature expiry
+  nonce: number;                  // Attester nonce for replay protection
+}
+```
+
+---
+
+## NumericComputeResponse
+
+Response shape for compute operations that return a number (distance, area, length).
+
+```typescript
+interface NumericComputeResponse {
+  result: number;
+  units: string;                  // "meters", "square_meters"
+  operation: string;
+  timestamp: number;
+  inputRefs: string[];
+  attestation: AttestationData;
+  delegatedAttestation: DelegatedAttestationData;
+}
+```
+
+---
+
+## BooleanComputeResponse
+
+Response shape for compute operations that return true/false (contains, within, intersects).
+
+```typescript
+interface BooleanComputeResponse {
+  result: boolean;
+  operation: string;
+  timestamp: number;
+  inputRefs: string[];
+  attestation: AttestationData;
+  delegatedAttestation: DelegatedAttestationData;
+}
+```
+
+---
+
+## VerifiedLocationProofResponse
+
+Response shape for [POST /verify/v0/proof](/api-reference/verify/proof).
+
+```typescript
+interface VerifiedLocationProofResponse {
+  proof: LocationProof;
+  credibility: CredibilityVector;
+  evaluationMethod: string;
+  evaluatedAt: string;            // ISO 8601
+  attestation?: AttestationData;
+  delegatedAttestation?: DelegatedAttestationData;
+}
+```
