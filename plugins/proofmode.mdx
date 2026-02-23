@@ -4,7 +4,7 @@ description: "Mobile device proofs via the ProofMode app"
 ---
 
 <Warning>
-  **Alpha** — The ProofMode plugin is in early development. The `create()` and `verify()` methods are available. See below for what's coming next.
+  **Alpha** — The ProofMode plugin is in early development. Bundle parsing, stamp creation, and `verify()` are available. See below for what's coming next.
 </Warning>
 
 # ProofMode plugin
@@ -100,13 +100,9 @@ The resulting stamp contains:
 - Temporal footprint from device timestamps
 - All parsed signals including SafetyNet JWT, PGP key presence, file hashes
 
-### create()
-
-Plugin interface method — wraps `createStampFromBundle()` for use with the `StampsModule`.
-
-```typescript
-const unsigned = await plugin.create(signals);
-```
+<Note>
+  ProofMode does **not** implement the standard `create(signals)` interface method. Use `parseBundle()` + `createStampFromBundle()` instead. This means `astral.stamps.create({ plugin: 'proofmode' }, signals)` is not supported — use the plugin's bundle-based workflow directly.
+</Note>
 
 ### verify()
 

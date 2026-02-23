@@ -157,7 +157,7 @@ astral.plugins.size            // Number of registered plugins
 | Plugin | Package | Status | collect | create | sign | verify |
 |--------|---------|--------|---------|--------|------|--------|
 | Mock | Built into SDK | Complete | Yes | Yes | Yes | Yes |
-| ProofMode | `@location-proofs/plugin-proofmode` | Alpha | Coming soon | Yes | — | Yes |
+| ProofMode | `@location-proofs/plugin-proofmode` | Alpha | — | `createStampFromBundle()` | — | Yes |
 | WitnessChain | `@location-proofs/plugin-witnesschain` | In development | Coming soon | Coming soon | Coming soon | Coming soon |
 
 <Card title="Plugin details" icon="plug" href="/plugins/overview">
@@ -192,80 +192,7 @@ See [MockPlugin documentation](/plugins/mock) for full details.
 
 ## How to write a custom plugin
 
-Implement the `LocationProofPlugin` interface with whichever methods your system supports:
-
-```typescript
-import type {
-  LocationProofPlugin,
-  Runtime,
-  CollectOptions,
-  RawSignals,
-  UnsignedLocationStamp,
-  LocationStamp,
-  StampSigner,
-  StampVerificationResult
-} from '@decentralized-geo/astral-sdk';
-
-class MyPlugin implements LocationProofPlugin {
-  readonly name = 'my-plugin';
-  readonly version = '0.1.0';
-  readonly runtimes: Runtime[] = ['node', 'browser'];
-  readonly requiredCapabilities: string[] = [];
-  readonly description = 'My custom proof-of-location plugin';
-
-  async collect(options?: CollectOptions): Promise<RawSignals> {
-    // Gather evidence from your system
-    const data = await fetchFromMyAPI();
-    return {
-      plugin: this.name,
-      timestamp: Math.floor(Date.now() / 1000),
-      data
-    };
-  }
-
-  async create(signals: RawSignals): Promise<UnsignedLocationStamp> {
-    // Parse signals into LP v0.2 format
-    return {
-      lpVersion: '0.2',
-      locationType: 'geojson-point',
-      location: {
-        type: 'Point',
-        coordinates: [signals.data.lon, signals.data.lat]
-      },
-      srs: 'EPSG:4326',
-      temporalFootprint: {
-        start: signals.timestamp,
-        end: signals.timestamp + 60
-      },
-      plugin: this.name,
-      pluginVersion: this.version,
-      signals: signals.data
-    };
-  }
-
-  async verify(stamp: LocationStamp): Promise<StampVerificationResult> {
-    // Validate stamp structure and signals
-    return {
-      valid: true,
-      signaturesValid: stamp.signatures.length > 0,
-      structureValid: stamp.plugin === this.name,
-      signalsConsistent: true,
-      details: {}
-    };
-  }
-}
-```
-
-Register and use:
-
-```typescript
-astral.plugins.register(new MyPlugin());
-
-const signals = await astral.stamps.collect({ plugins: ['my-plugin'] });
-const unsigned = await astral.stamps.create({ plugin: 'my-plugin' }, signals[0]);
-```
-
-See [Building a custom plugin](/plugins/custom) for a complete guide.
+Implement the `LocationProofPlugin` interface with whichever methods your system supports, then register with `astral.plugins.register()`. See [Building a custom plugin](/plugins/custom) for the complete guide with examples and testing patterns.
 
 <Card title="Next: Compute module" icon="calculator" href="/sdk/compute">
   Geospatial computation methods
