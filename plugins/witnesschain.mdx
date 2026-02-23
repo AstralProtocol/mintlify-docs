@@ -1,0 +1,90 @@
+---
+title: "WitnessChain"
+description: "Infrastructure-based proof-of-location via network latency triangulation"
+---
+
+<Warning>
+  **In development** — The WitnessChain plugin is under active development. The interface is defined but implementation is in progress.
+</Warning>
+
+# WitnessChain plugin
+
+[WitnessChain](https://www.witnesschain.com) provides infrastructure-based proof-of-location through network latency triangulation. Independent challenger nodes measure round-trip times to a prover, then use the speed-of-light constraint to verify the prover's claimed location. This is fundamentally different from device-based proofs like ProofMode — the evidence comes from the network infrastructure, not the user's device.
+
+## How it works
+
+1. A **prover** registers their claimed location with WitnessChain
+2. Independent **challenger** nodes send network challenges
+3. Challengers measure round-trip latency and compare against speed-of-light bounds
+4. If the measured latency is consistent with the claimed location, the challenge succeeds
+5. Results include ECDSA-signed attestations from each challenger
+
+This approach provides location evidence that doesn't depend on the prover's device being trustworthy — the evidence comes from independent network observers.
+
+## Current status
+
+The plugin is in development on the `develop` branch. The interface is fully defined:
+
+```typescript
+class WitnessChainPlugin implements LocationProofPlugin {
+  readonly name = 'witnesschain';
+  readonly version = '0.1.0';
+  readonly runtimes: Runtime[];
+  readonly requiredCapabilities: string[];
+  readonly description = 'WitnessChain proof-of-location via network latency triangulation';
+
+  collect(options?: CollectOptions): Promise<RawSignals>;
+  create(signals: RawSignals): Promise<UnsignedLocationStamp>;
+  sign(stamp: UnsignedLocationStamp, signer: StampSigner): Promise<LocationStamp>;
+  verify(stamp: LocationStamp): Promise<StampVerificationResult>;
+}
+```
+
+### Planned capabilities
+
+| Method | Description | Status |
+|--------|-------------|--------|
+| `collect()` | Fetch challenge results from WitnessChain API | In development |
+| `create()` | Parse challenge results into location stamp | In development |
+| `sign()` | Sign stamp with prover key | In development |
+| `verify()` | Verify challenger ECDSA signatures and challenge consistency | In development |
+
+## Challenge result structure
+
+Each WitnessChain challenge produces:
+
+```typescript
+interface WitnessChainChallengeResult {
+  id: string;
+  challenger: string;            // Ethereum address of challenger node
+  claims: {                      // Prover's claimed location
+    latitude: number;
+    longitude: number;
+    radius: number;
+  };
+  result: {
+    challenge_succeeded: boolean;
+    ping_delay: number;          // Measured latency
+  };
+  message: string;               // JSON-encoded challenge data
+  signature: string;             // ECDSA signature from challenger
+  consolidated_result: {
+    KnowLoc: boolean;            // WitnessChain's location assessment
+    KnowLocUncertainty: number;
+    verified: boolean;
+  };
+}
+```
+
+## Why WitnessChain matters for multifactor proofs
+
+WitnessChain provides a fundamentally independent evidence source:
+- **Device proofs** (ProofMode) rely on the prover's hardware
+- **Infrastructure proofs** (WitnessChain) rely on external network observers
+
+When both agree, the `independence` dimension of the `CredibilityVector` reflects the corroboration from truly independent systems.
+
+## Links
+
+- **GitHub:** [github.com/location-proofs/plugin-witnesschain](https://github.com/location-proofs/plugin-witnesschain)
+- **WitnessChain:** [witnesschain.com](https://www.witnesschain.com)

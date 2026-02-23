@@ -1,0 +1,235 @@
+---
+title: "ProofMode"
+description: "Mobile device proofs via the ProofMode app"
+---
+
+<Warning>
+  **Alpha** — The ProofMode plugin is in early development. The `create()` and `verify()` methods are available. See below for what's coming next.
+</Warning>
+
+# ProofMode plugin
+
+[ProofMode](https://proofmode.org) is a mobile app (iOS and Android) that collects device evidence — GPS coordinates, network context, device metadata, PGP signatures, and SafetyNet/Play Integrity attestations. The `@location-proofs/plugin-proofmode` package parses ProofMode's export bundles into Astral location stamps and verifies their internal consistency.
+
+## How it works today
+
+1. The user captures evidence in the ProofMode app on their phone
+2. They export a ZIP bundle from the app
+3. Your application passes the ZIP bundle to the plugin
+4. The plugin parses it into an `UnsignedLocationStamp` and can verify its structure and signals
+
+```
+ProofMode App → ZIP export → plugin.parseBundle() → plugin.createStampFromBundle() → UnsignedLocationStamp
+                                                   → plugin.verify() → StampVerificationResult
+```
+
+## Installation
+
+```bash
+npm install @location-proofs/plugin-proofmode
+```
+
+**GitHub:** [github.com/location-proofs/plugin-proofmode](https://github.com/location-proofs/plugin-proofmode)
+
+## Registration
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { ProofModePlugin } from '@location-proofs/plugin-proofmode';
+
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+astral.plugins.register(new ProofModePlugin());
+```
+
+## Plugin properties
+
+```typescript
+plugin.name        // 'proofmode'
+plugin.version     // '0.1.0'
+plugin.runtimes    // ['node', 'browser']
+plugin.description // 'ProofMode device-based location proofs with PGP signatures
+                   //  and hardware attestation'
+```
+
+---
+
+## Available methods
+
+### parseBundle()
+
+Parse a ProofMode ZIP export into a structured bundle.
+
+```typescript
+const plugin = new ProofModePlugin();
+const bundle = plugin.parseBundle(zipData);
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `zipData` | `Uint8Array` | Raw ZIP file data from ProofMode export |
+
+**Returns:** `ParsedBundle`
+
+```typescript
+interface ParsedBundle {
+  metadata: ProofModeMetadata;   // Parsed signal data
+  publicKey?: string;            // ASCII-armored PGP public key
+  metadataSignature?: Uint8Array; // PGP detached signature of metadata
+  mediaSignature?: Uint8Array;   // PGP detached signature of media
+  safetyNetToken?: string;       // Google SafetyNet/Play Integrity JWT
+  otsProof?: Uint8Array;         // OpenTimestamps proof
+  mediaFile?: Uint8Array;        // The media file data
+  mediaFileName?: string;
+  expectedHash?: string;         // SHA-256 hash from bundle filename
+  files: BundleFile[];           // All raw files in bundle
+}
+```
+
+### createStampFromBundle()
+
+Create an unsigned location stamp from a parsed bundle.
+
+```typescript
+const unsigned = plugin.createStampFromBundle(bundle);
+```
+
+The resulting stamp contains:
+- Location as a GeoJSON Point from GPS coordinates
+- Temporal footprint from device timestamps
+- All parsed signals including SafetyNet JWT, PGP key presence, file hashes
+
+### create()
+
+Plugin interface method — wraps `createStampFromBundle()` for use with the `StampsModule`.
+
+```typescript
+const unsigned = await plugin.create(signals);
+```
+
+### verify()
+
+Verify a ProofMode stamp's internal validity.
+
+```typescript
+const result = await plugin.verify(stamp);
+```
+
+Checks performed:
+- **Structure** — LP version is `'0.2'`, plugin is `'proofmode'`, location/signals/temporalFootprint present
+- **Signatures** — At least one signature exists with non-empty value and signer info
+- **Signal consistency:**
+  - Latitude and longitude are in valid ranges
+  - Location provider and accuracy are consistent
+  - SafetyNet JWT structure is valid (base64url-encoded, 3 parts)
+  - `Location.Time` matches `temporalFootprint` within 3600 seconds
+
+Returns `StampVerificationResult`:
+
+```typescript
+{
+  valid: boolean,
+  signaturesValid: boolean,
+  structureValid: boolean,
+  signalsConsistent: boolean,
+  details: { ... }   // ProofMode-specific verification details
+}
+```
+
+---
+
+## What the ZIP bundle contains
+
+A ProofMode export ZIP typically includes:
+
+| File | Description |
+|------|-------------|
+| `<hash>.proof.csv` or `.proof.json` | Location and device metadata signals |
+| `pubkey.asc` | ASCII-armored PGP public key |
+| `<file>.asc` | PGP detached signatures |
+| `<file>.gst` | Google SafetyNet/Play Integrity JWT |
+| `<file>.ots` | OpenTimestamps proof |
+| Media file | Photo or video captured during proof |
+
+### Signal fields
+
+The metadata file contains 30+ signal fields:
+
+| Category | Fields |
+|----------|--------|
+| Location | `Location.Latitude`, `Location.Longitude`, `Location.Provider`, `Location.Accuracy`, `Location.Altitude`, `Location.Bearing`, `Location.Speed`, `Location.Time` |
+| Network | `CellInfo`, `WiFi.MAC`, `IPv4`, `IPv6`, `Network` |
+| Device | `DeviceID`, `Hardware`, `Manufacturer`, `Model` |
+| ProofMode | `ProofHash`, `FileHash`, `MimeType`, `File.Name`, `File.Size` |
+| Timestamps | `DateCreated`, `Timestamp` |
+
+---
+
+## Verification scope
+
+### What verify checks today
+
+- Stamp structure conforms to Location Protocol v0.2
+- Signatures array is non-empty with valid signer info
+- GPS coordinates are within valid ranges
+- Signal consistency (provider/accuracy, timestamps alignment)
+- SafetyNet JWT structure (3-part base64url format)
+
+### Deferred to v1+
+
+- Full PGP cryptographic signature verification (checking signatures against the public key)
+- SafetyNet/Play Integrity certificate chain verification
+- OpenTimestamps proof verification
+
+---
+
+## Coming soon
+
+<Info>
+  **`collect()` — In-app evidence collection** is planned for developers building React Native apps. This will allow triggering ProofMode evidence collection directly from your app, rather than requiring the user to export a ZIP. This is under active development.
+</Info>
+
+---
+
+## Example
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { ProofModePlugin } from '@location-proofs/plugin-proofmode';
+import { readFileSync } from 'fs';
+
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+const plugin = new ProofModePlugin();
+astral.plugins.register(plugin);
+
+// Load a ProofMode ZIP export
+const zipData = new Uint8Array(readFileSync('proofmode-export.zip'));
+
+// Parse the bundle
+const bundle = plugin.parseBundle(zipData);
+
+console.log('Location:', bundle.metadata.signals['Location.Latitude'],
+            bundle.metadata.signals['Location.Longitude']);
+console.log('Has PGP key:', !!bundle.publicKey);
+console.log('Has SafetyNet:', !!bundle.safetyNetToken);
+
+// Create a stamp
+const unsigned = plugin.createStampFromBundle(bundle);
+
+console.log('Stamp location:', unsigned.location);
+console.log('Stamp time:', unsigned.temporalFootprint);
+
+// Sign the stamp (with your own key, since ProofMode's sign is handled on-device)
+const stamp = await astral.stamps.sign(
+  { plugin: 'proofmode' },
+  unsigned,
+  signer
+);
+
+// Verify
+const result = await astral.stamps.verify(stamp);
+console.log('Valid:', result.valid);
+console.log('Structure:', result.structureValid);
+console.log('Signals consistent:', result.signalsConsistent);
+```

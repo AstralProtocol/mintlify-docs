@@ -1,0 +1,253 @@
+---
+title: "Custom plugins"
+description: "Build your own proof-of-location plugin for the Astral SDK"
+---
+
+# Building a custom plugin
+
+Any proof-of-location system can integrate with the Astral SDK by implementing the `LocationProofPlugin` interface. This guide walks through the interface contract, which methods to implement, and how to test your plugin.
+
+## The interface
+
+```typescript
+import type {
+  LocationProofPlugin,
+  Runtime,
+  CollectOptions,
+  RawSignals,
+  UnsignedLocationStamp,
+  LocationStamp,
+  StampSigner,
+  StampVerificationResult
+} from '@decentralized-geo/astral-sdk';
+```
+
+```typescript
+interface LocationProofPlugin {
+  readonly name: string;                    // Unique plugin identifier
+  readonly version: string;                 // Semver version
+  readonly runtimes: Runtime[];             // ['react-native' | 'node' | 'browser']
+  readonly requiredCapabilities: string[];  // e.g., ['gps', 'network']
+  readonly description: string;             // Human-readable description
+
+  collect?(options?: CollectOptions): Promise<RawSignals>;
+  create?(signals: RawSignals): Promise<UnsignedLocationStamp>;
+  sign?(stamp: UnsignedLocationStamp, signer?: StampSigner): Promise<LocationStamp>;
+  verify?(stamp: LocationStamp): Promise<StampVerificationResult>;
+}
+```
+
+All four methods are optional. Implement what makes sense for your system.
+
+---
+
+## Step 1: Implement the interface
+
+```typescript
+import type {
+  LocationProofPlugin,
+  Runtime,
+  CollectOptions,
+  RawSignals,
+  UnsignedLocationStamp,
+  LocationStamp,
+  StampSigner,
+  StampVerificationResult
+} from '@decentralized-geo/astral-sdk';
+
+export class MyLocationPlugin implements LocationProofPlugin {
+  readonly name = 'my-location-service';
+  readonly version = '0.1.0';
+  readonly runtimes: Runtime[] = ['node', 'browser'];
+  readonly requiredCapabilities: string[] = [];
+  readonly description = 'Location proofs from My Location Service';
+
+  constructor(private config: { apiUrl: string; apiKey: string }) {}
+
+  async collect(options?: CollectOptions): Promise<RawSignals> {
+    const response = await fetch(`${this.config.apiUrl}/evidence`, {
+      headers: { Authorization: `Bearer ${this.config.apiKey}` }
+    });
+    const data = await response.json();
+
+    return {
+      plugin: this.name,
+      timestamp: Math.floor(Date.now() / 1000),
+      data
+    };
+  }
+
+  async create(signals: RawSignals): Promise<UnsignedLocationStamp> {
+    return {
+      lpVersion: '0.2',
+      locationType: 'geojson-point',
+      location: {
+        type: 'Point',
+        coordinates: [signals.data.longitude, signals.data.latitude]
+      },
+      srs: 'EPSG:4326',
+      temporalFootprint: {
+        start: signals.timestamp,
+        end: signals.timestamp + 60
+      },
+      plugin: this.name,
+      pluginVersion: this.version,
+      signals: signals.data
+    };
+  }
+
+  async verify(stamp: LocationStamp): Promise<StampVerificationResult> {
+    const structureValid =
+      stamp.lpVersion === '0.2' &&
+      stamp.plugin === this.name &&
+      stamp.location != null &&
+      stamp.temporalFootprint != null;
+
+    const signaturesValid =
+      stamp.signatures.length > 0 &&
+      stamp.signatures.every(s => s.value && s.signer);
+
+    // Add your own signal consistency checks
+    const signalsConsistent = validateMySignals(stamp.signals);
+
+    return {
+      valid: structureValid && signaturesValid && signalsConsistent,
+      structureValid,
+      signaturesValid,
+      signalsConsistent,
+      details: {}
+    };
+  }
+}
+```
+
+---
+
+## Step 2: Register with the SDK
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { MyLocationPlugin } from './my-location-plugin';
+
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+astral.plugins.register(new MyLocationPlugin({
+  apiUrl: 'https://api.my-service.com',
+  apiKey: process.env.MY_SERVICE_API_KEY
+}));
+```
+
+The registry validates that the current runtime is in the plugin's `runtimes` array. If not, `register()` throws.
+
+---
+
+## Step 3: Use through the SDK
+
+Once registered, your plugin works with the standard stamps and proofs pipeline:
+
+```typescript
+// Collect signals
+const signals = await astral.stamps.collect({
+  plugins: ['my-location-service']
+});
+
+// Create stamp
+const unsigned = await astral.stamps.create(
+  { plugin: 'my-location-service' },
+  signals[0]
+);
+
+// Sign stamp
+const stamp = await astral.stamps.sign(
+  { plugin: 'my-location-service' },
+  unsigned,
+  signer
+);
+
+// Verify stamp
+const result = await astral.stamps.verify(stamp);
+
+// Use in a proof
+const proof = astral.proofs.create(claim, [stamp]);
+const vector = await astral.proofs.verify(proof);
+```
+
+---
+
+## Which methods to implement
+
+| Method | Implement when... |
+|--------|-------------------|
+| `collect()` | Your system can actively gather evidence (API calls, sensor reads) |
+| `create()` | You need to parse raw data into Location Protocol v0.2 format |
+| `sign()` | Your system has its own signing mechanism (most plugins skip this — the SDK handles signing) |
+| `verify()` | You can validate stamps from your system (signature checks, signal consistency) |
+
+Common patterns:
+
+- **API-based service** (like WitnessChain): implement `collect()`, `create()`, `verify()`
+- **Mobile app export** (like ProofMode): implement `create()`, `verify()` (collection happens on-device)
+- **Full control**: implement all four methods
+
+---
+
+## Runtime compatibility
+
+Declare which environments your plugin supports:
+
+```typescript
+readonly runtimes: Runtime[] = ['node'];           // Server only
+readonly runtimes: Runtime[] = ['browser'];         // Browser only
+readonly runtimes: Runtime[] = ['react-native'];    // Mobile only
+readonly runtimes: Runtime[] = ['node', 'browser']; // Both
+readonly runtimes: Runtime[] = ['react-native', 'node', 'browser']; // All
+```
+
+The SDK detects the current runtime automatically and rejects plugins that don't support it.
+
+---
+
+## Location Protocol v0.2 compliance
+
+Stamps must conform to LP v0.2. Key requirements for `UnsignedLocationStamp`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `lpVersion` | `string` | Must be `'0.2'` |
+| `locationType` | `string` | e.g., `'geojson-point'`, `'h3-index'` |
+| `location` | `LocationData` | GeoJSON geometry or string |
+| `srs` | `string` | Spatial reference system, typically `'EPSG:4326'` |
+| `temporalFootprint` | `{ start: number; end: number }` | Unix seconds |
+| `plugin` | `string` | Your plugin name |
+| `pluginVersion` | `string` | Semver |
+| `signals` | `Record<string, unknown>` | Plugin-specific data |
+
+---
+
+## Testing with MockPlugin
+
+Use the MockPlugin as a reference implementation and for testing alongside your plugin:
+
+```typescript
+import { AstralSDK, MockPlugin } from '@decentralized-geo/astral-sdk';
+import { MyLocationPlugin } from './my-location-plugin';
+
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+// Register both
+astral.plugins.register(new MockPlugin({ lat: 37.7749, lon: -122.4194 }));
+astral.plugins.register(new MyLocationPlugin({ apiUrl: '...', apiKey: '...' }));
+
+// Collect from both — test multi-stamp proofs
+const signals = await astral.stamps.collect();
+// Returns signals from both plugins
+
+// Build multi-stamp proof for cross-correlation testing
+const mockStamp = /* ... */;
+const myStamp = /* ... */;
+const proof = astral.proofs.create(claim, [mockStamp, myStamp]);
+const vector = await astral.proofs.verify(proof);
+
+// independence.uniquePluginRatio should be 1.0
+console.log(vector.dimensions.independence.uniquePluginRatio);
+```
