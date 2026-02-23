@@ -426,6 +426,52 @@ if (now < deadline) {
 }
 ```
 
+---
+
+## Complete example
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { ethers } from 'ethers';
+
+const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+const astral = new AstralSDK({
+  chainId: 84532,
+  signer: wallet,
+  apiUrl: 'https://api.astral.global'
+});
+
+// Create a location attestation
+const location = await astral.location.onchain.create({
+  location: { type: 'Point', coordinates: [2.2951, 48.8580] },
+  memo: 'Near Eiffel Tower'
+});
+
+// Check proximity to a landmark
+const LANDMARK_UID = '0x...';
+const SCHEMA_UID = '0x...';
+
+const result = await astral.compute.within(
+  location.uid,
+  LANDMARK_UID,
+  500,
+  { schema: SCHEMA_UID, recipient: wallet.address }
+);
+
+console.log('Within 500m:', result.result);
+
+// Estimate gas and submit if check passed
+if (result.result) {
+  const gas = await astral.compute.estimate(result.delegatedAttestation);
+  console.log('Estimated gas:', gas.toString());
+
+  const submission = await astral.compute.submit(result.delegatedAttestation);
+  console.log('Attestation submitted:', submission.uid);
+}
+```
+
 <Card title="Next: EAS integration" icon="arrow-right" href="/sdk/eas">
   Learn how the SDK integrates with EAS
 </Card>

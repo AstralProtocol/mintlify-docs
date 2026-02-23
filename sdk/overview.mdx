@@ -1,6 +1,6 @@
 ---
 title: "SDK overview"
-description: "Unified TypeScript SDK for Astral Location Services"
+description: "Unified TypeScript SDK for the Astral Protocol"
 ---
 
 <Warning>
@@ -9,13 +9,13 @@ description: "Unified TypeScript SDK for Astral Location Services"
 
 # SDK overview
 
-The Astral SDK is the official TypeScript client for Astral Location Services. It provides a unified interface for location attestations, verifiable geospatial computations, multifactor location proofs, and an extensible plugin system for proof-of-location integrations.
+The Astral SDK is the official TypeScript client for the Astral Protocol. It provides a unified interface for working with location attestations, multi-factor location proofs, and verifiable geospatial computations.
 
 ## Design philosophy
 
 - **Namespaced API**: Clear separation between location, compute, stamps, proofs, and plugin operations
 - **Workflow-oriented**: Distinct offchain and onchain workflows for location attestations
-- **Plugin-extensible**: Register proof-of-location systems and get multifactor evidence bundles
+- **Plugin-extensible**: Register location proof plugins; collect signals, create location stamps, and compose multifactor location evidence bundles
 - **Multidimensional verification**: No single "confidence score" — applications apply their own weighting to a `CredibilityVector`
 - **Type-safe**: Full TypeScript support with comprehensive types
 - **Batteries included**: Handles signing, encoding, EAS integration, and plugin orchestration
@@ -126,7 +126,7 @@ interface AstralConfig {
   signer?: Signer;              // For signing attestations and transactions
   provider?: Provider;          // For read-only blockchain operations
   apiUrl?: string;              // Defaults to 'https://api.astral.global'
-  apiKey?: string;              // API key for authenticated requests
+  apiKey?: string;              // Required for TEE verification and hosted endpoints
 
   // Advanced
   debug?: boolean;              // Enable debug logging

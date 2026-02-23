@@ -61,7 +61,7 @@ const claim: LocationClaim = {
   srs: 'EPSG:4326',
   subject: { scheme: 'eth-address', value: '0x...' },
   radius: 100,
-  time: { start: Date.now() / 1000 - 60, end: Date.now() / 1000 }
+  time: { start: Math.floor(Date.now() / 1000) - 60, end: Math.floor(Date.now() / 1000) }
 };
 
 const proof = astral.proofs.create(claim, [stamp1, stamp2]);
@@ -365,7 +365,7 @@ const claim = {
   srs: 'EPSG:4326',
   subject: { scheme: 'eth-address', value: wallet.address },
   radius: 100,
-  time: { start: Date.now() / 1000 - 60, end: Date.now() / 1000 }
+  time: { start: Math.floor(Date.now() / 1000) - 60, end: Math.floor(Date.now() / 1000) }
 };
 
 // 3. Bundle into proof
