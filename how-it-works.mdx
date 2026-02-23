@@ -1,163 +1,99 @@
 ---
 title: "How It Works"
-description: "The architecture behind verifiable spatial computation"
+description: "The full pipeline from location evidence to signed results"
 ---
 
 <Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # How it works
 
-Astral runs spatial computations inside a Trusted Execution Environment and returns signed results. Here's what happens under the hood.
+Location data is easy to fake and hard to verify. GPS can be spoofed with a $20 app. IP geolocation is trivially manipulated. Self-reported coordinates carry no proof of origin. When a delivery platform confirms a drop-off, a compliance system checks a geofence, or an autonomous agent makes a spatial decision — the location data underneath is taken on faith.
 
-The core flow: geometry in, TEE computes, signed result out. The result can go anywhere — an agent, a smart contract, a database, a compliance report.
+Astral exists to change that. The system provides a pipeline that collects location evidence, bundles it into verifiable artifacts, evaluates its credibility, runs spatial computations on it, and delivers signed results that any downstream system can independently verify.
 
-## System architecture
+## The pipeline
 
-```mermaid
-flowchart LR
-    subgraph Client["Client"]
-        App[Developer App]
-        SDK[Astral SDK]
-    end
+### 1. Collect location evidence
 
-    subgraph Astral["Astral"]
-        API[API Gateway]
-        subgraph TEE["EigenCompute TEE"]
-            Engine[Compute Engine + PostGIS]
-        end
-    end
+Devices collect signals from **proof-of-location systems** — independent systems that produce evidence about where something is. A phone's secure enclave can attest to sensor readings. A network of infrastructure nodes can triangulate position via latency measurements. Each system has different strengths, weaknesses, and trust properties.
 
-    subgraph Chain["Ethereum / Base"]
-        EAS[EAS Contracts]
-        Resolver[Resolver Contract]
-    end
+[Location proof plugins](/plugins/overview) wrap each proof-of-location system behind a common interface. This makes it possible to compose evidence from multiple independent sources without writing custom integration code for each one.
 
-    App --> SDK
-    SDK --> API
-    API --> Engine
-    Engine --> SDK
-    SDK --> EAS
-    EAS --> Resolver
-```
+**Why this step matters:** Self-reported location is trivially spoofable. Evidence from independent proof-of-location systems raises the cost of forgery — which is the real goal, since absolute certainty about physical location is rarely achievable.
 
-## Key architectural decisions
+### 2. Create a location proof
 
-<AccordionGroup>
-  <Accordion title="Self-contained container" icon="box">
-    PostGIS runs **inside** the Docker container, not as an external service. This is essential for verifiable computation in the TEE — no external dependencies means the entire execution environment is attested.
-  </Accordion>
-  <Accordion title="Stateless model" icon="rotate">
-    Each request brings all required inputs. No persistent state between requests. This ensures determinism and simplifies verification — same inputs always produce same outputs. (Note: additional testing is needed to fully validate determinism across different environments.)
-  </Accordion>
-  <Accordion title="Delegated attestations" icon="signature">
-    Developers submit signed results onchain using EAS's delegated attestation pattern. Astral signs, the developer pays gas, and Astral is recorded as the attester.
-  </Accordion>
-</AccordionGroup>
+Raw signals become **location stamps** — structured evidence from a single proof-of-location system about an observed location. Each location stamp carries enough information to verify its internal validity: signatures, temporal footprint, and plugin identification.
 
-## The computation flow
+One or more location stamps bundle with a **location claim** — an assertion about where and when an event occurred — to form a **location proof**. The location proof is the verifiable artifact: a claim paired with its supporting evidence.
 
-<Steps>
-  <Step title="Request arrives">
-    Developer's app calls `astral.compute.within(uid1, uid2, 500)` via the SDK
-  </Step>
-  <Step title="Input resolution">
-    The compute service fetches and validates location records by UID, or accepts raw GeoJSON
-  </Step>
-  <Step title="Spatial computation">
-    PostGIS executes the spatial operation (e.g., `ST_DWithin`) inside the TEE
-  </Step>
-  <Step title="Result signing">
-    The service creates a signed result using the TEE-held key
-  </Step>
-  <Step title="Response">
-    The signed result is returned to the SDK, ready for offchain use or onchain submission
-  </Step>
-</Steps>
+**Why this step matters:** Structured, composable evidence instead of raw coordinates. A location proof separates the assertion ("I was here") from the evidence ("here's why you should believe me"), which makes both independently evaluable.
 
-## Verifiable execution with EigenCompute
+### 3. Verify the location proof
 
-The compute engine runs in **EigenCompute**, part of the EigenCloud ecosystem:
+Submit the location proof to Astral's verification endpoint. Inside a Trusted Execution Environment (TEE), the system evaluates each location stamp — checking signatures, structure, and signal consistency — then assesses how well the evidence supports the location claim. For multi-stamp location proofs, it also cross-correlates across independent sources.
+
+The output is a **credibility vector**: structured scores across multiple dimensions (spatial, temporal, validity, independence), not a binary yes/no. Applications decide what threshold they need.
+
+**Why this step matters:** Independent, structured evaluation of location evidence. The credibility vector gives applications enough information to make risk-appropriate decisions — a $10 check-in reward can accept lower confidence than a $10M land title transfer.
+
+### 4. Compute spatial relationships
+
+Run geospatial operations — distance, containment, intersection, area, length — on location data inside the TEE. The compute endpoints accept raw GeoJSON, signed location records, or verified location proofs as inputs. PostGIS (backed by the GEOS library, the same engine behind QGIS and GDAL) performs the computation; the TEE signs the result.
+
+**Why this step matters:** Verifiable spatial answers. The signed result proves not just "what was the answer" but "the answer was computed correctly by trusted code on these specific inputs."
+
+### 5. Use the signed result
+
+The signed result goes wherever it needs to — an autonomous agent's decision loop, a backend database, a compliance report, or a smart contract via EAS attestation. It carries its own proof of correctness, so any downstream consumer can verify it independently without re-executing the computation or trusting the intermediary.
+
+**Why this step matters:** Portable, independently verifiable spatial facts. The result is useful whether it stays offchain or goes onchain.
+
+## Architecture
 
 ```mermaid
-flowchart LR
-    subgraph TEE["EigenCompute TEE"]
-        subgraph Container["Docker Container"]
-            API[Node.js API] --> PostGIS[PostgreSQL + PostGIS]
-            PostGIS --> GEOS[GEOS Library]
-        end
+graph LR
+    subgraph Evidence Collection
+        D[Device / Sensor] --> P1[Location Proof Plugin]
+        D --> P2[Location Proof Plugin]
     end
 
-    Input[Request] --> API
-    API --> Output[Signed Result]
+    subgraph Location Proof Composition
+        P1 --> S1[Location Stamp]
+        P2 --> S2[Location Stamp]
+        S1 --> LP[Location Proof]
+        S2 --> LP
+        CL[Location Claim] --> LP
+    end
+
+    subgraph Astral TEE
+        LP --> VE[Verify]
+        VE --> CR[Credibility Vector]
+        CR --> CO[Compute]
+        LD[Location Data] --> CO
+        CO --> SR[Signed Result]
+    end
+
+    SR --> AG[Agent]
+    SR --> AP[Application]
+    SR --> SC[Smart Contract]
 ```
 
-<Info>
-  PostGIS uses [GEOS](https://libgeos.org/) for geometry operations — the same C++ library used by QGIS, GDAL, and most professional geospatial software. See the [GEOS documentation](https://libgeos.org/usage/download/) for more on its reliability and widespread adoption.
-</Info>
+The two paths through the system serve different needs:
 
-### Verifiability properties
+- **Location proofs path** (left → center): Evidence collection → composition → verification. Produces a credibility vector that tells you how much to trust the location claim. The verified location proof can then flow into compute, or be used on its own.
+- **Geocomputation path** (center → right): Location data (raw, signed, or verified) → spatial operation → signed result. Produces a cryptographically signed spatial answer.
 
-| Property | How it's achieved |
-|----------|-------------------|
-| **Input verification** | Attestation signatures verified at TEE boundary |
-| **Deterministic computation** | Same inputs always produce same result |
-| **Signed output** | Service key signs the result inside the TEE |
-| **TEE attestation** | EigenCompute provides hardware attestation of execution |
+A verified location proof is valuable on its own — it doesn't need to flow into a compute operation. And a compute operation can run on any location data, not just verified location proofs. The two capabilities compose but don't require each other.
 
-## Input resolution
+## What's verified vs. what's trusted
 
-The service accepts multiple input formats:
+The TEE guarantees that computation executes correctly — the code that ran is the code that was attested, inputs weren't tampered with, and the signing key never leaves the enclave. That's the "verifiable" part.
 
-| Input format | Resolution |
-|--------------|------------|
-| UID string | Fetch from EAS contracts (onchain attestations) |
-| `{ uid, uri }` | Fetch from URI, verify UID matches, verify signature |
-| `{ attestation }` | Verify signature, extract geometry directly |
-| Raw GeoJSON | Use directly, hash for `inputRefs` |
+The truthfulness of location inputs is a separate question. It depends on the strength of the location proof: how many independent proof-of-location systems contributed evidence, how resistant those systems are to forgery, and whether the evidence is consistent. Astral evaluates this and reports it honestly via the credibility vector — but it cannot make weak evidence strong.
 
-<Note>
-  For offchain attestations, the UID is deterministically derived from the attestation data. Even when fetching from HTTPS (not content-addressed), Astral verifies the fetched attestation produces the expected UID. Mismatch = reject.
-</Note>
+For a detailed accounting of what exactly is verified and what trust assumptions remain, see the [Trust Model](/trust-model/architecture).
 
-## Delegated attestation flow
-
-For the full blockchain integration flow, see [Blockchain integration](/guides/blockchain-integration).
-
-The delegated attestation pattern means:
-- **Astral signs** the attestation data offchain
-- **Developer submits** with Astral's signature (pays gas)
-- **EAS verifies** the signature and records Astral as attester
-- **Resolver contracts** can verify `attestation.attester == astralSigner`
-
-<Note>
-  Resolver contracts must be deployed and registered by the developer. Astral does not provide pre-built resolver contracts — you create them to implement your specific business logic. See [EAS Resolvers](/concepts/eas-resolvers) for patterns and examples.
-</Note>
-
-## Trust model
-
-There are two distinct trust questions in location-based systems:
-
-### 1. Are the inputs truthful?
-
-This is the **location verification problem** — how do you know a user was actually at the location they claim? GPS is spoofable, and proving physical presence remains an open research problem.
-
-We're actively working on this through our [location proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323). For now, Astral trusts the location data provided as input.
-
-### 2. Was the computation performed correctly?
-
-This is what Astral solves. Given location inputs, how do you prove the geocomputation (distance, containment, etc.) was performed correctly?
-
-**Current approach:**
-- **Open source code**: The compute service code is public and auditable
-- **TEE execution**: Code runs inside EigenCompute's trusted execution environment
-- **Astral signing key**: Results are signed by a key held inside the TEE
-- **Deterministic operations**: Same inputs produce same outputs (additional testing in progress)
-
-**Future improvements:**
-- **AVS consensus**: Multiple operators verify computations
-- **ZK proofs**: Cryptographic proof of correct execution
-- **Decentralized signers**: Multi-party result signing
-
-<Card title="Next: Geographic features" icon="map" href="/concepts/geographic-features">
-  How Astral represents spatial data
+<Card title="Next: Location data" icon="map" href="/concepts/location-data">
+  How Astral represents and verifies spatial data
 </Card>
