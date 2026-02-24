@@ -1,0 +1,85 @@
+---
+title: "Agent Quickstart"
+description: "Everything an AI coding agent needs to get Astral running locally"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Agent Quickstart
+
+Paste the block below into Claude Code (or any AI coding agent). It contains everything the agent needs to clone, configure, and run the Astral stack locally.
+
+<Info>
+  This is a self-contained prompt — copy the whole thing. The agent will read the `CLAUDE.md` files in each repo for deeper context once it's up and running.
+</Info>
+
+```text
+The Astral Protocol v0 — what you need to know
+
+Two repos, one service, one SDK.
+
+Repos:
+- astral-location-services — Express API that runs geospatial computations via PostGIS
+  and signs EAS attestations. github.com/AstralProtocol/astral-location-services.
+  (This will run in a TEE; local-only for now while staging deployment is in progress.)
+- astral-sdk — TypeScript SDK (@decentralized-geo/astral-sdk) that talks to the service
+  and submits attestations onchain. github.com/DecentralizedGeo/astral-sdk
+  (This will run on an edge device or web server, with plugins installed on client
+  devices needing to be located.)
+
+Local setup (service):
+  git clone git@github.com:AstralProtocol/astral-location-services.git
+  cd astral-location-services
+  npm install
+
+  # Start PostGIS (needs Docker)
+  # Default port is 5432. If you already have Postgres running on 5432,
+  # edit docker-compose.dev.yml to map a different host port (e.g., "5433:5432")
+  # and update DATABASE_URL in .env.local to match.
+  docker compose -f docker-compose.dev.yml up -d
+
+  # Create .env.local from the template
+  cp .env.example packages/astral-service/.env.local
+  # Fill in SIGNER_PRIVATE_KEY (any test wallet key works for local dev)
+  # Generate one with: node -e "console.log(require('ethers').Wallet.createRandom().privateKey)"
+
+  # Run the service
+  cd packages/astral-service
+  # Note: the service doesn't use dotenv — you must pass the env file explicitly
+  node --env-file=.env.local --import tsx src/index.ts
+  # Runs on http://localhost:3000 (or whatever PORT you set in .env.local)
+  # Health check: curl http://localhost:3000/health
+
+  # Quick smoke test:
+  curl -X POST http://localhost:3000/compute/v0/distance \
+    -H "Content-Type: application/json" \
+    -d '{
+      "from": {"type": "Point", "coordinates": [-73.9857, 40.7484]},
+      "to": {"type": "Point", "coordinates": [-0.1278, 51.5074]},
+      "chainId": 84532
+    }'
+  # Should return ~5581421 meters with a signed attestation
+
+Local setup (SDK):
+  git clone git@github.com:DecentralizedGeo/astral-sdk.git
+  cd astral-sdk
+  pnpm install   # SDK uses pnpm, not npm
+  pnpm run build
+  pnpm run test  # 402 tests, should all pass
+
+Architecture in 30 seconds:
+- Client calls SDK → SDK calls service API → service does PostGIS computation → signs a
+  delegated EAS attestation → returns it → SDK submits it onchain (caller pays gas,
+  Astral is attester)
+- Main entry points: src/compute/ComputeModule.ts (SDK), src/compute/routes/ (service)
+- Operations: distance, area, length, contains, within, intersects
+- API uses `from`/`to` fields for input geometries (not geometryA/geometryB),
+  and `chainId` is required on every request
+- There's also a verify module (src/verify/) that evaluates location proofs against
+  claims
+
+Key files:
+- Service: SPEC.md is the authoritative technical doc
+- SDK: CLAUDE.md has all the commands and project structure
+- Both repos have CLAUDE.md files — read those first
+```

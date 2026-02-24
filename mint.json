@@ -68,7 +68,7 @@
   "navigation": [
     {
       "group": "Getting Started",
-      "pages": ["introduction", "quickstart", "how-it-works"]
+      "pages": ["introduction", "quickstart", "agent-quickstart", "how-it-works"]
     },
     {
       "group": "Core Concepts",
