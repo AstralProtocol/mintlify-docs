@@ -106,26 +106,6 @@
       ]
     },
     {
-      "group": "Guides",
-      "pages": [
-        "guides/local-development",
-        "guides/calling-the-api",
-        "guides/verifying-location-proofs",
-        "guides/blockchain-integration",
-        "guides/agent-integration",
-        "guides/building-plugins"
-      ]
-    },
-    {
-      "group": "Use Cases",
-      "pages": [
-        "use-cases/delivery-verification",
-        "use-cases/parametric-insurance",
-        "use-cases/geofence-compliance",
-        "use-cases/onchain-attestation"
-      ]
-    },
-    {
       "group": "API Reference",
       "pages": [
         "api-reference/overview",
@@ -174,15 +154,6 @@
         "plugins/proofmode",
         "plugins/witnesschain",
         "plugins/custom"
-      ]
-    },
-    {
-      "group": "Trust Model",
-      "pages": [
-        "trust-model/architecture",
-        "trust-model/what-is-verified",
-        "trust-model/what-you-are-trusting",
-        "trust-model/security"
       ]
     },
     {
