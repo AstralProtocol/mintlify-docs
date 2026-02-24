@@ -9,7 +9,7 @@ description: "Location proof plugins for the Astral SDK"
 
 # Location proof plugins
 
-Location proof plugins are the extensibility layer of the Astral SDK. Each plugin integrates a proof-of-location system — a technology that produces evidence about where something was at a given time. Plugins follow a standard interface so the SDK can orchestrate across multiple independent evidence sources.
+Location proof plugins collect and create location evidence. Each plugin integrates a proof-of-location system — a social or technical system that produces evidence about where something was at a given time. Plugins follow a standard interface so the SDK can orchestrate across multiple independent evidence sources.
 
 ## How plugins fit in
 
@@ -29,7 +29,7 @@ Once you have signed stamps, the SDK's `ProofsModule` bundles them with a claim 
 | Plugin | Package | Status | collect | create | sign | verify |
 |--------|---------|--------|---------|--------|------|--------|
 | [Mock](/plugins/mock) | Built into SDK | Complete | Yes | Yes | Yes | Yes |
-| [ProofMode](/plugins/proofmode) | `@location-proofs/plugin-proofmode` | Alpha | Coming soon | Yes | — | Yes (structural) |
+| [Proofmode](/plugins/proofmode) | `@location-proofs/plugin-proofmode` | Alpha | Coming soon | Yes | — | Yes (structural) |
 | [WitnessChain](/plugins/witnesschain) | `@location-proofs/plugin-witnesschain` | In development | Coming soon | Coming soon | Coming soon | Coming soon |
 
 ## Quick start
