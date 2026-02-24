@@ -5,9 +5,11 @@ description: "Strategies and technologies for producing location evidence"
 
 <Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
-# Proof-of-location systems
+# Proof-of-Location Systems
 
-A proof-of-location system is any strategy or technology that produces evidence about physical location. These systems are the foundation of location proofs — each [location stamp](/concepts/location-stamps) comes from a proof-of-location system, wrapped in a [location proof plugin](/concepts/location-proof-structure#location-proof-plugins).
+A proof-of-location system is any system that produces evidence about physical location. These systems are the foundation of location proofs — each [location stamp](/concepts/location-stamps) comes from a proof-of-location system, wrapped in a [location proof plugin](/concepts/location-proof-structure#location-proof-plugins).
+
+// callout: Location verification is ubiquitous online, but it is usually ad hoc or unverifiable. Things ranging from GeoIP lookups, scanning a QR code, inputting a passphrase, checking in with an event host, even submitting a bank statement as proof-of-address... the Location Proof Framework is intended to make these different techniques more transparent and legible ... 
 
 ## Categories of proof-of-location systems
 
@@ -17,23 +19,23 @@ Proof-of-location systems span a wide range of approaches, from hardware-based m
 |----------|-----------|---------|-----------|-------------|
 | **Near-field machine** | Physical proximity verification via short-range signals | RFID, NFC, Bluetooth beacons | Hard to forge without physical presence | Short range; requires infrastructure |
 | **Network machine** | Position derived from network measurements | Time of Flight, TDOA, latency triangulation | Independent of device; based on physics | Requires distributed infrastructure |
-| **Sensor data** | Location inferred from environmental readings | Magnetometer signatures, image/audio analysis | Rich contextual evidence | Computationally expensive to verify |
+| **Sensor data** | Location inferred from environmental readings | Magnetometer signatures, image/audio analysis | Rich contextual evidence | Computationally expensive to verify, difficult to detect generated sensor data |
 | **Delegated** | Trusted third party attests to location | Notarized presence, institutional witness | Leverages existing trust relationships | Only as trustworthy as the delegate |
 | **Social** | Peer confirmations of co-location | Mutual attestation, group check-in | Distributed trust; no infrastructure needed | Collusion risk |
 | **Authority-based** | Authorized entity confirms location | Government agency, licensed surveyor | High institutional trust | Centralized; requires authority access |
-| **Legal** | Location established through legal process | Court records, notarized documents | Strong evidentiary weight | Slow; expensive; not real-time |
+| **Legal** | Location established through legal process | Court records, notarized documents, affadavits | Strong evidentiary weight, legal liability of fraud | Slow; expensive; not real-time |
 
 ## Current state of the field
 
-Honesty matters here: few "hard" proof-of-location systems exist at scale today. Most deployed location infrastructure (GPS, Wi-Fi positioning, cell tower triangulation) was designed for navigation, not proof. These systems tell you where you are but don't produce cryptographically verifiable evidence that you were there.
+Honesty matters here: few "hard" proof-of-location systems exist at scale today, and even fewer are decentralized. Most deployed location infrastructure (GPS, Wi-Fi positioning, cell tower triangulation) was designed for navigation, not proof. These systems tell you where you are but don't produce cryptographically verifiable evidence that you were there.
 
-The proof-of-location systems that do exist with meaningful cryptographic properties — hardware attestation, network latency triangulation, secure enclave readings — are still maturing. Each has real limitations and known attack vectors.
+The proof-of-location systems that do exist with meaningful cryptographic properties — hardware attestation, network latency triangulation, secure enclave readings, [Galileo's OSNMA authentication feature](https://www.gsc-europa.eu/galileo/services/galileo-open-service-navigation-message-authentication-osnma) — are still maturing. Each has real limitations and known attack vectors.
 
-That said, significant value comes from "softer" proof-of-location systems too. Even a single device attestation with sensor readings, while not unbreakable, raises the cost of forgery substantially compared to self-reported GPS. And combining multiple independent sources — even individually weak ones — creates meaningful assurance through cross-correlation.
+That said, significant value comes from "softer" proof-of-location systems too. Even a single device attestation with sensor readings, while not unbreakable, raises the cost of forgery substantially compared to self-reported GPS. And combining multiple independent sources — even individually weak ones — creates meaningful assurance through cross-correlation. Our vision is to build a community ecosystem of location proof plugins, and over time enhance our capability to create location proofs further and further up the certainty spectrum.
 
 ## Available plugins
 
-Astral currently supports these proof-of-location systems through [location proof plugins](/plugins/overview):
+v0 of the Astral Protocol is launching with limited support for  these proof-of-location systems through [location proof plugins](/plugins/overview):
 
 <CardGroup cols={2}>
   <Card title="ProofMode" icon="mobile" href="/plugins/proofmode">
@@ -45,6 +47,8 @@ Astral currently supports these proof-of-location systems through [location proo
 </CardGroup>
 
 The [Mock plugin](/plugins/mock) is available for development and testing.
+
+We are actively [researching](https://github.com/location-proofs/research) many more location proofs plugins, and invite collaboration here. 
 
 ## Building new plugins
 

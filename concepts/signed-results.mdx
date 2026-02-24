@@ -5,11 +5,11 @@ description: "Output formats from verification and computation — and how to us
 
 <Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
-# Signed results
+# Signed Results
 
-Both the [verify](/concepts/verify) and [compute](/concepts/compute) endpoints return signed results — cryptographically signed records of what was computed, what inputs were used, and what the answer was. The signature comes from the Astral signing key, held exclusively inside the [TEE](/concepts/astral-location-services).
+Both the [Verify](/concepts/verify) and [Compute](/concepts/compute) endpoints return signed results — cryptographically signed records of what was computed, what inputs were used, and what the answer was. The signature comes from the Astral signing key, held exclusively inside the [TEE](/concepts/astral-location-services).
 
-## What a signed result proves
+## What a Signed Result Proves
 
 A signed result proves three things:
 
@@ -19,7 +19,7 @@ A signed result proves three things:
 
 Any downstream consumer can verify these properties by checking the signature against the known Astral public key — without re-executing the computation or trusting an intermediary.
 
-## Result types
+## Result Types
 
 The signed result format depends on the operation:
 
@@ -31,7 +31,7 @@ The signed result format depends on the operation:
 
 Each result also includes: input references (UIDs or hashes), a timestamp, the operation name, and the Astral signing key's signature.
 
-## Using signed results offchain
+## Using Signed Results Offchain
 
 A signed result is immediately usable in any application:
 
@@ -42,7 +42,7 @@ A signed result is immediately usable in any application:
 
 A verified location proof (from the verify endpoint) is valuable on its own — it doesn't need to flow into a compute operation. Many applications only need to know "how credible is this location claim?" and can act on that directly.
 
-## Using signed results onchain
+## Using Signed Results Onchain
 
 Signed results can be submitted onchain via EAS (Ethereum Attestation Service) delegated attestations. The flow:
 
@@ -55,7 +55,7 @@ This is the **delegated attestation pattern** — Astral produces the attestatio
 
 Resolver contracts can verify that the result came from Astral by checking `attestation.attester == astralSigner`, and can inspect the input references to confirm the expected locations were checked.
 
-## Not every result needs to go onchain
+## Not Every Result Needs to Go Onchain
 
 The onchain path is available but not required. Most applications will use signed results offchain — the cryptographic signature provides verifiability regardless of whether the result is submitted to a blockchain.
 

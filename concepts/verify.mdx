@@ -1,21 +1,21 @@
 ---
 title: "Verify"
-description: "The verification endpoint — submit a location proof, get a credibility vector"
+description: "The verification endpoint — submit a location proof, get a verified location proof"
 ---
 
 <Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Verify
 
-The verify endpoint accepts a [location proof](/concepts/location-proof-structure) and returns a [credibility vector](/concepts/location-proof-evaluation#the-credibility-vector). It's the service-level manifestation of the [evaluation concepts](/concepts/location-proof-evaluation) — this page describes *how the service works*; the evaluation page describes *what is checked and why*.
+The Verify service accepts a [location proof](/concepts/location-proof-structure) and returns a **verified location proof** — the original proof, a [credibility vector](/concepts/location-proof-evaluation#the-credibility-vector), and a signed EAS attestation. It's a hosted, verifiable implementation of the [evaluation function](/concepts/location-proof-evaluation). This page describes *how the service works*; the evaluation page describes *what is checked and why*.
 
-## How it works
+## How It Works
 
 When a location proof is submitted to the verify endpoint:
 
 1. **Plugin resolution** — The service identifies which [location proof plugins](/plugins/overview) produced each [location stamp](/concepts/location-stamps) in the proof and loads the appropriate verification logic.
 
-2. **Stamp verification** — Each location stamp is verified independently: signature validation, structural checks, and signal consistency assessment. This is plugin-specific — ProofMode verification checks different things than WitnessChain verification.
+2. **Stamp verification** — Each location stamp is verified independently: signature validation, structural checks, and signal consistency assessment. Verification is plugin-specific — each plugin knows how to check its own evidence.
 
 3. **Cross-correlation** (multi-stamp location proofs) — For location proofs with multiple location stamps from independent proof-of-location systems, the service assesses independence and agreement across sources.
 
@@ -25,26 +25,25 @@ When a location proof is submitted to the verify endpoint:
 
 All of this happens inside the [TEE](/concepts/astral-location-services), which means the evaluation logic is attested and the signing key is protected.
 
-## Verify endpoint vs. stamp endpoint
-
-There are two verification endpoints:
+## Two Endpoints
 
 | Endpoint | Input | Output | Use case |
 |----------|-------|--------|----------|
-| **Verify proof** | Full location proof (claim + stamps) | Credibility vector | Full evaluation — the primary verification path |
-| **Verify stamp** | Single location stamp | Stamp validity result | Check a location stamp's internal validity without a claim |
+| **[Verify proof](/api-reference/verify/proof)** | Full location proof (claim + stamps) | Verified location proof | Full evaluation — the primary verification path |
+| **[Verify stamp](/api-reference/verify/stamp)** | Single location stamp | Stamp validity result | Quick check of a location stamp's internal validity without a claim |
 
-The stamp endpoint is useful for quick validity checks — confirming that a location stamp's signatures are valid and its structure is correct — without the overhead of claim assessment and cross-correlation.
+The stamp endpoint is useful for confirming that a location stamp's signatures are valid and its structure is correct — without the overhead of claim assessment and cross-correlation.
 
-## Output
+## What Each Endpoint Returns
 
-The verify endpoint returns:
-- **Credibility vector** — Scores across spatial, temporal, validity, and independence dimensions
-- **Per-stamp results** — Individual verification results for each location stamp
-- **Overall confidence** — Summary score (0–1)
-- **Signed attestation** — The verification result as a signed EAS attestation
+**Verify proof** returns a verified location proof containing:
+- **The original proof** — the location claim and location stamps as submitted
+- **Credibility vector** — structured assessment across spatial, temporal, validity, and independence dimensions, with per-stamp detail
+- **Signed EAS attestation** — the verification result signed by the TEE key, independently verifiable by any downstream consumer
 
-A verified location proof is valuable on its own. It doesn't need to flow into a [compute](/concepts/compute) operation — many applications only need to know "how credible is this location claim?" without asking any further spatial questions.
+**Verify stamp** returns a validity result: whether signatures, structure, and signals pass their checks.
+
+A verified location proof is valuable on its own. It doesn't need to flow into a [Compute](/concepts/compute) operation — many applications only need to know "how credible is this location claim?" without asking any further spatial questions.
 
 <Card title="Next: Compute" icon="calculator" href="/concepts/compute">
   Geospatial operations inside the TEE

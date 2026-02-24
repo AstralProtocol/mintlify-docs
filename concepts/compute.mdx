@@ -7,9 +7,9 @@ description: "Geospatial operations inside the TEE — distance, containment, an
 
 # Compute
 
-The compute endpoint runs geospatial operations on location data inside the [TEE](/concepts/astral-location-services) and returns [signed results](/concepts/signed-results). It answers spatial questions — how far apart are these locations? is this point inside that boundary? — with cryptographically verifiable answers.
+The Compute endpoint runs geospatial operations on location data inside the [TEE](/concepts/astral-location-services) and returns [signed results](/concepts/signed-results). It answers spatial questions — how far apart are these locations? is this point inside that boundary? — with cryptographically verifiable answers.
 
-## Accepted inputs
+## Accepted Inputs
 
 The compute endpoint accepts location data at any level of the [verifiability spectrum](/concepts/location-data#the-verifiability-spectrum):
 
@@ -27,9 +27,9 @@ The compute engine is PostGIS backed by GEOS — the same C++ library that power
 
 Computation is stateless and deterministic. Each request brings all required inputs. Results are rounded to centimeter precision before signing to ensure reproducibility. Same inputs always produce the same output.
 
-## Available operations
+## Available Operations
 
-### Measurements (numeric results)
+### Measurements (Numeric Results)
 
 | Operation | What it computes | Unit | PostGIS function |
 |-----------|-----------------|------|------------------|
@@ -37,7 +37,7 @@ Computation is stateless and deterministic. Each request brings all required inp
 | **Area** | Area of a polygon | square meters | `ST_Area` |
 | **Length** | Length of a line | meters | `ST_Length` |
 
-### Predicates (boolean results)
+### Predicates (Boolean Results)
 
 | Operation | What it checks | PostGIS function |
 |-----------|---------------|------------------|
@@ -47,7 +47,7 @@ Computation is stateless and deterministic. Each request brings all required inp
 
 All measurements use metric units. No unit conversion is provided — convert client-side if needed.
 
-## Precision and determinism
+## Precision and Determinism
 
 Results are stored with centimeter precision as scaled integers:
 
@@ -67,21 +67,20 @@ Every compute operation returns a [signed result](/concepts/signed-results) cont
 - The operation name
 - A cryptographic signature from the TEE-held signing key
 
-The signed result can be used offchain (in an agent, application, or database) or submitted onchain via EAS delegated attestation to trigger smart contract logic.
+The signed result can be used offchain (in an agent, application, or database) or submitted onchain via EAS delegated attestation. EAS resolvers allow those attestations to trigger smart contract logic.
 
-## Planned operations
+## What's Next
 
-Post-v0, additional operations are planned:
+The current operation set covers the most common spatial questions, but PostGIS exposes a much larger surface. Areas we're exploring:
 
-| Operation | Type | Description |
-|-----------|------|-------------|
-| `disjoint` | Predicate | Do geometries not share any space? |
-| `buffer` | Transformation | Create buffer zone around geometry |
-| `centroid` | Transformation | Find center point of geometry |
-| `union` | Transformation | Merge geometries |
-| `intersection` | Transformation | Compute overlapping area |
+- **More predicates and measurements** — `disjoint`, `touches`, `crosses`, nearest-neighbor queries
+- **Geometry transformations** — buffers, centroids, unions, intersections. These return **new geometries** rather than scalar or boolean values, which raises open design questions about signed result format and storage
+- **Spatial selection queries** — operations over sets of geometries, like "which of these polygons contains this point?" or "find all zones within 1km of this location"
+- **Compositional queries** — chaining multiple operations into a single verified request, so you could express something like "is this point within 500m of any geometry in this set that intersects this boundary?" without multiple round trips
 
-Composable operations — combining multiple predicates in a single request — are also under exploration.
+<Tip>
+  The operation set is extensible. If you need a spatial operation that isn't listed here, [open an issue](https://github.com/AstralProtocol/astral-location-services/issues).
+</Tip>
 
 <Card title="Next: Signed results" icon="file-signature" href="/concepts/signed-results">
   Output formats and how to use them

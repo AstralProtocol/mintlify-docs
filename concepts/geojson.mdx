@@ -9,13 +9,33 @@ description: "Raw unsigned geospatial data — the simplest input format"
 
 GeoJSON is raw, unsigned geospatial data. It's the simplest way to pass location data into Astral — and the least verifiable.
 
-## What GeoJSON provides
+## The format
 
-GeoJSON ([RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946)) is a standard format for encoding geographic data structures. Astral's v0 implementation uses GeoJSON as the universal geometry format across all inputs and outputs. Expansion to other geospatial formats is planned.
+GeoJSON ([RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946)) is a standard format for encoding geographic data structures. The full spec defines three object types — Geometry, Feature (geometry + properties), and FeatureCollection — but **Astral v0 works with bare Geometry objects only**, not Feature or FeatureCollection wrappers.
 
-A GeoJSON geometry carries:
-- **Shape** — Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, GeometryCollection
-- **Coordinates** — `[longitude, latitude]` pairs in WGS84
+A Geometry object has two keys:
+
+- **`type`** — the geometry type: `Point`, `LineString`, `Polygon`, `MultiPoint`, `MultiLineString`, `MultiPolygon`, or `GeometryCollection`
+- **`coordinates`** — nested arrays of `[longitude, latitude]` positions
+
+Geometries are built from coordinate arrays. A Point is a single `[lon, lat]` pair. A LineString is an array of positions. A Polygon is an array of linear rings — where each ring is an array of positions and the **first and last position must be identical** (closing the ring to form a valid area).
+
+```json
+{
+  "type": "Polygon",
+  "coordinates": [[
+    [-122.42, 37.78],
+    [-122.42, 37.76],
+    [-122.40, 37.76],
+    [-122.40, 37.78],
+    [-122.42, 37.78]
+  ]]
+}
+```
+
+<Warning>
+  Astral APIs accept **bare Geometry objects** — pass the geometry directly, not wrapped in a Feature. If you're exporting from tools like geojson.io, extract the `geometry` field from the Feature before passing it to Astral.
+</Warning>
 
 ## What GeoJSON does not provide
 
@@ -25,15 +45,7 @@ A GeoJSON geometry carries:
 
 A signed result that uses raw GeoJSON as input proves "Astral computed the relationship between geometry A and geometry B" — but it does not prove who provided those geometries or whether they correspond to anything in the physical world.
 
-## When to use raw GeoJSON
-
-Raw GeoJSON is appropriate for:
-
-- **Reference geometries** — Official boundaries, well-known landmarks, administrative regions. These are publicly verifiable facts that don't need cryptographic proof of origin.
-- **Prototyping** — Testing computations without creating signed records first.
-- **Static inputs** — Geometries that represent fixed, known locations (a building footprint, a city boundary).
-
-For user positions, device locations, or any input where provenance matters, use [signed location records](/concepts/location-records) or [location proofs](/concepts/location-proofs) instead.
+For inputs where provenance matters, use [signed location records](/concepts/location-records) or [location proofs](/concepts/location-proofs).
 
 ## Coordinate conventions
 
@@ -47,6 +59,12 @@ For user positions, device locations, or any input where provenance matters, use
 <Warning>
   Many mapping APIs use `[latitude, longitude]` order. GeoJSON uses `[longitude, latitude]`. Mixing these up is a common source of bugs — your point ends up in the wrong hemisphere.
 </Warning>
+
+## Tools for working with GeoJSON
+
+- **[geojson.io](https://geojson.io)** — Draw, edit, and export GeoJSON on a map. The standard quick-start tool.
+- **[Placemark Play](https://play.placemark.io)** — Open-source geodata editor with drawing and algorithmic operations (buffering, simplification).
+- **[MapShaper](https://mapshaper.org)** — Simplify, convert, and inspect vector data. Useful for reducing file size and format conversion.
 
 <Card title="Next: Location records" icon="file-signature" href="/concepts/location-records">
   Signed, verifiable location data

@@ -5,11 +5,11 @@ description: "Assertions about the timing and location of an event"
 
 <Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
-# Location claims
+# Location Claims
 
 A location claim is an assertion about where and when an event occurred. It's the "I was here" statement that [location stamps](/concepts/location-stamps) provide evidence for or against.
 
-## What a location claim contains
+## What a Location Claim Contains
 
 A location claim extends the [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) specification with verification-specific fields:
 
@@ -28,18 +28,20 @@ A location claim extends the [Location Protocol v0.2](https://github.com/Decentr
 - **Asset location** — a physical asset was at a location
 - **Delivery** — a delivery occurred at a location
 
-## The uncertainty tradeoff
+## The Uncertainty Tradeoff
 
 Location claims involve a fundamental tension between precision and confidence:
 
-- "Somewhere in California during 2024" — easy to verify with high confidence, but not very useful
-- "Within 10 meters at 14:32:07" — precise and useful, but hard to verify confidently
+- "Somewhere in California during 2024" — easy to verify with high confidence, but not very useful for many use cases
+- "Within 10 meters at 14:32:07" — precise and useful, but harder to verify confidently
 
-Broader claims are easier to verify because the evidence just needs to fall anywhere within a larger target. Narrower claims require stronger evidence. Applications decide what precision/confidence balance they need.
+Broader claims are easier to verify because the evidence just needs to fall anywhere within a larger target. Narrower claims require more precise evidence. Applications decide what precision/confidence balance they need.
 
 This tradeoff also has privacy implications. Broader spatial and temporal bounds reveal less about exact location, which can be a feature rather than a limitation for privacy-sensitive applications.
 
-## Relationship to location stamps
+Ultimately, spatial and temporal precision, forgery cost, privacy, latency and other factors are application-specific — different combinations of location stamps will be useful in different contexts. 
+
+## Relationship to Location Stamps
 
 A location claim is an assertion. A [location stamp](/concepts/location-stamps) is evidence. They use the same Location Protocol format for their location data, but represent different things:
 

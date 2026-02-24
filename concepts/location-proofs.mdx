@@ -1,52 +1,68 @@
 ---
-title: "Location Proofs"
+title: "Overview"
 description: "Composable, multi-factor evidence that something was somewhere"
 ---
 
 <Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
-# Location proofs
+# Location Proofs
 
-A location proof adds **evidence** to a location record. Where a [signed location record](/concepts/location-records) proves that someone *claimed* a location, a location proof provides independently evaluable evidence that the claim corresponds to physical reality.
+A location proof is a location record that represents a **location claim**, coupled with **location evidence** supporting that claim. A location proof provides independently evaluable evidence that the claim corresponds to physical reality.
 
-This is Astral's core innovation: composable, multi-factor location proofs that bundle evidence from independent [proof-of-location systems](/concepts/pol-systems) into a single verifiable artifact.
+<Info>
+  A location proof is a verifiable digital artifact that represents a claim about the timing and position of some event, plus one or more pieces of corroborating evidence that would require technical manipulation, collusion, or fraud to forge.
+</Info>
 
-## Why location proofs matter
+The key aim is to **raise the cost of lying about where things happen**, so we can build more interesting applications on more credible spatial facts.
+
+Astral's Location Proof Framework provides a library of [location proof plugins](/plugins/overview) that collect evidence from different systems and compose them in a way that can be parsed and verified. We are building to support the widest possible range of ways to verify location — we don't want to make assumptions about what forms of evidence system designers will or won't accept.
+
+One of Astral's core innovations: composable, multi-factor location proofs that bundle evidence collected from independent [proof-of-location systems](/concepts/pol-systems) into a single verifiable artifact.
+
+## Why Location Proofs Matter
 
 Most location data today is self-reported. A device says "I'm at these coordinates" and the receiving system takes it on faith. This works until the stakes are high enough to justify forgery — and the cost of forging GPS coordinates is essentially zero.
 
-Location proofs change the economics. By requiring evidence from independent proof-of-location systems, they raise the cost of forgery. The goal is not absolute certainty (which is rarely achievable for physical location), but making the cost of a convincing forgery exceed the value of the fraud.
+Location proofs change the economics. By requiring evidence from independent proof-of-location systems, they raise the cost of forgery. The goal is not absolute certainty (which we believe is not achievable for physical location), but making the cost of a convincing forgery exceed the value of the fraud.
 
-## The certainty spectrum
+## The Certainty Spectrum
 
-Not all location proofs are equally strong. The level of assurance depends on the number, diversity, and quality of the evidence sources:
+Not all location proofs are equally strong. The level of assurance depends on the number, diversity, and quality of the evidence sources.
 
-| Level | Description | Example |
-|-------|------------|---------|
-| **L0** | No evidence — bare self-reported claim | Raw GPS coordinates from an app |
-| **L1** | One externally sourced piece of evidence | GeoIP lookup confirming approximate region |
-| **L2** | One substantive strategy or 2-3 lighter-weight sources | ProofMode device attestation with sensor readings |
-| **L3** | Multiple independent sources, at least one substantive | ProofMode + WitnessChain latency triangulation |
-| **L4** | Diverse high-integrity signals with strong cryptography | Multiple hardware-backed sources + network verification + cross-correlation |
-| **L5** | Nation-state resistance | Advanced cryptographic proofs + multiple cross-domain endorsements (research frontier) |
+To reason about the relative security of location proofs, we are developing a 5-level **certainty spectrum**:
 
-Most real-world applications operate between L1 and L3. Higher levels require proof-of-location systems that don't yet exist at scale — this is an active area of research.
+| Level | Description |
+|-------|------------|
+| **L0** | No evidence — bare self-reported claim |
+| **L1** | One externally sourced piece of evidence (e.g. IP-based or single-sensor) |
+| **L2** | One substantive strategy or 2–3 lighter-weight independent sources |
+| **L3** | Multiple independent sources, at least one substantive |
+| **L4** | Diverse high-integrity signals with strong cryptographic backing and cross-correlation |
+| **L5** | Nation-state resistance — advanced cryptographic proofs with multiple cross-domain endorsements (research frontier) |
 
-## Key principles
+Most real-world applications today operate at L1 or L2. Higher levels require proof-of-location systems that don't yet exist at scale — this is an active area of research.
+
+## Design Principles
 
 **No one-size-fits-all.** Different applications need different levels of assurance. A social check-in app has different requirements than a land title registry. Location proofs are designed to be composable so applications can choose the right level for their use case.
 
+**Neutral framework.** Astral provides the structure for collecting, composing, and evaluating location evidence — not opinions about which evidence sources to trust. Some applications will accept government-issued attestations as sufficient; others will give them no weight. The framework accommodates both without preference.
+
 **Probabilistic, not deterministic.** Location proofs produce credibility scores, not binary verdicts. The evidence either supports the claim strongly, weakly, or not at all — and applications decide what threshold they need.
 
-**Compose for the use case.** A single location stamp from one proof-of-location system is a valid location proof. Multiple location stamps from independent systems are stronger. The architecture supports both without requiring a minimum.
+**Compose for the use case.** A single location stamp from one proof-of-location system coupled with a claim is a valid location proof. Multiple location stamps from independent systems are stronger. The architecture supports both without requiring a minimum.
 
-**Forgery cost principle.** The cost of forging a location proof should exceed the economic value of the transaction it underpins. A $10 check-in reward needs less forgery resistance than a $10M land title transfer.
+**Information monotonicity.** Adding valid, independent evidence to a location proof may raise or lower confidence in the underlying claim, but it should always increase certainty about that confidence. More evidence means a clearer picture, even if the picture is unfavorable.
 
-## The location proof pipeline
+**Verifiability throughout.** Location stamps should be cryptographically signed, evidence bundles should maintain clear provenance, and evaluation functions should be identifiable. Every layer of the location proof should be independently checkable.
+
+**Forgery cost principle.** The cost of forging a location proof should exceed the economic value of the transaction it underpins. A \$10 check-in reward needs less forgery resistance than a \$10M land title transfer.
+
+## The Location Proof Pipeline
 
 Location proofs are built from a series of concepts that compose together:
 
-1. **[Proof-of-location systems](/concepts/pol-systems)** — The strategies and technologies that produce location evidence
+1. **[Proof-of-location systems](/concepts/pol-systems)** — The technical and social systems that produce location evidence
 2. **[Location stamps](/concepts/location-stamps)** — Individual pieces of evidence from a single proof-of-location system
 3. **[Location claims](/concepts/location-claims)** — Assertions about where and when an event occurred
 4. **[Composing location proofs](/concepts/location-proof-structure)** — Bundling location stamps with a location claim into a verifiable artifact
@@ -55,7 +71,7 @@ Location proofs are built from a series of concepts that compose together:
 Each of the following pages covers one of these concepts in detail.
 
 <Card title="Next: Proof-of-location systems" icon="satellite-dish" href="/concepts/pol-systems">
-  The strategies and technologies that produce location evidence
+  The technical and social systems that produce location evidence
 </Card>
 
 ---

@@ -5,23 +5,23 @@ description: "Evidence from a single proof-of-location system about an observed 
 
 <Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
-# Location stamps
+# Location Stamps
 
-A location stamp is a piece of evidence from a single [proof-of-location system](/concepts/pol-systems) about an observed location. It's the atomic unit of location evidence in Astral — the building block from which [location proofs](/concepts/location-proof-structure) are composed.
+A location stamp is a signed piece of evidence from a single [proof-of-location system](/concepts/pol-systems) about an observed location. It's the atomic unit of location evidence in Astral — the building block from which the [location evidence](/concepts/location-proof-structure) component of a location proof is composed.
 
-## What a location stamp contains
+## Location Stamp Contents
 
 Conceptually, a location stamp carries four things:
 
 **Observed location.** Where the proof-of-location system's evidence indicates the subject was. This uses the same [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) format as location records — a geometry with a spatial reference system.
 
-**Temporal footprint.** When the observation was made. This is a time range (start and end), not a single instant, because observations take time and evidence may span a window.
+**Temporal footprint.** When the observation was made. Both location stamps and location claims use time ranges (start and end), not single instants — observations take time, and evidence may span a window.
 
-**Plugin identification.** Which proof-of-location system produced this evidence, and which version of the [location proof plugin](/concepts/location-proof-structure#location-proof-plugins) was used. This is necessary for verification — the verifier needs to know what kind of evidence to expect and how to evaluate it.
+**Plugin identification.** Which [location proof plugin](/concepts/location-proof-structure#location-proof-plugins) + version was used to create this evidence. This is necessary for verification — the verifier needs to know what kind of evidence to expect and how to evaluate it.
 
-**Signals and signatures.** The raw evidence data (signals) collected by the proof-of-location system, plus cryptographic signatures that bind the evidence to its source. The signals are plugin-specific — ProofMode provides sensor readings and device attestation; WitnessChain provides latency measurements and challenger responses.
+**Signals and signatures.** The raw evidence data (signals) collected by the proof-of-location system, plus cryptographic signatures that bind the evidence to its source. The signals are plugin-specific — each proof-of-location system produces different kinds of raw data (sensor readings, latency measurements, attestation tokens, etc.).
 
-## Location stamps are independent of location claims
+## Independence From Claims
 
 This is a key design decision. A location stamp says "here is evidence about an observed location" — it does not say "this evidence supports a particular claim." The separation matters because:
 
@@ -29,7 +29,7 @@ This is a key design decision. A location stamp says "here is evidence about an 
 - Location stamps can be collected before a location claim is formulated
 - Verification can assess each location stamp on its own merits before comparing it to the claim
 
-The connection between location stamps and location claims happens at the [location proof](/concepts/location-proof-structure) level, where they're bundled together. The [evaluation](/concepts/location-proof-evaluation) process then assesses whether the observed locations (from location stamps) support the asserted location (from the location claim).
+The connection between location stamps and location claims happens at the [location proof](/concepts/location-proof-structure) level, where they're bundled together. The [evaluation](/concepts/location-proof-evaluation) process then assesses whether the observed evidence (from location stamps) support the asserted location (from the location claim).
 
 ## Internal validity
 

@@ -9,16 +9,16 @@ description: "The hosted TEE service that runs verification and computation"
 
 Astral Location Services is the hosted service that performs [location proof verification](/concepts/verify) and [geospatial computation](/concepts/compute). It runs inside a Trusted Execution Environment (TEE), which is what makes the results verifiable rather than merely signed.
 
-## What the service provides
+## What the Service Provides
 
 Two endpoints, one TEE:
 
-- **[Verify](/concepts/verify)** — Submit a location proof, get a credibility vector
-- **[Compute](/concepts/compute)** — Submit location data and a spatial operation, get a signed result
+- **[Verify](/concepts/verify)** — Submit a location proof, get back a verified location proof: the original proof, a [credibility vector](/concepts/location-proof-evaluation#the-credibility-vector), and a signed EAS attestation
+- **[Compute](/concepts/compute)** — Submit location data with geographic features and a specified spatial operation, get a signed result representing the computed relationship between those features
 
 Both endpoints accept requests via the [Astral SDK](/sdk/overview) or directly through the [API](/api-reference/overview).
 
-## Verifiability properties
+## Verifiability Properties
 
 The TEE provides four properties that together make computation verifiable:
 
@@ -31,13 +31,13 @@ The TEE provides four properties that together make computation verifiable:
 
 Together: the code is attested, the inputs are verified, the computation is deterministic, and the output is signed by a key the operator cannot access. An observer can verify that the result came from the correct code running on the correct inputs — without re-executing the computation.
 
-## Privacy properties
+## Privacy Properties
 
-The TEE also provides meaningful privacy guarantees:
+The TEE provides meaningful privacy guarantees. Inputs and outputs are encrypted in transit and decrypted only inside the enclave — the infrastructure operator never sees raw location data.
 
 - **Raw input coordinates** are processed inside the enclave and never exposed to the operator
 - **Exact geometries** (polygon boundaries, line paths) exist only during computation and are discarded after signing
-- **The operator** — whoever runs the Astral service — never sees raw location data
+- **The operator** — whoever runs the Astral service — cannot access the plaintext data at any point
 
 The signed result reveals the operation type, the answer, and hashed input references, but not the raw input data itself. Some information leaks from the result (a `contains` answer of `true` tells you the point is inside the polygon), but this is inherent to the computation, not a limitation of the privacy model.
 
@@ -46,33 +46,36 @@ The signed result reveals the operation type, the answer, and hashed input refer
 The service runs on [EigenCompute](https://blog.eigencloud.xyz/eigencloud-brings-verifiable-ai-to-mass-market-with-eigenai-and-eigencompute-launches/), part of the EigenCloud ecosystem:
 
 ```mermaid
-flowchart LR
-    subgraph TEE["EigenCompute TEE"]
-        subgraph Container["Docker Container"]
-            API[Node.js API] --> PostGIS[PostgreSQL + PostGIS]
-            PostGIS --> GEOS[GEOS Library]
-        end
-    end
-
-    Input[Request] --> API
-    API --> Output[Signed Result]
+sequenceDiagram
+    participant C as Client
+    participant T as EigenCompute TEE
+    C->>T: Encrypted request
+    Note over T: Decrypt inside enclave
+    Note over T: Validate inputs
+    Note over T: PostGIS computation
+    Note over T: Sign result with TEE key
+    T->>C: Signed result
 ```
 
-PostGIS runs **inside** the Docker container, not as an external service. This is essential — no external dependencies means the entire execution environment is attested. The GEOS library under PostGIS is the same C++ geometry engine used by QGIS, GDAL, and most professional geospatial software.
+PostGIS runs **inside** the TEE container, not as an external service — no external dependencies means the entire execution environment is attested. The GEOS library under PostGIS is the same C++ geometry engine used by QGIS, GDAL, and most professional geospatial software.
 
-## The Astral signing key
+## The Signing Key
 
 The signing key is generated and provisioned inside the TEE. It cannot be extracted by the operator, even with physical access to the machine. All signed results are produced by this key, and downstream consumers (smart contracts, applications, agents) can verify that a result was signed by the Astral service by checking the signature against the known public key.
+
+<Warning>
+  Signing key publication is not yet finalized — key management and rotation are still being worked out for production deployment. This page will be updated with the public key and verification instructions when available.
+</Warning>
 
 <Info>
   For key rotation and management details in smart contract integrations, see the [SDK: EAS module](/sdk/eas).
 </Info>
 
-## Stateless model
+## Stateless Model
 
 Each request brings all required inputs. There is no persistent state between requests. This ensures determinism — the same request always produces the same result, regardless of when it's submitted or what other requests have been processed.
 
-## Future directions
+## Future Directions
 
 The current TEE-based approach provides verifiable computation today. Future enhancements include:
 
