@@ -56,6 +56,10 @@ plugin.description // 'ProofMode device-based location proofs with PGP signature
 
 ProofMode implements the standard `create()` and `verify()` interface methods, so it works with the SDK's `StampsModule`.
 
+### Collecting evidence
+
+Evidence collection happens in the [ProofMode app](https://proofmode.org) on the user's device. The app captures GPS coordinates, sensor data, PGP signatures, and hardware attestations, then exports a ZIP bundle. Your application receives this ZIP and passes it through the SDK pipeline below.
+
 ### create()
 
 Pass the ZIP bundle as `signals.data.zipData`:
