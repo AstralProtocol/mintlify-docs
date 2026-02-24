@@ -1,0 +1,149 @@
+---
+title: "Local Development"
+description: "Run Astral locally for development and testing"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Local development
+
+This guide walks you through running Astral on your machine. By the end, you will have a working local instance that responds to geocomputation requests.
+
+## Prerequisites
+
+- **Node.js 20+** — the service uses the `--env-file` flag, which requires Node 20
+- **Docker** — for PostgreSQL with PostGIS
+- **pnpm** — the monorepo uses pnpm workspaces
+
+## Clone and install
+
+```bash
+git clone https://github.com/AstralProtocol/astral-location-services.git
+cd astral-location-services
+pnpm install
+```
+
+## Start PostgreSQL + PostGIS
+
+The repo includes a development Docker Compose file that runs PostgreSQL with PostGIS:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+
+Verify the database is running:
+
+```bash
+docker compose -f docker-compose.dev.yml ps
+```
+
+### Port conflicts
+
+If port 5432 is already in use by another PostgreSQL instance, create a `docker-compose.override.yml` that maps to a different port (e.g., 5434:5432) and update your `DATABASE_URL` accordingly:
+
+```yaml
+# docker-compose.override.yml
+services:
+  postgres:
+    ports:
+      - "5434:5432"
+```
+
+Then set `DATABASE_URL=postgresql://postgres:postgres@localhost:5434/astral` in your environment file.
+
+## Environment setup
+
+```bash
+cp packages/astral-service/.env.example packages/astral-service/.env.local
+```
+
+Edit `.env.local` with your configuration. You will need a `SIGNER_PRIVATE_KEY` — any Ethereum private key works for development. You can generate one with `openssl rand -hex 32`.
+
+The important fields:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgres@localhost:5432/astral` |
+| `PORT` | HTTP server port | `3004` |
+| `SIGNER_PRIVATE_KEY` | Ethereum private key for signing results | `0xac0974bec...` |
+| `CHAIN_ID` | Default chain ID | `84532` (Base Sepolia) |
+
+## Start the service
+
+<Warning>
+The service does not use dotenv. You must pass the env file explicitly using Node's `--env-file` flag.
+</Warning>
+
+```bash
+node --env-file=packages/astral-service/.env.local --import tsx packages/astral-service/src/index.ts
+```
+
+The `npm run dev` script may not work reliably. The command above is the most reliable way to start the service.
+
+You should see output indicating the server is listening on the configured port.
+
+## Health check
+
+Confirm the service is running:
+
+```bash
+curl http://localhost:3004/health
+```
+
+A successful response means the service is up and connected to the database.
+
+## Smoke test
+
+Run a distance computation between the Eiffel Tower and a point across the Seine:
+
+```bash
+curl -X POST http://localhost:3004/compute/distance \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": { "type": "Point", "coordinates": [2.2945, 48.8584] },
+    "to": { "type": "Point", "coordinates": [2.3522, 48.8566] },
+    "chainId": 84532
+  }'
+```
+
+The response includes the distance in meters, a cryptographic signature, and input references. If you see a `result` field with a numeric value, everything is working.
+
+## Platform notes
+
+<AccordionGroup>
+  <Accordion title="Apple Silicon (M1/M2/M3)" icon="apple">
+    PostGIS Docker images may need an explicit platform flag. If the container fails to start, add `platform: linux/amd64` to the postgres service in your compose file:
+
+    ```yaml
+    services:
+      postgres:
+        platform: linux/amd64
+        image: postgis/postgis:16-3.4
+    ```
+
+    This runs under Rosetta emulation, which is slower but functional.
+  </Accordion>
+
+  <Accordion title="Common port conflicts" icon="circle-exclamation">
+    These ports may collide with other local services:
+
+    | Port | Used by | Common conflict |
+    |------|---------|----------------|
+    | 5432 | PostgreSQL | Other Postgres instances, Homebrew Postgres |
+    | 3004 | Astral service | Other dev servers |
+    | 3000-3003 | Other monorepo packages | Next.js, React dev servers |
+
+    Use the `docker-compose.override.yml` approach for database port conflicts, and change `PORT` in `.env.local` for service port conflicts.
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Calling the API" icon="code" href="/guides/calling-the-api">
+    Learn the request format and response structure
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Your first verified spatial computation
+  </Card>
+</CardGroup>

@@ -1,0 +1,82 @@
+---
+title: "Privacy"
+description: "Privacy properties of verification and computation"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Privacy
+
+Privacy is designed into Astral from the start — not bolted on afterward. The [TEE](/concepts/astral-location-services) provides meaningful privacy guarantees today, and zero-knowledge circuits for location proof verification and geospatial computations are an active research direction for stronger properties in the future.
+
+## TEE Privacy Guarantees
+
+The Trusted Execution Environment processes location data inside hardware-isolated memory that the operator cannot inspect, even with physical access to the machine:
+
+**What stays private:**
+- Raw input coordinates — the exact lat/lng values submitted
+- Exact geometries — polygon boundaries, line paths, and other spatial data used in computation
+- Location stamp signals — the raw evidence data from proof-of-location systems
+
+These values exist only inside the TEE during computation and are discarded after the result is signed.
+
+**What is visible:**
+- The signed result — a boolean, numeric value, or credibility vector
+- The operation type — which computation was performed
+- Input references — hashes of the inputs, not the raw data itself
+
+However, in v0 the signed results **do include input data in plaintext**. Compute results can carry the full location claim and credibility vector via `proofInputs`, and verified location proofs include the original proof with all stamps and claim data. This means anyone who receives a signed result can see the raw location inputs.
+
+<Warning>
+  v0 does not strip input data from signed results. A privacy-preserving output mode — returning only the answer, operation type, and hashed input references — is planned. See [astral-location-services#57](https://github.com/AstralProtocol/astral-location-services/issues/57) for progress.
+</Warning>
+
+## Information Leakage From Results
+
+The result itself may reveal information about the inputs. This is inherent to the computation, not a limitation of the privacy model:
+
+| Operation | What the result reveals |
+|-----------|------------------------|
+| `contains` (true) | The point is somewhere inside the polygon |
+| `within` (true, 500m) | The point is within 500m of the target |
+| `distance` (exact value) | The precise distance between two geometries |
+
+More specific operations leak more. A `contains` check against a country-sized polygon reveals less than a `within` check with a 10-meter radius.
+
+## Spatial and Temporal Uncertainty as Privacy Tools
+
+The [uncertainty tradeoff](/concepts/location-claims#the-uncertainty-tradeoff) in location claims has a privacy dimension. Broader spatial bounds (larger radius) and wider temporal bounds reveal less about exact location and timing. Applications that want to preserve user privacy can intentionally use coarser claims — "was this user in San Francisco sometime today?" rather than "was this user within 5m 37.7749°N 122.4194°W at 14:32:07?"
+
+This isn't a hack — it's a principled privacy-preserving approach. If the application only needs to know "roughly where, roughly when," there's no reason to collect or process exact coordinates.
+
+## ZK Location Proofs (Research)
+
+Zero-knowledge proofs would allow verification of location claims without revealing the underlying location data to anyone — including the verifier. A ZK location proof could prove "I was inside this boundary" without revealing where inside the boundary, or even what the boundary was.
+
+| Property | TEE (today) | ZK (future) |
+|----------|------------|-------------|
+| Raw inputs hidden from operator | Yes | Yes |
+| Raw inputs hidden from verifier | No | Yes |
+| No trusted hardware required | No | Yes |
+| Verification without re-execution | No | Yes |
+| Production-ready | Yes | Not yet |
+
+ZK location proofs are an active area of research. The challenge is constructing efficient circuits for geospatial operations — polygon containment and distance calculations are expensive to express in arithmetic circuits. This is future work, not a current capability.
+
+## TEE Limitations
+
+The TEE provides strong but not absolute privacy:
+
+- **Hardware trust** — You are trusting that the TEE hardware (Intel SGX / AMD SEV) correctly isolates the enclave. Side-channel attacks on TEEs are an active area of security research.
+- **Result leakage** — As described above, the result itself carries information about the inputs.
+- **Input reference hashes** — Hashed input references are visible. If an observer knows the possible input space, they could attempt to match hashes (though this is computationally expensive for arbitrary geometries).
+
+<Card title="Next: Guides" icon="map" href="/guides/calling-the-api">
+  Walk through common workflows step by step
+</Card>
+
+---
+
+**See also:**
+- [Trust model](/trust-model/architecture) — what's verified vs. what you're trusting
+- [Astral Location Services](/concepts/astral-location-services) — TEE architecture details

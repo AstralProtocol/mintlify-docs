@@ -1,0 +1,53 @@
+---
+title: "Location Stamps"
+description: "Evidence from a single proof-of-location system about an observed location"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Location Stamps
+
+A location stamp is a signed piece of evidence from a single [proof-of-location system](/concepts/pol-systems) about an observed location. It's the atomic unit of location evidence in Astral — the building block from which the [location evidence](/concepts/location-proof-structure) component of a location proof is composed.
+
+## Location Stamp Contents
+
+Conceptually, a location stamp carries four things:
+
+**Observed location.** Where the proof-of-location system's evidence indicates the subject was. This uses the same [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) format as location records — a geometry with a spatial reference system.
+
+**Temporal footprint.** When the observation was made. Both location stamps and location claims use time ranges (start and end), not single instants — observations take time, and evidence may span a window.
+
+**Plugin identification.** Which [location proof plugin](/concepts/location-proof-structure#location-proof-plugins) + version was used to create this evidence. This is necessary for verification — the verifier needs to know what kind of evidence to expect and how to evaluate it.
+
+**Signals and signatures.** The raw evidence data (signals) collected by the proof-of-location system, plus cryptographic signatures that bind the evidence to its source. The signals are plugin-specific — each proof-of-location system produces different kinds of raw data (sensor readings, latency measurements, attestation tokens, etc.).
+
+## Independence From Claims
+
+This is a key design decision. A location stamp says "here is evidence about an observed location" — it does not say "this evidence supports a particular claim." The separation matters because:
+
+- The same location stamp could be evaluated against different location claims
+- Location stamps can be collected before a location claim is formulated
+- Verification can assess each location stamp on its own merits before comparing it to the claim
+
+The connection between location stamps and location claims happens at the [location proof](/concepts/location-proof-structure) level, where they're bundled together. The [evaluation](/concepts/location-proof-evaluation) process then assesses whether the observed evidence (from location stamps) support the asserted location (from the location claim).
+
+## Internal validity
+
+Each location stamp carries enough information to verify its own internal validity — independent of any location claim. Stamp verification checks:
+
+- **Signatures** — Are the cryptographic signatures valid? Do they chain back to a trusted source?
+- **Structure** — Does the location stamp conform to the expected format for its plugin?
+- **Signal consistency** — Are the raw signals internally consistent? (e.g., do multiple sensor readings agree?)
+
+This is the first phase of [location proof evaluation](/concepts/location-proof-evaluation) — checking each location stamp before assessing how well it supports the claim.
+
+<Card title="Next: Location claims" icon="map-pin" href="/concepts/location-claims">
+  Assertions about where and when an event occurred
+</Card>
+
+---
+
+**See also:**
+- [SDK: Stamps](/sdk/stamps) — collecting, creating, and signing location stamps
+- [API: Verify stamp](/api-reference/verify/stamp) — verifying individual location stamps
+- [API: Types](/api-reference/types) — LocationStamp type reference

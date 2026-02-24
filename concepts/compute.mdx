@@ -1,0 +1,94 @@
+---
+title: "Compute"
+description: "Geospatial operations inside the TEE — distance, containment, and more"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Compute
+
+The Compute endpoint runs geospatial operations on location data inside the [TEE](/concepts/astral-location-services) and returns [signed results](/concepts/signed-results). It answers spatial questions — how far apart are these locations? is this point inside that boundary? — with cryptographically verifiable answers.
+
+## Accepted Inputs
+
+The compute endpoint accepts location data at any level of the [verifiability spectrum](/concepts/location-data#the-verifiability-spectrum):
+
+| Input type | What it is | Trust properties |
+|-----------|-----------|-----------------|
+| **Raw GeoJSON** | Unsigned geometry | Proves computation was correct; does not prove input provenance |
+| **Signed location record** | EAS attestation UID (onchain) or UID + URI (offchain) | Attribution + integrity + correct computation |
+| **Verified location proof** | UID of a verified location proof | Evidence of physical correspondence + correct computation |
+
+You can mix input types in a single operation. A geofencing check might use raw GeoJSON for the boundary (a publicly known polygon) and a verified location proof for the user's position.
+
+## Inside the TEE
+
+The compute engine is PostGIS backed by GEOS — the same C++ library that powers QGIS, GDAL, and most professional geospatial software. PostGIS runs inside the Docker container within the TEE, not as an external service.
+
+Computation is stateless and deterministic. Each request brings all required inputs. Results are rounded to centimeter precision before signing to ensure reproducibility. Same inputs always produce the same output.
+
+## Available Operations
+
+### Measurements (Numeric Results)
+
+| Operation | What it computes | Unit | PostGIS function |
+|-----------|-----------------|------|------------------|
+| **Distance** | Nearest distance between two geometries | meters | `ST_Distance` |
+| **Area** | Area of a polygon | square meters | `ST_Area` |
+| **Length** | Length of a line | meters | `ST_Length` |
+
+### Predicates (Boolean Results)
+
+| Operation | What it checks | PostGIS function |
+|-----------|---------------|------------------|
+| **Contains** | Is geometry B entirely inside geometry A? | `ST_Contains` |
+| **Within** | Is geometry within a specified radius of target? | `ST_DWithin` |
+| **Intersects** | Do geometries share any space? | `ST_Intersects` |
+
+All measurements use metric units. No unit conversion is provided — convert client-side if needed.
+
+## Precision and Determinism
+
+Results are stored with centimeter precision as scaled integers:
+
+| Type | Precision | Scaling |
+|------|-----------|---------|
+| Distance / Length | 0.01 m | 523.45 meters → stored as 52345 |
+| Area | 0.0001 m² | 1234.5678 m² → stored as 12345678 |
+
+This scaling ensures deterministic integer representation, which is important for smart contract integration where floating-point arithmetic isn't available.
+
+## Output
+
+Every compute operation returns a [signed result](/concepts/signed-results) containing:
+- The computed answer (boolean or numeric)
+- References to the specific inputs used
+- A timestamp
+- The operation name
+- A cryptographic signature from the TEE-held signing key
+
+The signed result can be used offchain (in an agent, application, or database) or submitted onchain via EAS delegated attestation. EAS resolvers allow those attestations to trigger smart contract logic.
+
+## What's Next
+
+The current operation set covers the most common spatial questions, but PostGIS exposes a much larger surface. Areas we're exploring:
+
+- **More predicates and measurements** — `disjoint`, `touches`, `crosses`, nearest-neighbor queries
+- **Geometry transformations** — buffers, centroids, unions, intersections. These return **new geometries** rather than scalar or boolean values, which raises open design questions about signed result format and storage
+- **Spatial selection queries** — operations over sets of geometries, like "which of these polygons contains this point?" or "find all zones within 1km of this location"
+- **Compositional queries** — chaining multiple operations into a single verified request, so you could express something like "is this point within 500m of any geometry in this set that intersects this boundary?" without multiple round trips
+
+<Tip>
+  The operation set is extensible. If you need a spatial operation that isn't listed here, [open an issue](https://github.com/AstralProtocol/astral-location-services/issues).
+</Tip>
+
+<Card title="Next: Signed results" icon="file-signature" href="/concepts/signed-results">
+  Output formats and how to use them
+</Card>
+
+---
+
+**See also:**
+- [API: Compute endpoints](/api-reference/compute/distance) — endpoint reference for each operation
+- [SDK: Compute module](/sdk/compute) — programmatic access to compute operations
+- [API: Types](/api-reference/types) — result type reference

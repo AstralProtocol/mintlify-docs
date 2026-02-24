@@ -1,0 +1,51 @@
+---
+title: "Overview"
+description: "Processing location data with proof of correct execution"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Geocomputation
+
+Geocomputation is the processing of geospatial data to answer spatial questions: How far apart are these two locations? Is this point inside that boundary? Do these regions overlap? The answers seem simple, but computing them correctly — on a curved, non-Euclidean surface, with consistent precision and deterministic results — is harder than it appears.
+
+## The computational challenge
+
+Spatial computation involves real complexity:
+
+- **Reference systems** — The Earth is not flat, and different coordinate systems represent it differently. Computing distance on a sphere vs. a projected plane vs. a geoid gives different results.
+- **Computational geometry** — Operations like polygon containment, intersection detection, and area calculation require robust algorithms that handle edge cases (self-intersecting polygons, antipodal points, degenerate geometries).
+- **Precision and determinism** — Floating-point arithmetic is not associative. The same computation can produce different results depending on operation order, hardware, or library version. For verifiable results, computation must be deterministic.
+
+Professional geospatial software (QGIS, GDAL, PostGIS) has spent decades solving these problems. Astral builds on that foundation. (This is a pragmatic shift from our original plan to reimplement these [algorithms](https://github.com/DecentralizedGeo/spatial-sol) in Solidity.)
+
+## Scope of geocomputation in Astral
+
+Astral's geocomputation capabilities span three areas, at different stages of maturity:
+
+| Capability | Status | What it does |
+|-----------|--------|-------------|
+| **[Location proof verification](/concepts/verify)** | Shipping | Evaluates location proof credibility |
+| **[Geospatial operations](/concepts/compute)** | Shipping | Distance, containment, intersection, area, length |
+| **Geospatial AI/ML** | Planned | Spatial analysis, prediction, pattern detection |
+
+## Verifiable geocomputation
+
+Computation is only useful in adversarial contexts if you can trust the result. For most applications, that means running code on a server and trusting the operator. For applications where the spatial answer triggers real-world consequences that may carry an incentive to lie — a smart contract execution, a compliance determination, an autonomous agent decision — that trust model isn't sufficient.
+
+Astral makes geocomputation verifiable through three approaches, at different stages of development:
+
+**Trusted Execution Environments (v0 — shipped).** Astral's Compute engine runs inside a TEE (currently [EigenCompute](https://blog.eigencloud.xyz/eigencloud-brings-verifiable-ai-to-mass-market-with-eigenai-and-eigencompute-launches/)), which provides hardware-level isolation. The TEE guarantees that the attested code executed on the attested inputs, and that the signing key never left the enclave. This is the foundation of [Astral Location Services](/concepts/astral-location-services), our hosted service.
+
+**Zero-knowledge circuits (research).** ZK proofs would allow verification of correct computation without any trusted hardware — a verifier could confirm the result was computed correctly without re-executing the computation or trusting a TEE manufacturer. This is an active research direction, not yet implemented.
+
+**Smart contract verification (limited).** Some spatial operations could theoretically run onchain, but gas costs and computational limitations make this impractical for most geospatial operations today.
+
+<Card title="Next: Astral Location Services" icon="server" href="/concepts/astral-location-services">
+  The hosted TEE service that runs verification and computation
+</Card>
+
+---
+
+**See also:**
+- [API Reference](/api-reference/overview) — full endpoint documentation

@@ -1,0 +1,284 @@
+---
+title: "Building Verification Plugins"
+description: "Connect a new proof-of-location system to Astral"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Building verification plugins
+
+A plugin connects a proof-of-location (PoL) system to Astral's verification framework. Plugins collect signals from a PoL system, produce location stamps, and verify those stamps.
+
+<Info>
+  The plugin interface is under active development. The patterns shown here reflect the current design direction, but specifics may change as we iterate on the verification framework.
+</Info>
+
+## What is a plugin?
+
+Proof-of-location systems vary widely — hardware attestation, network triangulation, sensor fusion, institutional records. A plugin is a standardized adapter that translates a specific PoL system's output into the common stamp format that Astral can verify and cross-correlate.
+
+Each plugin handles three responsibilities:
+
+1. **Collect signals** from the PoL system (GPS readings, network measurements, device attestations)
+2. **Create stamps** from those signals (structured evidence artifacts)
+3. **Verify stamps** for authenticity and structural integrity
+
+## Plugin interface
+
+```typescript
+interface LocationProofPlugin {
+  name: string;
+  version: string;
+
+  // Collect raw signals from the PoL system
+  collectSignals(config: PluginConfig): Promise<Signal[]>;
+
+  // Process signals into a location stamp
+  createStamp(signals: Signal[]): Promise<UnsignedLocationStamp>;
+
+  // Verify a stamp's authenticity and structure
+  verifyStamp(stamp: LocationStamp): Promise<StampVerificationResult>;
+}
+
+interface PluginConfig {
+  timeout: number;
+  [key: string]: unknown;
+}
+
+interface Signal {
+  type: string;
+  value: unknown;
+  timestamp: number;
+  source: string;
+}
+
+interface StampVerificationResult {
+  valid: boolean;
+  errors: string[];
+  details: Record<string, unknown>;
+}
+```
+
+## How stamps work
+
+A stamp is a signed artifact from a PoL system. It encodes the system's conclusion about where and when an event occurred, along with the raw signals that support that conclusion.
+
+Stamps follow the [Location Protocol](https://github.com/DecentralizedGeo/location-protocol-spec) format:
+
+```typescript
+interface LocationStamp {
+  // Location data (LP v0.2)
+  lpVersion: string;
+  locationType: string;
+  location: LocationData;     // Where evidence indicates the subject was
+  srs: string;
+
+  // Temporal footprint
+  temporalFootprint: { start: number; end: number };
+
+  // Plugin identification
+  plugin: string;             // "proofmode", "witnesschain", etc.
+  pluginVersion: string;
+
+  // Evidence and signatures
+  signals: Record<string, unknown>;
+  signatures: Signature[];
+}
+```
+
+The distinction between a stamp's location and a claim's location is important. The stamp records where the PoL system *observed* the subject. The claim records where the subject *asserts* they were. Verification compares the two.
+
+## Implementation guide
+
+Here is a step-by-step walkthrough for building a hypothetical plugin that uses Wi-Fi access point data.
+
+### Step 1: Define signal collection
+
+```typescript
+import type { LocationProofPlugin, PluginConfig, Signal } from '@decentralized-geo/astral-sdk';
+
+const wifiPlugin: LocationProofPlugin = {
+  name: 'wifi-triangulation',
+  version: '0.1.0',
+
+  async collectSignals(config: PluginConfig): Promise<Signal[]> {
+    const networks = await scanNearbyNetworks(config.timeout);
+
+    return networks.map((network) => ({
+      type: 'wifi-ap',
+      value: {
+        bssid: network.bssid,
+        ssid: network.ssid,
+        rssi: network.signalStrength,
+        frequency: network.frequency
+      },
+      timestamp: Date.now() / 1000,
+      source: 'device-wifi-scan'
+    }));
+  },
+
+  // ... continued below
+};
+```
+
+### Step 2: Create stamps from signals
+
+```typescript
+  async createStamp(signals: Signal[]): Promise<UnsignedLocationStamp> {
+    // Triangulate position from Wi-Fi signals
+    const position = triangulateFromAccessPoints(
+      signals.map((s) => s.value as WifiSignal)
+    );
+
+    return {
+      lpVersion: '0.2',
+      locationType: 'geojson-point',
+      location: {
+        type: 'Point',
+        coordinates: [position.longitude, position.latitude]
+      },
+      srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
+      temporalFootprint: {
+        start: Math.min(...signals.map((s) => s.timestamp)),
+        end: Math.max(...signals.map((s) => s.timestamp))
+      },
+      plugin: 'wifi-triangulation',
+      pluginVersion: '0.1.0',
+      signals: {
+        accessPoints: signals.map((s) => s.value),
+        triangulationMethod: 'weighted-centroid'
+      }
+    };
+  },
+```
+
+### Step 3: Implement stamp verification
+
+```typescript
+  async verifyStamp(stamp: LocationStamp): Promise<StampVerificationResult> {
+    const errors: string[] = [];
+
+    // Check plugin identification
+    if (stamp.plugin !== 'wifi-triangulation') {
+      errors.push(`Expected plugin 'wifi-triangulation', got '${stamp.plugin}'`);
+    }
+
+    // Verify signal structure
+    const signals = stamp.signals as { accessPoints?: unknown[] };
+    if (!signals.accessPoints || signals.accessPoints.length < 3) {
+      errors.push('Wi-Fi triangulation requires at least 3 access points');
+    }
+
+    // Verify temporal bounds are reasonable
+    const duration = stamp.temporalFootprint.end - stamp.temporalFootprint.start;
+    if (duration > 60) {
+      errors.push('Signal collection window exceeds 60 seconds');
+    }
+
+    // Verify signatures
+    const signaturesValid = await verifyStampSignatures(stamp);
+    if (!signaturesValid) {
+      errors.push('Stamp signatures are invalid');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      details: {
+        accessPointCount: signals.accessPoints?.length ?? 0,
+        collectionDuration: duration,
+        signaturesChecked: stamp.signatures.length
+      }
+    };
+  }
+```
+
+## Registration
+
+Register your plugin with the Astral SDK so it can be used in stamp collection and verification:
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({ chainId: 84532 });
+
+astral.plugins.register(wifiPlugin);
+
+// Now you can collect stamps using your plugin
+const signals = await astral.stamps.collect({
+  name: 'wifi-triangulation',
+  version: '0.1.0',
+  config: { timeout: 5000 }
+});
+
+const stamp = await astral.stamps.create(
+  { name: 'wifi-triangulation', version: '0.1.0', config: {} },
+  signals
+);
+```
+
+## Testing
+
+Test each plugin responsibility independently:
+
+```typescript
+import { describe, it, expect } from 'vitest';
+
+describe('wifi-triangulation plugin', () => {
+  it('collects signals from nearby networks', async () => {
+    const signals = await wifiPlugin.collectSignals({ timeout: 5000 });
+
+    expect(signals.length).toBeGreaterThan(0);
+    for (const signal of signals) {
+      expect(signal.type).toBe('wifi-ap');
+      expect(signal.timestamp).toBeGreaterThan(0);
+    }
+  });
+
+  it('creates a valid stamp from signals', async () => {
+    const signals = mockWifiSignals(5);
+    const stamp = await wifiPlugin.createStamp(signals);
+
+    expect(stamp.lpVersion).toBe('0.2');
+    expect(stamp.plugin).toBe('wifi-triangulation');
+    expect(stamp.location.type).toBe('Point');
+    expect(stamp.location.coordinates).toHaveLength(2);
+  });
+
+  it('rejects stamps with fewer than 3 access points', async () => {
+    const stamp = createMockStamp({ accessPointCount: 2 });
+    const result = await wifiPlugin.verifyStamp(stamp);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.stringContaining('at least 3 access points')
+    );
+  });
+});
+```
+
+## Existing plugins
+
+Two plugins are currently in development:
+
+<CardGroup cols={2}>
+  <Card title="ProofMode" icon="mobile">
+    Device attestation and sensor fusion. Uses Secure Enclave (iOS) or hardware keystore (Android) to sign location observations.
+  </Card>
+  <Card title="WitnessChain" icon="server">
+    Infrastructure verification using UDP latency triangulation and a challenger network. Trust derives from speed-of-light constraints and cryptoeconomic incentives.
+  </Card>
+</CardGroup>
+
+Each plugin documents its own threat model and trust assumptions. When building a new plugin, you should clearly document what an attacker would need to do to forge a stamp from your system.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Location proofs" icon="map-pin" href="/concepts/location-proofs">
+    Understand how stamps combine into verifiable proofs
+  </Card>
+  <Card title="Verifying location proofs" icon="shield-check" href="/guides/verifying-location-proofs">
+    Submit proofs and understand credibility scores
+  </Card>
+</CardGroup>

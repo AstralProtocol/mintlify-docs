@@ -1,0 +1,224 @@
+---
+title: "Parametric Insurance"
+description: "Policies that trigger based on verified proximity"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Parametric insurance
+
+You're building crop insurance. When a qualifying weather event occurs within a certain distance of insured farmland, the policy pays out automatically. No claims process, no adjuster visits — just verified spatial computation.
+
+## How it works
+
+1. The insurance contract stores a farmland location UID and references to weather station locations
+2. When a weather event is reported, the system computes the distance from the event to the insured farmland
+3. If the distance is below the policy threshold, the payout triggers automatically
+4. The signed result provides auditable proof that the spatial condition was met
+
+## The flow
+
+### Register locations
+
+Both the insured farmland and weather station locations are registered as onchain location records.
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+// Register farmland boundary
+const farmland = await astral.location.onchain.create({
+  location: {
+    type: 'Polygon',
+    coordinates: [[
+      [-95.123, 38.456],
+      [-95.120, 38.456],
+      [-95.120, 38.460],
+      [-95.123, 38.460],
+      [-95.123, 38.456]
+    ]]
+  },
+  memo: "Insured farmland parcel"
+});
+
+// Register weather station
+const weatherStation = await astral.location.onchain.create({
+  location: { type: 'Point', coordinates: [-95.200, 38.470] },
+  memo: "NOAA weather station KS-042"
+});
+```
+
+### Compute distance when an event occurs
+
+When a qualifying weather event is reported at the station, compute the distance to the insured farmland.
+
+```typescript
+async function checkPolicyTrigger(
+  farmlandUID: string,
+  weatherStationUID: string,
+  thresholdKm: number,
+  wallet: Signer
+) {
+  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+  // Compute distance from weather event to farmland
+  const result = await astral.compute.distance({
+    from: weatherStationUID,
+    to: farmlandUID,
+    chainId: 84532,
+    schema: SCHEMA_UID,
+    recipient: INSURANCE_CONTRACT_ADDRESS
+  });
+
+  const distanceKm = result.result / 1000;
+
+  if (distanceKm > thresholdKm) {
+    return { triggered: false, distanceKm };
+  }
+
+  // Submit signed result to trigger payout
+  const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
+  await tx.wait();
+
+  return { triggered: true, distanceKm, txHash: tx.hash };
+}
+```
+
+### Resolver contract
+
+The insurance resolver decodes a numeric signed result and checks whether the distance is below the policy threshold.
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@eas/contracts/resolver/SchemaResolver.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract ParametricInsurance is SchemaResolver, Ownable {
+    address public astralSigner;
+
+    struct Policy {
+        address beneficiary;
+        bytes32 farmlandUID;
+        bytes32 weatherStationUID;
+        uint256 thresholdCm;     // Distance threshold in centimeters
+        uint256 payoutAmount;
+        bool active;
+        bool triggered;
+    }
+
+    mapping(bytes32 => Policy) public policies;
+
+    event PolicyCreated(bytes32 indexed policyId, address beneficiary, uint256 payout);
+    event PolicyTriggered(bytes32 indexed policyId, uint256 distanceCm);
+
+    constructor(IEAS eas, address _astralSigner)
+        SchemaResolver(eas)
+        Ownable(msg.sender)
+    {
+        astralSigner = _astralSigner;
+    }
+
+    function createPolicy(
+        bytes32 policyId,
+        address beneficiary,
+        bytes32 farmlandUID,
+        bytes32 weatherStationUID,
+        uint256 thresholdKm
+    ) external payable onlyOwner {
+        require(msg.value > 0, "Must fund payout");
+
+        policies[policyId] = Policy({
+            beneficiary: beneficiary,
+            farmlandUID: farmlandUID,
+            weatherStationUID: weatherStationUID,
+            thresholdCm: thresholdKm * 100000,  // km to cm
+            payoutAmount: msg.value,
+            active: true,
+            triggered: false
+        });
+
+        emit PolicyCreated(policyId, beneficiary, msg.value);
+    }
+
+    function onAttest(
+        Attestation calldata attestation,
+        uint256 /* value */
+    ) internal override returns (bool) {
+        require(attestation.attester == astralSigner, "Not from Astral");
+
+        // Decode numeric signed result (distance)
+        (
+            uint256 distanceCm,
+            string memory units,
+            bytes32[] memory inputRefs,
+            uint64 timestamp,
+            string memory operation
+        ) = abi.decode(
+            attestation.data,
+            (uint256, string, bytes32[], uint64, string)
+        );
+
+        // Verify this is a distance computation
+        require(
+            keccak256(bytes(operation)) == keccak256(bytes("distance")),
+            "Wrong operation"
+        );
+
+        // Extract policy ID from recipient
+        bytes32 policyId = bytes32(uint256(uint160(attestation.recipient)));
+        Policy storage policy = policies[policyId];
+
+        require(policy.active, "Policy not active");
+        require(!policy.triggered, "Already triggered");
+
+        // Verify correct locations were used
+        require(inputRefs.length >= 2, "Invalid inputs");
+        require(inputRefs[0] == policy.weatherStationUID, "Wrong weather station");
+        require(inputRefs[1] == policy.farmlandUID, "Wrong farmland");
+
+        // Check if distance is below threshold
+        require(distanceCm <= policy.thresholdCm, "Distance exceeds threshold");
+
+        // Trigger payout
+        policy.triggered = true;
+
+        (bool success, ) = policy.beneficiary.call{value: policy.payoutAmount}("");
+        require(success, "Payout failed");
+
+        emit PolicyTriggered(policyId, distanceCm);
+        return true;
+    }
+
+    function onRevoke(Attestation calldata, uint256)
+        internal pure override returns (bool)
+    {
+        return false;
+    }
+
+    function updateAstralSigner(address newSigner) external onlyOwner {
+        astralSigner = newSigner;
+    }
+}
+```
+
+## Why this matters
+
+Traditional crop insurance requires:
+- Filing a claim
+- Waiting for an adjuster
+- Disputing coverage decisions
+
+Parametric insurance removes all of that. The spatial condition is defined upfront, the computation is verifiable, and the payout is automatic. The signed result is auditable proof that the trigger condition was met.
+
+## Variations
+
+- **Flood insurance** — use `intersects` to check if a flood polygon overlaps insured property
+- **Wildfire proximity** — use `distance` from fire perimeter to insured structures
+- **Hurricane path** — use `within` to check if insured property falls within the projected storm path
+
+<Card title="Next: Geofence compliance" icon="map" href="/use-cases/geofence-compliance">
+  Prove an asset stayed within an approved boundary
+</Card>

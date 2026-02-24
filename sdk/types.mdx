@@ -1,0 +1,159 @@
+---
+title: "Types"
+description: "TypeScript type definitions for the Astral SDK"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Types
+
+Core TypeScript types exported by `@decentralized-geo/astral-sdk`.
+
+## SDK configuration
+
+```typescript
+interface AstralSDKConfig {
+  chainId: number;                // Target chain ID (e.g., 84532 for Base Sepolia)
+  apiUrl?: string;                // API base URL (default: https://api.astral.global)
+  signer?: ethers.Signer;        // Ethers signer for onchain submissions
+}
+```
+
+## Compute types
+
+### Input types
+
+Geographic features can be provided as raw GeoJSON, EAS attestation UIDs, or offchain references.
+
+```typescript
+/** GeoJSON geometry */
+type GeoJSONInput = {
+  type: 'Point' | 'LineString' | 'Polygon' | 'MultiPoint' | 'MultiLineString' | 'MultiPolygon';
+  coordinates: number[] | number[][] | number[][][] | number[][][][];
+};
+
+/** Onchain attestation UID */
+type UIDInput = string;   // "0x..."
+
+/** Offchain attestation reference */
+type OffchainInput = {
+  uid: string;
+  uri: string;            // IPFS or HTTP URI
+};
+
+/** Inline attestation object */
+type InlineAttestationInput = {
+  attestation: {
+    uid: string;
+    schema: string;
+    data: string;
+  };
+};
+
+type Input = GeoJSONInput | UIDInput | OffchainInput | InlineAttestationInput;
+```
+
+### Compute request types
+
+```typescript
+interface DistanceRequest {
+  from: Input;
+  to: Input;
+  chainId: number;
+  schema?: string;
+  recipient?: string;
+}
+
+interface AreaRequest {
+  geometry: Input;
+  chainId: number;
+  schema?: string;
+  recipient?: string;
+}
+
+interface LengthRequest {
+  geometry: Input;
+  chainId: number;
+  schema?: string;
+  recipient?: string;
+}
+
+interface ContainsRequest {
+  container: Input;
+  geometry: Input;
+  chainId: number;
+  schema?: string;
+  recipient?: string;
+}
+
+interface WithinRequest {
+  geometry: Input;
+  target: Input;
+  radius: number;         // meters
+  chainId: number;
+  schema?: string;
+  recipient?: string;
+}
+
+interface IntersectsRequest {
+  geometry1: Input;
+  geometry2: Input;
+  chainId: number;
+  schema?: string;
+  recipient?: string;
+}
+```
+
+### Compute result
+
+```typescript
+interface ComputeResult<T = number | boolean> {
+  result: T;
+  operation: string;
+  units?: string;                 // "meters" | "square_meters"
+  timestamp: number;
+  inputRefs: string[];
+  attestation: AttestationData;
+  delegatedAttestation: DelegatedAttestationData;
+}
+```
+
+## Attestation types
+
+```typescript
+interface AttestationData {
+  schema: string;
+  attester: string;
+  recipient: string;
+  data: string;                   // ABI-encoded
+  signature: string;
+}
+
+interface DelegatedAttestationData {
+  signature: string;
+  attester: string;
+  deadline: number;               // Unix timestamp
+}
+```
+
+## Verify types
+
+See the [Verify API reference](/api-reference/verify/proof#data-types) for the full `LocationClaim`, `LocationStamp`, `LocationProof`, and `CredibilityAssessment` type definitions.
+
+## EAS types
+
+```typescript
+interface SubmitDelegatedOptions {
+  signature: string;
+  attester: string;
+  schema: string;
+  data: string;
+  recipient: string;
+  deadline: number;
+}
+
+interface SubmitResult {
+  hash: string;                   // Transaction hash
+  uid: string;                    // Attestation UID
+}
+```

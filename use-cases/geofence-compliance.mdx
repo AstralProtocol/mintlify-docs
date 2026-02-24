@@ -1,0 +1,159 @@
+---
+title: "Geofence Compliance"
+description: "Prove an asset stayed within an approved boundary"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Geofence compliance
+
+You're managing a drone fleet. Regulators require proof that each drone stayed within its approved flight corridor. Astral's `contains` operation verifies this with a signed result that constitutes auditable compliance evidence.
+
+## How it works
+
+1. Define the approved corridor as a polygon
+2. Periodically check the drone's position with `compute.contains`
+3. Each check produces a signed result
+4. A compliance report is a series of signed results covering the flight duration
+
+## Define the approved corridor
+
+Register the approved flight corridor as an onchain location record.
+
+```typescript
+import { AstralSDK } from '@decentralized-geo/astral-sdk';
+
+const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+// Register approved flight corridor
+const corridor = await astral.location.onchain.create({
+  location: {
+    type: 'Polygon',
+    coordinates: [[
+      [-122.420, 37.780],
+      [-122.410, 37.780],
+      [-122.410, 37.790],
+      [-122.420, 37.790],
+      [-122.420, 37.780]
+    ]]
+  },
+  memo: "Approved flight corridor — permit #DR-2025-0042"
+});
+
+console.log('Corridor UID:', corridor.uid);
+```
+
+## Periodic compliance checks
+
+At regular intervals during the flight, check whether the drone's position falls within the corridor.
+
+```typescript
+async function checkCompliance(
+  droneCoords: [number, number],
+  corridorUID: string,
+  wallet: Signer
+) {
+  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+  // Register current drone position
+  const dronePosition = await astral.location.onchain.create({
+    location: { type: 'Point', coordinates: droneCoords }
+  });
+
+  // Check containment
+  const result = await astral.compute.contains({
+    container: corridorUID,
+    geometry: dronePosition.uid,
+    chainId: 84532,
+    schema: SCHEMA_UID
+  });
+
+  return {
+    inCorridor: result.result,
+    timestamp: result.timestamp,
+    attestation: result.attestation
+  };
+}
+```
+
+## Building a compliance report
+
+A compliance report is a time series of signed results. Each one is independently verifiable.
+
+```typescript
+interface ComplianceRecord {
+  timestamp: number;
+  inCorridor: boolean;
+  attestationUID: string;
+}
+
+async function runComplianceLoop(
+  corridorUID: string,
+  getDronePosition: () => Promise<[number, number]>,
+  intervalMs: number,
+  wallet: Signer
+): Promise<ComplianceRecord[]> {
+  const records: ComplianceRecord[] = [];
+
+  const interval = setInterval(async () => {
+    const coords = await getDronePosition();
+    const result = await checkCompliance(coords, corridorUID, wallet);
+
+    records.push({
+      timestamp: result.timestamp,
+      inCorridor: result.inCorridor,
+      attestationUID: result.attestation.uid
+    });
+
+    // Alert on violation
+    if (!result.inCorridor) {
+      console.warn(`Corridor violation at ${new Date(result.timestamp * 1000).toISOString()}`);
+    }
+  }, intervalMs);
+
+  return records;
+}
+```
+
+## Submitting compliance onchain
+
+For regulatory requirements that demand onchain proof, submit each signed result as an EAS attestation.
+
+```typescript
+async function submitComplianceProof(
+  result: PolicyAttestationResult<boolean>,
+  wallet: Signer
+) {
+  const astral = new AstralSDK({ chainId: 84532, signer: wallet });
+
+  const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
+  await tx.wait();
+
+  return tx.hash;
+}
+```
+
+## What the regulator sees
+
+Each signed result in the compliance report includes:
+
+| Field | Value |
+|-------|-------|
+| Operation | `contains` |
+| Result | `true` (in corridor) or `false` (violation) |
+| Input references | Hashes of the drone position and corridor polygon |
+| Timestamp | When the check was performed |
+| Attester | Astral's TEE signing key |
+
+The regulator can verify each result independently — the Astral signature proves the computation was performed correctly inside the TEE, and the input references tie it to the specific corridor and position.
+
+## Variations
+
+- **Maritime shipping** — verify vessels stay within approved shipping lanes
+- **Autonomous vehicles** — prove a vehicle stayed within its operational design domain
+- **Asset tracking** — verify high-value goods remained within approved transit routes
+- **Environmental monitoring** — confirm survey equipment stayed within permitted research areas
+
+<Card title="Next: Onchain attestation" icon="link-simple" href="/use-cases/onchain-attestation">
+  End-to-end blockchain flow from computation to smart contract
+</Card>

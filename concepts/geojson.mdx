@@ -1,0 +1,76 @@
+---
+title: "GeoJSON"
+description: "Raw unsigned geospatial data — the simplest input format"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# GeoJSON
+
+GeoJSON is raw, unsigned geospatial data. It's the simplest way to pass location data into Astral — and the least verifiable.
+
+## The format
+
+GeoJSON ([RFC 7946](https://datatracker.ietf.org/doc/html/rfc7946)) is a standard format for encoding geographic data structures. The full spec defines three object types — Geometry, Feature (geometry + properties), and FeatureCollection — but **Astral v0 works with bare Geometry objects only**, not Feature or FeatureCollection wrappers.
+
+A Geometry object has two keys:
+
+- **`type`** — the geometry type: `Point`, `LineString`, `Polygon`, `MultiPoint`, `MultiLineString`, `MultiPolygon`, or `GeometryCollection`
+- **`coordinates`** — nested arrays of `[longitude, latitude]` positions
+
+Geometries are built from coordinate arrays. A Point is a single `[lon, lat]` pair. A LineString is an array of positions. A Polygon is an array of linear rings — where each ring is an array of positions and the **first and last position must be identical** (closing the ring to form a valid area).
+
+```json
+{
+  "type": "Polygon",
+  "coordinates": [[
+    [-122.42, 37.78],
+    [-122.42, 37.76],
+    [-122.40, 37.76],
+    [-122.40, 37.78],
+    [-122.42, 37.78]
+  ]]
+}
+```
+
+<Warning>
+  Astral APIs accept **bare Geometry objects** — pass the geometry directly, not wrapped in a Feature. If you're exporting from tools like geojson.io, extract the `geometry` field from the Feature before passing it to Astral.
+</Warning>
+
+## What GeoJSON does not provide
+
+- **Attribution** — No record of who created it
+- **Integrity** — No way to detect if it's been modified
+- **Correspondence** — No evidence that it reflects reality
+
+A signed result that uses raw GeoJSON as input proves "Astral computed the relationship between geometry A and geometry B" — but it does not prove who provided those geometries or whether they correspond to anything in the physical world.
+
+For inputs where provenance matters, use [signed location records](/concepts/location-records) or [location proofs](/concepts/location-proofs).
+
+## Coordinate conventions
+
+| Convention | Value |
+|-----------|-------|
+| **Format** | GeoJSON (RFC 7946) |
+| **CRS** | WGS84 (`http://www.opengis.net/def/crs/OGC/1.3/CRS84`) |
+| **Coordinate order** | `[longitude, latitude]` |
+| **Altitude** | Optional third coordinate, meters above WGS84 ellipsoid |
+
+<Warning>
+  Many mapping APIs use `[latitude, longitude]` order. GeoJSON uses `[longitude, latitude]`. Mixing these up is a common source of bugs — your point ends up in the wrong hemisphere.
+</Warning>
+
+## Tools for working with GeoJSON
+
+- **[geojson.io](https://geojson.io)** — Draw, edit, and export GeoJSON on a map. The standard quick-start tool.
+- **[Placemark Play](https://play.placemark.io)** — Open-source geodata editor with drawing and algorithmic operations (buffering, simplification).
+- **[MapShaper](https://mapshaper.org)** — Simplify, convert, and inspect vector data. Useful for reducing file size and format conversion.
+
+<Card title="Next: Location records" icon="file-signature" href="/concepts/location-records">
+  Signed, verifiable location data
+</Card>
+
+---
+
+**See also:**
+- [API: Types — Input](/api-reference/types) — how raw GeoJSON is passed to API endpoints

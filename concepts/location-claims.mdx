@@ -1,0 +1,63 @@
+---
+title: "Location Claims"
+description: "Assertions about the timing and location of an event"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Location Claims
+
+A location claim is an assertion about where and when an event occurred. It's the "I was here" statement that [location stamps](/concepts/location-stamps) provide evidence for or against.
+
+## What a Location Claim Contains
+
+A location claim extends the [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) specification with verification-specific fields:
+
+**Asserted location.** The location being claimed — a GeoJSON geometry with a spatial reference system. This is where the subject claims the event occurred.
+
+**Spatial uncertainty (radius).** How precisely the claim defines the location, in meters. This field is required — you cannot claim presence at an exact point. Both physical measurement and honest reporting involve uncertainty, and pretending otherwise produces misleading verification results.
+
+**Temporal bounds.** A time range (start and end) during which the event is claimed to have occurred. Like spatial uncertainty, temporal bounds acknowledge that events have duration.
+
+**Subject.** Who or what was at the location. This could be a person (identified by an Ethereum address, DID, or other scheme), a device, an asset, or an organization.
+
+**Event type.** What kind of event is being claimed. The event could be:
+
+- **Presence** — a person or device was at a location
+- **Transaction origin** — a transaction originated from a location
+- **Asset location** — a physical asset was at a location
+- **Delivery** — a delivery occurred at a location
+
+## The Uncertainty Tradeoff
+
+Location claims involve a fundamental tension between precision and confidence:
+
+- "Somewhere in California during 2024" — easy to verify with high confidence, but not very useful for many use cases
+- "Within 10 meters at 14:32:07" — precise and useful, but harder to verify confidently
+
+Broader claims are easier to verify because the evidence just needs to fall anywhere within a larger target. Narrower claims require more precise evidence. Applications decide what precision/confidence balance they need.
+
+This tradeoff also has privacy implications. Broader spatial and temporal bounds reveal less about exact location, which can be a feature rather than a limitation for privacy-sensitive applications.
+
+Ultimately, spatial and temporal precision, forgery cost, privacy, latency and other factors are application-specific — different combinations of location stamps will be useful in different contexts. 
+
+## Relationship to Location Stamps
+
+A location claim is an assertion. A [location stamp](/concepts/location-stamps) is evidence. They use the same Location Protocol format for their location data, but represent different things:
+
+| | Location claim | Location stamp |
+|---|--------------|----------------|
+| **Location** | Asserted — where the subject claims to have been | Observed — where evidence indicates the subject was |
+| **Created by** | The claimant | A proof-of-location system |
+| **Purpose** | States what needs to be verified | Provides evidence for verification |
+
+[Evaluation](/concepts/location-proof-evaluation) compares the two: does the observed location (from location stamps) support the asserted location (from the location claim)?
+
+<Card title="Next: Composing location proofs" icon="layer-group" href="/concepts/location-proof-structure">
+  Bundling location stamps with a location claim
+</Card>
+
+---
+
+**See also:**
+- [API: Types](/api-reference/types) — LocationClaim type reference

@@ -1,0 +1,57 @@
+---
+title: "Overview"
+description: "Spatial data in Astral — from raw coordinates to verifiable records"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Location Data
+
+Location data is what Astral operates on. Every API call starts with spatial data — points, polygons, lines, or references to previously recorded locations. But not all location data is created equal. The provenance of a piece of location data determines how much trust you can place in it.
+
+## The Verifiability Spectrum
+
+Astral works with location data at three levels of verifiability:
+
+| Level | What it is | What you know |
+|-------|-----------|---------------|
+| **Raw GeoJSON** | Unsigned geospatial data | The vector geometry itself — nothing about who created it or whether it's been tampered with |
+| **Signed location record** | EAS attestation with cryptographic signature | Who attested to this location, plus assurances that data hasn't been changed |
+| **Location proof** | Signed location record + evidence from proof-of-location systems | All of the above, plus independently evaluable evidence about a claim about the location of an event |
+
+Each level adds verifiability. Raw GeoJSON is fine for some use cases; signed location records add attribution and integrity. Location proofs add evidence of physical correspondence — the hardest part.
+
+Astral doesn't take a stance on what's trustworthy — that's not our role. Instead, we provide a system to organize, harmonize, and evaluate location data and evidence — to make spatial decision parameters legible – so that applications can make informed, risk-appropriate choices about what to trust and how much.
+
+<Info>
+  **v0 supports vector geospatial data only.** Raster support (GeoTIFFs, imagery analysis) is planned.
+</Info>
+
+## Geospatial data sources
+
+Location data comes from many sources, each with different properties:
+
+- **Device sensors** — GPS, Wi-Fi, cellular positioning. Ubiquitous but often spoofable.
+- **Network infrastructure** — Cell tower triangulation, IP geolocation, internet latency measurements. Coarse but hard to manipulate without network access.
+- **Hardware attestation** — Secure enclave readings, hardware keystores. Harder to forge but still device-dependent.
+- **Institutional records** — Land registries, shipping manifests, IoT telemetry. Trusted because of the institution, not cryptography.
+- **Reference data** — Official boundaries, standard geometries, public datasets. Trusted because they're publicly auditable.
+
+No single source is sufficient for high-stakes applications. [Location proofs](/concepts/location-proofs) address this through defense-in-depth: combining evidence from multiple independent sources to raise the cost of forgery.
+
+## Coordinate system
+
+All location data in v0 of the Astral Protocol uses [GeoJSON](https://datatracker.ietf.org/doc/html/rfc7946) as the geometry format. Coordinates follow the GeoJSON standard:
+
+- **Default Coordinate Reference System (CRS):** WGS84 (`http://www.opengis.net/def/crs/OGC/1.3/CRS84`)
+- **Coordinate order:** `[longitude, latitude]` — note that this is the opposite of what many mapping APIs use (a common challenge in GIS systems — [here's why](https://macwright.com/lonlat/).)
+
+<Card title="Next: GeoJSON" icon="brackets-curly" href="/concepts/geojson">
+  Raw unsigned geospatial data
+</Card>
+
+---
+
+**See also:**
+- [SDK: Location module](/sdk/location) — creating and fetching location records
+- [API: Types](/api-reference/types) — input format reference

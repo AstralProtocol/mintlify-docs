@@ -1,0 +1,81 @@
+---
+title: "Location Records"
+description: "Signed, verifiable location data with attribution and integrity"
+---
+
+<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+
+# Location records
+
+A location record is signed, verifiable location data artifact. It takes raw geospatial data and adds what [GeoJSON](/concepts/geojson) alone cannot provide: attribution (who created it) and integrity (proof it hasn't been tampered with).
+
+In the Astral ecosystem, location records conform to v0.2 of the [Location Protocol](https://spec.decentralizedgeo.org) specification. The Location Protocol provides a lightweight data schema that wraps spatial data in any format, to improve interoperability so that spatial data can be parsed and interpreted across distributed systems.
+
+## What signing adds
+
+| Property | Raw GeoJSON | Signed location record |
+|----------|------------|----------------------|
+| **Geometry** | Yes | Yes |
+| **Attribution** | No — anyone could have created it | Yes — cryptographic signature ties it to a specific identity |
+| **Integrity** | No — could be modified silently | Yes — any modification invalidates the signature |
+| **Verifiable timestamp** | No | Sometimes — if the attestation was anchored or registered on a blockchain or other timestamp server |
+| **Correspondence** | No | No — signing proves who *claimed* this location, not that they *were* there |
+
+The last row is important. A signed location record proves that a specific identity attested to a specific location at a specific time. It does not prove the attester was physically present. That's what [location proofs](/concepts/location-proofs) add.
+
+//@claude: callout: We use the term "correspondence" to refer to how well a digital spatial data record *corresponds* to physical reality.
+
+## EAS attestations
+
+Astral's v0 implementation uses [Ethereum Attestation Service (EAS)](https://attest.org/) for signed location records. EAS provides:
+
+- **Onchain attestations** — stored directly on EAS contracts, referenced by UID (unique identifier), permanent and immutable
+- **Offchain attestations** — stored on user devices, centralized servers, IPFS or other infrastructure, referenced by UID + URI, no gas cost, EIP-712 signed
+
+Both carry the same cryptographic guarantees. The difference is storage: onchain attestations live on the blockchain; offchain attestations live wherever you put them but are still cryptographically verifiable.
+
+Other implementations — for example, on ATProto — are in development, and we plan to add support in time. 
+
+## Location Protocol v0.2 schema
+
+Location records conform to the [Location Protocol v0.2](https://github.com/DecentralizedGeo/location-protocol-spec/tree/v0.2-draft) schema:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `lp_version` | string | Protocol version (e.g., "0.2") |
+| `location_type` | string | Type of location data (e.g., "GeoJSON") |
+| `location` | bytes | Encoded location data |
+| `srs` | string | Spatial reference system as OGC URI |
+
+<Warning>
+  We are actively verifying that deployed schemas conform to Location Protocol v0.2. There may be inconsistencies between the documentation, deployed schemas, and the spec. See [GitHub issue #11](https://github.com/AstralProtocol/astral-location-services/issues/11) for status.
+</Warning>
+
+## Storage options
+
+<CardGroup cols={2}>
+  <Card title="Onchain" icon="link">
+    - Stored on EAS contracts
+    - Referenced by chain ID + UID //@claude: right?
+    - Higher gas cost
+    - Permanent, immutable
+  </Card>
+  <Card title="Offchain" icon="cloud">
+    - Held on user devices or stored on IPFS, servers, etc.
+    - Referenced by UID + URI
+    - No gas cost to create
+    - EIP-712 signed
+  </Card>
+</CardGroup>
+
+For offchain attestations, the UID is deterministically derived from the attestation data. Even when fetching from HTTPS (not content-addressed), Astral verifies that the fetched attestation produces the expected UID. Mismatch means rejection.
+
+<Card title="Next: Location proofs" icon="shield-check" href="/concepts/location-proofs">
+  Adding evidence of physical correspondence
+</Card>
+
+---
+
+**See also:**
+- [SDK: Location module](/sdk/location) — creating, fetching, and querying location records
+- [API: Types](/api-reference/types) — input format reference
