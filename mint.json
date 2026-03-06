@@ -157,6 +157,13 @@
       ]
     },
     {
+      "group": "Integrations",
+      "pages": [
+        "integrations/erc-8004",
+        "integrations/openclaw"
+      ]
+    },
+    {
       "group": "Resources",
       "pages": [
         "resources/playground",
