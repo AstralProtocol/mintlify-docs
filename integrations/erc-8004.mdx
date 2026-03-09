@@ -1,9 +1,9 @@
 ---
-title: "ERC-8004: Location for Autonomous Agents"
-description: "Extending ERC-8004 agent validation with verifiable location proofs from Astral"
+title: "ERC-8004 + Astral"
+description: "Adding verifiable location to autonomous agent validation"
 ---
 
-<Note>**Research preview** — This integration is under active development. Interfaces may change. [GitHub](https://github.com/pblvrt/openclaw-location-plugin)</Note>
+<Note>**Research preview** — This integration is under active development. Interfaces may change.</Note>
 
 # ERC-8004 + Astral
 
@@ -11,7 +11,7 @@ description: "Extending ERC-8004 agent validation with verifiable location proof
 
 It doesn't answer **where the agent is**.
 
-A growing class of agent tasks — deliveries, inspections, environmental monitoring, physical-world services — require verifiable proof of location. Without it, an agent's claim to be "at the delivery address" or "at the inspection site" is self-reported and unverifiable. ERC-8004 validators can check computational correctness, but they can't check physical presence.
+A growing class of agent tasks — deliveries, inspections, environmental monitoring, data residency, compute jobs anchored to physical infrastructure — require verifiable proof of location. Without it, an agent's claim to be "at the delivery address" or "at the inspection site" is self-reported and unverifiable. ERC-8004 validators can check computational correctness, but they can't check physical presence.
 
 Astral fills that gap. By combining Astral's verifiable location infrastructure with ERC-8004's agent framework, agents can prove *where* they are — not just *what* they did.
 
@@ -20,10 +20,17 @@ Astral fills that gap. By combining Astral's verifiable location infrastructure 
 | Layer | Responsibility | Provider |
 |-------|---------------|----------|
 | **Agent** | Identity, task execution, reputation | ERC-8004 |
-| **Location** | Spatial proofs, verification, geocomputation | Astral Protocol |
+| **Location** | Location proofs, verification, geocomputation | Astral Protocol |
 | **Consensus** | On-chain validation and settlement | EVM chain |
 
 ## How it works
+
+[Astral Location Services](/concepts/astral-location-services) is a verifiable geospatial computation service that runs inside a Trusted Execution Environment. It exposes two modules:
+
+- **[Verify](/concepts/verify)** — Verifies location proofs: checks each stamp's signatures, structure, and signal consistency, cross-correlates evidence from independent sources, and produces a [credibility vector](/concepts/location-proof-evaluation).
+- **[Compute](/concepts/compute)** — Computes spatial relationships between geographic features: distance, containment, intersection, area. This is how spatial constraints in tasks get checked — e.g., "is this verified location within the required geofence?"
+
+Both modules run inside the TEE, and both produce cryptographically signed [EAS attestations](/concepts/signed-results).
 
 ```mermaid
 graph LR
@@ -32,84 +39,46 @@ graph LR
         E --> S[Submit result]
     end
 
-    subgraph Astral["Astral Protocol"]
-        C[Collect evidence] --> V[TEE verification]
-        V --> P[Signed location proof]
+    subgraph Astral["Astral Location Services"]
+        C[Collect evidence] --> V[Verify module]
+        V --> CR[Credibility vector]
+        CR --> CO[Compute module]
+        CO --> A[Signed attestations]
     end
 
     T --> C
-    P --> S
+    A --> S
     S --> Val[On-chain validation]
 ```
 
 1. **Task assignment** — An ERC-8004 task includes a spatial constraint (e.g., "must be within 50m of 52.3676°N, 4.9041°E")
-2. **Evidence collection** — The agent collects location evidence from multiple signal sources (GNSS, WiFi, cell towers)
-3. **TEE verification** — Astral processes the evidence in a Trusted Execution Environment, cross-correlates signals, and produces a signed location proof with a credibility score
-4. **Result submission** — The signed proof is bundled with the agent's task result and submitted on-chain
-5. **Validation** — ERC-8004 validators check both the task result *and* the location proof
+2. **Evidence collection** — The agent uses [location proof plugins](/plugins/overview) to collect location evidence from multiple independent signal sources. Each plugin connects with a different [proof-of-location system](/concepts/pol-systems) — GPS hardware, WiFi geolocation, IP lookup, device attestation, infrastructure triangulation — and provides a common interface.
+3. **Verification** — The agent submits the location proof to Astral's [Verify module](/concepts/verify). It checks each [location stamp's](/concepts/location-stamps) internal validity, cross-correlates evidence from independent sources, and evaluates how well the evidence supports the claim. The output is a [credibility vector](/concepts/location-proof-evaluation) — a multi-dimensional assessment across spatial, temporal, validity, and independence dimensions.
+4. **Constraint check** — The agent uses Astral's [Compute module](/concepts/compute) to check the verified location against the task's spatial constraint — e.g., a containment check against a geofence, or a distance check from a target point. The Compute module compares geographic features and returns a signed result.
+5. **Signed attestations** — Both the credibility vector and the constraint check result are signed as [EAS attestations](/concepts/signed-results). The signing key lives inside the TEE and cannot be extracted — a valid signature proves the result came from Astral's attested code.
+6. **Result submission** — The signed attestations are bundled with the agent's task result and submitted on-chain. ERC-8004 validators check the Astral signatures to verify both the location evidence and the spatial constraint were evaluated correctly.
 
 ## What Astral adds to ERC-8004
 
-### TEE-attested verification → task validation
+### Verifiable location evaluation
 
-Astral processes location evidence inside Trusted Execution Environments. The TEE attestation chain provides a hardware-rooted guarantee that location data wasn't tampered with. In ERC-8004 terms, this becomes an additional validation input — the location proof carries the same trust properties as the TEE that produced it.
+Astral's Verify module runs inside a TEE, providing hardware attestation that the verification code ran as deployed, the credibility vector was computed correctly, and the signed output hasn't been tampered with. The TEE signing key cannot be extracted by the operator — a valid signature is proof the result came from the attested environment.
 
-### Credibility vectors → agent reputation
+The strength of the underlying evidence depends on the [plugins](/plugins/overview) used. Each plugin connects with a proof-of-location system that has its own trust properties — from hardware-rooted device attestation to lightweight IP geolocation. The [credibility vector](/concepts/location-proof-evaluation) surfaces these differences so applications can make informed decisions. The exact structure and dimensions of the credibility vector are an active area of [research](https://github.com/AstralProtocol/research).
 
-Astral assigns credibility scores to location claims based on signal quality, consistency, and historical accuracy. These feed directly into ERC-8004's reputation system: agents with consistently verifiable locations build spatial reputation. Agents that claim to be places they aren't see their credibility degrade.
+### Verifiable geocomputation
 
-### Geocomputation → spatial constraints
+Astral's [Compute module](/concepts/compute) compares and computes relationships between geographic features — distances, containment, intersections, areas — inside the TEE. This is what makes spatial constraints enforceable: a task says "agent must be within this geofence," and the Compute module produces a signed attestation confirming whether the condition is met.
 
-Astral's geocomputation capabilities — geofencing, proximity checks, route verification, area coverage — map to ERC-8004 task constraints. A task can specify spatial requirements that are evaluated by Astral, with results returned as signed attestations.
+### Signed attestations on-chain
 
-### Signed results → on-chain proofs
-
-Every Astral verification produces a cryptographically signed result. These signatures are verifiable on-chain, making them native inputs to ERC-8004 smart contract validation logic. No oracle required — the proof is self-contained.
-
-## Location-bound task results
-
-An agent's task result is cryptographically bound to a verified location. The proof isn't "agent says it was here" — it's "Astral verified the agent was here, in a TEE, using cross-correlated signals, and signed the result."
-
-```json
-{
-  "agent_id": "0xABCD...",
-  "task_id": 42,
-  "result": "<task output>",
-  "location_proof": {
-    "coordinates": { "lat": 52.3676, "lng": 4.9041 },
-    "accuracy": 12,
-    "timestamp": 1709251200,
-    "signals_used": ["gnss", "wifi_fingerprint", "cell_tower"],
-    "credibility": 0.94,
-    "tee_attestation": "0x1234...",
-    "astral_signature": "0x5678..."
-  }
-}
-```
-
-## Continuous verification
-
-For tasks that require presence over time — monitoring, guarding, patrolling — Astral can produce a continuous verification stream: a series of time-stamped, signed location proofs that together attest to an agent's trajectory or sustained presence.
-
-```json
-{
-  "agent_id": "0xABCD...",
-  "task_id": 42,
-  "proofs": [
-    { "timestamp": 1709251200, "coordinates": { "lat": 52.3676, "lng": 4.9041 }, "credibility": 0.94 },
-    { "timestamp": 1709251260, "coordinates": { "lat": 52.3677, "lng": 4.9042 }, "credibility": 0.91 },
-    { "timestamp": 1709251320, "coordinates": { "lat": 52.3676, "lng": 4.9040 }, "credibility": 0.95 }
-  ],
-  "trajectory_hash": "0xABCD...",
-  "astral_signature": "0x5678..."
-}
-```
+Every Astral result — whether from Verify or Compute — is a cryptographically signed [EAS attestation](/concepts/signed-results). These signatures are verifiable on-chain, making them native inputs to ERC-8004 validator contracts.
 
 ## Use cases unlocked
 
 <CardGroup cols={2}>
   <Card title="Trustless delivery" icon="truck">
-    Courier must produce an Astral-verified proof within 30m of the delivery point. Payment releases automatically on proof submission.
+    Courier must produce a multi-factor location proof within 30m of the delivery point. Payment releases automatically when the credibility vector meets the task's threshold.
   </Card>
   <Card title="Environmental monitoring" icon="leaf">
     Each sensor reading is bound to a verified location. Coverage gaps are detectable. A single agent can't fake data for multiple stations.
@@ -117,47 +86,34 @@ For tasks that require presence over time — monitoring, guarding, patrolling �
   <Card title="Infrastructure inspection" icon="building">
     Agents dispatched to inspect properties must prove physical presence at the site before submitting reports.
   </Card>
-  <Card title="Spatial task routing" icon="route">
-    Query Astral's spatial index for verified-present agents near a target location, then route tasks deterministically.
+  <Card title="Data residency" icon="server">
+    Compute jobs and data storage tasks can require verifiable proof that the agent is operating from a specific jurisdiction.
   </Card>
 </CardGroup>
-
-## Credibility is a spectrum
-
-Astral doesn't output binary "verified / not verified." It produces a **credibility score** reflecting signal quality, consistency, and confidence. Task issuers set their own minimum thresholds based on risk tolerance:
-
-- A casual check-in might accept **0.6**
-- A routine delivery might require **0.8**
-- A high-value asset transfer might require **0.95**
-
-This maps naturally to ERC-8004's validation model — different tasks can demand different levels of spatial assurance.
 
 ## Trust model
 
 | Claim | Verification method | Trust root |
 |-------|-------------------|------------|
-| Agent was at location X at time T | TEE-processed cross-correlated signals | Hardware attestation + Astral signature |
-| Location proof is authentic | Cryptographic signature verification | Astral's signing key |
-| Agent meets spatial constraint | On-chain geofence check | Smart contract logic |
-| Credibility score is accurate | Multi-signal cross-correlation in TEE | Signal diversity + TEE integrity |
+| Evidence was evaluated correctly | TEE-attested computation | TEE hardware attestation + Astral signing key |
+| Spatial constraint was checked correctly | TEE-attested geocomputation | TEE hardware attestation + Astral signing key |
+| Location stamps are internally valid | Plugin-level verification (signatures, structure, signal consistency) | Per-plugin — depends on the proof-of-location system |
+| Location evidence is authentic at source | Plugin-specific | Varies: hardware secure elements, infrastructure attestation, cryptographic proofs |
 
-For a detailed discussion of what's verified vs. what's trusted, see the [Trust Model](/trust-model/architecture).
+Each [plugin](/plugins/overview) has its own trust properties. The credibility vector's dimensions — especially validity and independence — help applications distinguish between evidence backed by strong guarantees and lighter-weight signals.
+
+For a detailed discussion, see the [Trust Model](/trust-model/architecture).
 
 ## Open questions
 
 These are active areas of research and design:
 
-1. **On-chain proof size** — Full proofs with TEE attestations can be large. Should only the hash go on-chain, with full proofs on IPFS/Arweave?
+1. **On-chain proof size** — Full credibility vectors with TEE attestations can be large. Should only the hash go on-chain, with full results on IPFS/Arweave?
 2. **Proof freshness** — How recent must a location proof be? Should tasks include a `maxProofAge` parameter?
 3. **Privacy** — Can Astral produce zero-knowledge spatial proofs? ("Agent is within the geofence" without revealing exact coordinates.)
 4. **Agent collusion** — Colluding agents could co-attest false locations. How does the credibility model handle spatial Sybil attacks?
-5. **Standard extension** — Should location verification become a formal ERC-8004 extension (EIP), or remain a plugin-level integration?
+5. **Standard extension** — Should location verification become a formal ERC-8004 extension (EIP), or remain an integration-level pattern?
 
-<CardGroup cols={2}>
-  <Card title="OpenClaw plugin" icon="plug" href="/integrations/openclaw">
-    Reference implementation and smart contract interfaces
-  </Card>
-  <Card title="Trust model" icon="shield-check" href="/trust-model/architecture">
-    What the system verifies vs. what it assumes
-  </Card>
-</CardGroup>
+<Card title="Trust model" icon="shield-check" href="/trust-model/architecture">
+  What the system verifies vs. what it assumes
+</Card>

@@ -159,8 +159,7 @@
     {
       "group": "Integrations",
       "pages": [
-        "integrations/erc-8004",
-        "integrations/openclaw"
+        "integrations/erc-8004"
       ]
     },
     {
