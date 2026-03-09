@@ -31,7 +31,7 @@ Astral is a REST API, so any language or framework that can make HTTP requests w
 ```python
 import httpx
 
-response = httpx.post("https://api.astral.global/compute/distance", json={
+response = httpx.post("https://staging-api.astral.global/compute/distance", json={
     "from": {"type": "Point", "coordinates": [2.2945, 48.8584]},
     "to": {"type": "Point", "coordinates": [2.3522, 48.8566]},
     "chainId": 84532
@@ -44,7 +44,7 @@ distance_meters = result["result"]
 ### TypeScript
 
 ```typescript
-const response = await fetch('https://api.astral.global/compute/distance', {
+const response = await fetch('https://staging-api.astral.global/compute/distance', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -76,7 +76,7 @@ else:
 For boolean operations like containment or intersection, the result is `true` or `false`:
 
 ```python
-response = httpx.post("https://api.astral.global/compute/contains", json={
+response = httpx.post("https://staging-api.astral.global/compute/contains", json={
     "container": geofence_polygon,
     "geometry": {"type": "Point", "coordinates": agent_location},
     "chainId": 84532
@@ -100,7 +100,7 @@ Here is a complete agent workflow that checks whether a courier has arrived at t
 import httpx
 import time
 
-ASTRAL_URL = "https://api.astral.global"
+ASTRAL_URL = "https://staging-api.astral.global"
 DELIVERY_RADIUS_METERS = 100
 
 def check_delivery_proximity(

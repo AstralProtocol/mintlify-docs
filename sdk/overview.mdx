@@ -29,7 +29,7 @@ import { AstralSDK } from '@decentralized-geo/astral-sdk';
 const astral = new AstralSDK({
   chainId: 84532,
   signer: wallet,
-  apiUrl: 'https://api.astral.global',
+  apiUrl: 'https://staging-api.astral.global',
   apiKey: 'your-api-key'
 });
 
@@ -91,7 +91,7 @@ const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const astral = new AstralSDK({
   chainId: 84532,
   signer: wallet,
-  apiUrl: 'https://api.astral.global'
+  apiUrl: 'https://staging-api.astral.global'
 });
 
 // Create an offchain location attestation
@@ -125,7 +125,7 @@ interface AstralConfig {
   // Recommended
   signer?: Signer;              // For signing attestations and transactions
   provider?: Provider;          // For read-only blockchain operations
-  apiUrl?: string;              // Defaults to 'https://api.astral.global'
+  apiUrl?: string;              // Defaults to 'https://staging-api.astral.global'
   apiKey?: string;              // Required for TEE verification and hosted endpoints
 
   // Advanced

@@ -39,8 +39,21 @@ curl -X POST https://staging-api.astral.global/compute/v0/distance \
   }'
 ```
 
+## Verifying signatures
+
+All attestations from the staging service are signed by the attester address above. To verify a result came from Astral's staging environment:
+
+```solidity
+require(attestation.attester == 0x590fdb53ed3f0B52694876d42367192a5336700F, "Not from Astral staging");
+```
+
+```typescript
+const ASTRAL_STAGING_SIGNER = '0x590fdb53ed3f0B52694876d42367192a5336700F';
+// Verify the EAS attestation's attester field matches
+```
+
 ## Notes
 
 - No authentication required
 - Rate limited to 100 requests/hour per IP
-- Attestations are signed but use a staging key (not production)
+- Attestations are signed with the staging key — a different key will be used for production
