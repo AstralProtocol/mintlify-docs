@@ -157,6 +157,12 @@
       ]
     },
     {
+      "group": "Integrations",
+      "pages": [
+        "integrations/erc-8004"
+      ]
+    },
+    {
       "group": "Resources",
       "pages": [
         "resources/playground",

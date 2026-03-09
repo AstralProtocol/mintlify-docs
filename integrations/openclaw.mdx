@@ -1,0 +1,243 @@
+---
+title: "OpenClaw Location Plugin"
+description: "Reference implementation for location-aware ERC-8004 agents"
+---
+
+<Note>**Research preview** — OpenClaw is a reference concept, not production software. Contracts are undeployed. Interfaces will change. [GitHub](https://github.com/pblvrt/openclaw-location-plugin)</Note>
+
+# OpenClaw
+
+OpenClaw is a reference implementation for extending ERC-8004 autonomous agents with Astral's location verification. It acts as a plugin layer — existing agents can add location proofs to their task results without modifying core logic.
+
+The goal: give builders a concrete starting point for building location-aware agents on ERC-8004.
+
+## Architecture
+
+OpenClaw sits between the ERC-8004 agent and Astral Protocol, handling location evidence collection, proof generation, and on-chain submission.
+
+```
+┌──────────────────────────────────────────────┐
+│               ERC-8004 Agent                 │
+│                                              │
+│  Identity ─── Task Engine ─── Validators     │
+│                    │               │         │
+│  ┌─────────────────┴───────────────┴──────┐  │
+│  │       OpenClaw Location Plugin         │  │
+│  │                                        │  │
+│  │  Location    Proof       Spatial       │  │
+│  │  Assertion   Bundle      Constraint    │  │
+│  └──────┬─────────┬────────────┬──────────┘  │
+└─────────┼─────────┼────────────┼─────────────┘
+          │         │            │
+          ▼         ▼            ▼
+┌──────────────────────────────────────────────┐
+│            Astral Protocol                   │
+│                                              │
+│  TEE Verification   Credibility Vectors      │
+│  Geocomputation     Signed Results           │
+└──────────────────────────────────────────────┘
+```
+
+## Smart contract interface
+
+The plugin defines two core structures and three key functions.
+
+### Data structures
+
+```solidity
+struct LocationProof {
+    int256 latitude;      // Fixed-point, 6 decimals (52367600 = 52.3676°)
+    int256 longitude;     // Fixed-point, 6 decimals
+    uint256 accuracy;     // Meters
+    uint256 timestamp;
+    uint256 credibility;  // 0-100 (percentage)
+    bytes teeAttestation;
+    bytes astralSignature;
+}
+
+struct SpatialConstraint {
+    int256 centerLat;
+    int256 centerLng;
+    uint256 radiusMeters;
+    uint256 minCredibility;  // Minimum credibility score required (0-100)
+}
+```
+
+Coordinates use fixed-point micro-degrees (degrees × 10⁶) for on-chain math without floating point. Distance calculations use equirectangular approximation, accurate to <0.1% for distances under 100km.
+
+### Plugin interface
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+interface IOpenClawPlugin {
+    /// @notice Verify that a location proof satisfies a spatial constraint
+    function verifyLocation(
+        LocationProof calldata proof,
+        SpatialConstraint calldata constraint
+    ) external view returns (bool valid);
+
+    /// @notice Verify the Astral signature on a location proof
+    function verifyAstralSignature(
+        LocationProof calldata proof
+    ) external view returns (bool authentic);
+
+    /// @notice Submit a task result with an attached location proof
+    function submitWithLocation(
+        uint256 taskId,
+        bytes calldata result,
+        LocationProof calldata proof
+    ) external;
+}
+```
+
+### Validator integration
+
+A location-aware validator that plugs into ERC-8004's validation flow:
+
+```solidity
+contract LocationAwareValidator is IERC8004Validator {
+    IOpenClawPlugin public openClaw;
+
+    function validate(
+        uint256 taskId,
+        address agent,
+        bytes calldata result,
+        bytes calldata metadata
+    ) external override returns (bool) {
+        // Decode the location proof from metadata
+        IOpenClawPlugin.LocationProof memory proof = abi.decode(
+            metadata, (IOpenClawPlugin.LocationProof)
+        );
+
+        // Get the spatial constraint for this task
+        IOpenClawPlugin.SpatialConstraint memory constraint = getConstraint(taskId);
+
+        // Verify the Astral signature is authentic
+        require(openClaw.verifyAstralSignature(proof), "Invalid Astral signature");
+
+        // Verify the location satisfies the task's spatial constraint
+        require(openClaw.verifyLocation(proof, constraint), "Location constraint not met");
+
+        // Proceed with standard task validation
+        return validateTaskResult(taskId, agent, result);
+    }
+}
+```
+
+## Agent-side integration
+
+A TypeScript agent that collects location evidence, generates a proof, and submits with its task result:
+
+```typescript
+import { AstralClient } from "@astral-protocol/sdk";
+import { ERC8004Agent } from "@erc8004/agent-sdk";
+
+class LocationAwareAgent extends ERC8004Agent {
+  private astral: AstralClient;
+
+  constructor(config: AgentConfig) {
+    super(config);
+    this.astral = new AstralClient({
+      endpoint: "https://api.astral.global",
+      agentId: this.id,
+    });
+  }
+
+  async executeTask(task: Task): Promise<TaskResult> {
+    // Collect location evidence from multiple signals
+    const evidence = await this.astral.collectEvidence({
+      signals: ["gnss", "wifi", "cell"],
+      duration: 5000, // ms
+    });
+
+    // Submit to Astral for TEE-verified proof generation
+    const locationProof = await this.astral.generateProof(evidence);
+
+    // Check if proof meets task's spatial requirements
+    if (locationProof.credibility < task.spatialConstraint.minCredibility) {
+      throw new Error(
+        `Credibility ${locationProof.credibility} below required ${task.spatialConstraint.minCredibility}`
+      );
+    }
+
+    // Execute the actual task
+    const result = await this.performTask(task);
+
+    // Submit result with location proof attached
+    return this.submitResult(task.id, result, locationProof);
+  }
+}
+```
+
+## Location signals
+
+Astral cross-correlates multiple signals to produce a credibility score. No single signal is trusted alone.
+
+| Signal | Accuracy | Spoofing difficulty |
+|--------|----------|-------------------|
+| GNSS (GPS/Galileo/GLONASS) | ~3m | Medium — spoofable with SDR |
+| WiFi fingerprint | ~30-200m | Hard — requires physical AP presence |
+| Cell tower triangulation | ~100-500m | Hard — requires infrastructure access |
+| IP geolocation | ~5-50km | Easy — VPN defeats this |
+| Bluetooth beacons | ~1-5m | Medium — beacons can be cloned |
+| Peer attestation | Varies | Scales with collusion cost |
+
+When signals agree, credibility is high. When they disagree, credibility drops and the credibility vector flags the inconsistency:
+
+```json
+{
+  "overall": 0.94,
+  "breakdown": {
+    "gnss": { "present": true, "consistent": true, "weight": 0.35 },
+    "wifi": { "present": true, "consistent": true, "weight": 0.30 },
+    "cell": { "present": true, "consistent": true, "weight": 0.25 },
+    "ip":   { "present": true, "consistent": true, "weight": 0.10 }
+  },
+  "flags": []
+}
+```
+
+For more on how credibility works, see [Location Proof Evaluation](/concepts/location-proof-evaluation).
+
+## Building on OpenClaw
+
+OpenClaw is a starting point. Here's what a builder might do with it:
+
+### Add location to an existing agent
+
+If you already have an ERC-8004 agent, OpenClaw wraps your existing task flow. Collect evidence, generate a proof, append it to your result submission. The validator checks both your task output and the location proof.
+
+### Custom spatial constraints
+
+The `SpatialConstraint` struct is minimal by design — a center point, a radius, and a minimum credibility. Extend it for your use case: polygon geofences, route corridors, elevation requirements, time-of-day restrictions.
+
+### Continuous monitoring
+
+For tasks requiring sustained presence, submit proofs at regular intervals. Aggregate them into a trajectory proof with a Merkle root for efficient on-chain verification.
+
+## Repository
+
+The reference implementation is at [pblvrt/openclaw-location-plugin](https://github.com/pblvrt/openclaw-location-plugin):
+
+- `contracts/` — Solidity implementations (Foundry)
+- `sdk/` — TypeScript agent integration
+- `test/` — Unit and fuzz tests (32+ test cases)
+
+Contracts are not yet deployed. They're waiting on Astral's infrastructure availability across mainnet, Base, and testnet.
+
+## Related work
+
+- [Astral SDK PR #68](https://github.com/DecentralizedGeo/astral-sdk/pull/68) — Unix location plugin signals (GNSS, GeoClue, WiFi, IP) being integrated into the Astral SDK
+- [ERC-8004 specification](https://ethereum-magicians.org/t/erc-8004-autonomous-agents) — The autonomous agent standard
+- [Location proof plugins](/plugins/overview) — Astral's plugin system for proof-of-location sources
+
+<CardGroup cols={2}>
+  <Card title="ERC-8004 overview" icon="robot" href="/integrations/erc-8004">
+    Why the agent economy needs a location layer
+  </Card>
+  <Card title="Agent integration guide" icon="code" href="/guides/agent-integration">
+    Using Astral as a spatial oracle in agent workflows
+  </Card>
+</CardGroup>
