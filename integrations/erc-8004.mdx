@@ -30,7 +30,7 @@ Astral fills that gap. By combining Astral's verifiable location infrastructure 
 - **[Verify](/concepts/verify)** — Verifies location proofs: checks each stamp's signatures, structure, and signal consistency, cross-correlates evidence from independent sources, and produces a [credibility vector](/concepts/location-proof-evaluation).
 - **[Compute](/concepts/compute)** — Computes spatial relationships between geographic features: distance, containment, intersection, area. This is how spatial constraints in tasks get checked — e.g., "is this verified location within the required geofence?"
 
-Both modules run inside the TEE, and both produce cryptographically signed [EAS attestations](/concepts/signed-results).
+Both endpoints run inside the TEE, and both produce cryptographically signed [EAS attestations](/concepts/signed-results).
 
 ```mermaid
 graph LR
@@ -40,9 +40,9 @@ graph LR
     end
 
     subgraph Astral["Astral Location Services"]
-        C[Collect evidence] --> V[Verify module]
+        C[Collect evidence] --> V[Verify]
         V --> CR[Credibility vector]
-        CR --> CO[Compute module]
+        CR --> CO[Compute]
         CO --> A[Signed attestations]
     end
 
@@ -53,8 +53,8 @@ graph LR
 
 1. **Task assignment** — An ERC-8004 task includes a spatial constraint (e.g., "must be within 50m of 52.3676°N, 4.9041°E")
 2. **Evidence collection** — The agent uses [location proof plugins](/plugins/overview) to collect location evidence from multiple independent signal sources. Each plugin connects with a different [proof-of-location system](/concepts/pol-systems) — GPS hardware, WiFi geolocation, IP lookup, device attestation, infrastructure triangulation — and provides a common interface.
-3. **Verification** — The agent submits the location proof to Astral's [Verify module](/concepts/verify). It checks each [location stamp's](/concepts/location-stamps) internal validity, cross-correlates evidence from independent sources, and evaluates how well the evidence supports the claim. The output is a [credibility vector](/concepts/location-proof-evaluation) — a multi-dimensional assessment across spatial, temporal, validity, and independence dimensions.
-4. **Constraint check** — The agent uses Astral's [Compute module](/concepts/compute) to check the verified location against the task's spatial constraint — e.g., a containment check against a geofence, or a distance check from a target point. The Compute module compares geographic features and returns a signed result.
+3. **Verification** — The agent submits the location proof to Astral's [Verify](/concepts/verify) endpoint. It checks each [location stamp's](/concepts/location-stamps) internal validity, cross-correlates evidence from independent sources, and evaluates how well the evidence supports the claim. The output is a [credibility vector](/concepts/location-proof-evaluation) — a multi-dimensional assessment across spatial, temporal, validity, and independence dimensions.
+4. **Constraint check** — The agent uses Astral's [Compute](/concepts/compute) endpoint to check the verified location against the task's spatial constraint — e.g., a containment check against a geofence, or a distance check from a target point. Compute compares geographic features and returns a signed result.
 5. **Signed attestations** — Both the credibility vector and the constraint check result are signed as [EAS attestations](/concepts/signed-results). The signing key lives inside the TEE and cannot be extracted — a valid signature proves the result came from Astral's attested code.
 6. **Result submission** — The signed attestations are bundled with the agent's task result and submitted on-chain. ERC-8004 validators check the Astral signatures to verify both the location evidence and the spatial constraint were evaluated correctly.
 
@@ -62,17 +62,17 @@ graph LR
 
 ### Verifiable location evaluation
 
-Astral's Verify module runs inside a TEE, providing hardware attestation that the verification code ran as deployed, the credibility vector was computed correctly, and the signed output hasn't been tampered with. The TEE signing key cannot be extracted by the operator — a valid signature is proof the result came from the attested environment.
+Astral's Verify endpoint runs inside a TEE, providing hardware attestation that the verification code ran as deployed, the credibility vector was computed correctly, and the signed output hasn't been tampered with. The TEE signing key cannot be extracted by the operator — a valid signature is proof the result came from the attested environment.
 
 The strength of the underlying evidence depends on the [plugins](/plugins/overview) used. Each plugin connects with a proof-of-location system that has its own trust properties — from hardware-rooted device attestation to lightweight IP geolocation. The [credibility vector](/concepts/location-proof-evaluation) surfaces these differences so applications can make informed decisions. The exact structure and dimensions of the credibility vector are an active area of [research](https://github.com/AstralProtocol/research).
 
 ### Verifiable geocomputation
 
-Astral's [Compute module](/concepts/compute) compares and computes relationships between geographic features — distances, containment, intersections, areas — inside the TEE. This is what makes spatial constraints enforceable: a task says "agent must be within this geofence," and the Compute module produces a signed attestation confirming whether the condition is met.
+Astral's [Compute](/concepts/compute) endpoint compares and computes relationships between geographic features — distances, containment, intersections, areas — inside the TEE. This is what makes spatial constraints enforceable: a task says "agent must be within this geofence," and Compute produces a signed attestation confirming whether the condition is met.
 
 ### Signed attestations on-chain
 
-Every Astral result — whether from Verify or Compute — is a cryptographically signed [EAS attestation](/concepts/signed-results). These signatures are verifiable on-chain, making them native inputs to ERC-8004 validator contracts.
+Every result from Astral Location Services — whether from Verify or Compute — is a cryptographically signed [EAS attestation](/concepts/signed-results). These signatures are verifiable on-chain, making them native inputs to ERC-8004 validator contracts.
 
 ## Use cases unlocked
 
