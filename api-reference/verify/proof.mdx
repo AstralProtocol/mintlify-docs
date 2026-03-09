@@ -38,7 +38,7 @@ POST /verify/v0/proof
 <CodeGroup>
 
 ```bash cURL
-curl -X POST https://api.astral.global/verify/v0/proof \
+curl -X POST https://staging-api.astral.global/verify/v0/proof \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
@@ -84,7 +84,7 @@ curl -X POST https://api.astral.global/verify/v0/proof \
 ```
 
 ```typescript TypeScript
-const response = await fetch('https://api.astral.global/verify/v0/proof', {
+const response = await fetch('https://staging-api.astral.global/verify/v0/proof', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',

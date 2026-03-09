@@ -17,7 +17,7 @@ import { AstralSDK } from '@decentralized-geo/astral-sdk';
 const astral = new AstralSDK({
   chainId: 84532,
   signer: wallet,
-  apiUrl: 'https://api.astral.global'
+  apiUrl: 'https://staging-api.astral.global'
 });
 
 // Access via astral.compute
@@ -440,7 +440,7 @@ const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const astral = new AstralSDK({
   chainId: 84532,
   signer: wallet,
-  apiUrl: 'https://api.astral.global'
+  apiUrl: 'https://staging-api.astral.global'
 });
 
 // Create a location attestation

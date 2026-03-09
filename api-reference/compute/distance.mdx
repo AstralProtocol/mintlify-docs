@@ -42,7 +42,7 @@ POST /compute/v0/distance
 <CodeGroup>
 
 ```bash cURL
-curl -X POST https://api.astral.global/compute/v0/distance \
+curl -X POST https://staging-api.astral.global/compute/v0/distance \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
@@ -57,7 +57,7 @@ curl -X POST https://api.astral.global/compute/v0/distance \
 ```
 
 ```typescript TypeScript
-const response = await fetch('https://api.astral.global/compute/v0/distance', {
+const response = await fetch('https://staging-api.astral.global/compute/v0/distance', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',

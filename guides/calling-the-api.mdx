@@ -13,7 +13,7 @@ This guide covers the mechanics of making requests to Astral — how to format i
 
 | Environment | URL |
 |-------------|-----|
-| Production | `https://api.astral.global` |
+| Staging (testnet) | `https://staging-api.astral.global` |
 | Local development | `http://localhost:3004` |
 
 See [Local development](/guides/local-development) for setup instructions.
@@ -146,7 +146,7 @@ Errors follow [RFC 7807](https://tools.ietf.org/html/rfc7807) (Problem Details f
 
 ```json
 {
-  "type": "https://api.astral.global/errors/invalid-input",
+  "type": "https://staging-api.astral.global/errors/invalid-input",
   "title": "Invalid Input",
   "status": 400,
   "detail": "Field 'from' must be a valid GeoJSON geometry or attestation UID"
@@ -166,7 +166,7 @@ Errors follow [RFC 7807](https://tools.ietf.org/html/rfc7807) (Problem Details f
 ### Handling errors in code
 
 ```typescript
-const response = await fetch('https://api.astral.global/compute/distance', {
+const response = await fetch('https://staging-api.astral.global/compute/distance', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -189,7 +189,7 @@ console.log(`Distance: ${result.result} ${result.units}`);
 ## Full example: curl
 
 ```bash
-curl -X POST https://api.astral.global/compute/contains \
+curl -X POST https://staging-api.astral.global/compute/contains \
   -H "Content-Type: application/json" \
   -d '{
     "container": {

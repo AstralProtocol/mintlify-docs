@@ -49,7 +49,7 @@ const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const astral = new AstralSDK({
   chainId: 84532,
   signer: wallet,
-  apiUrl: 'https://api.astral.global'
+  apiUrl: 'https://staging-api.astral.global'
 });
 
 // All modules are available
@@ -70,7 +70,7 @@ import { ProofModePlugin } from '@location-proofs/plugin-proofmode';
 const astral = new AstralSDK({
   chainId: 84532,
   signer: wallet,
-  apiUrl: 'https://api.astral.global'
+  apiUrl: 'https://staging-api.astral.global'
 });
 
 // Register plugins before using stamps/proofs
@@ -94,7 +94,7 @@ const network = await provider.getNetwork();
 const astral = new AstralSDK({
   chainId: Number(network.chainId),
   signer: signer,
-  apiUrl: 'https://api.astral.global'
+  apiUrl: 'https://staging-api.astral.global'
 });
 ```
 
@@ -111,7 +111,7 @@ const provider = new ethers.JsonRpcProvider('https://sepolia.base.org');
 const astral = new AstralSDK({
   chainId: 84532,
   provider: provider,
-  apiUrl: 'https://api.astral.global'
+  apiUrl: 'https://staging-api.astral.global'
 });
 
 // Can verify attestations
@@ -137,7 +137,7 @@ interface AstralConfig {
   /** Ethers provider for read-only blockchain operations. */
   provider?: Provider;
 
-  /** Astral API base URL. Defaults to 'https://api.astral.global' */
+  /** Astral API base URL. Defaults to 'https://staging-api.astral.global' */
   apiUrl?: string;
 
   /** Required for TEE verification and hosted stamp verification. */
@@ -221,7 +221,7 @@ For server-side applications:
 # .env
 PRIVATE_KEY=0x...
 CHAIN_ID=84532
-ASTRAL_API_URL=https://api.astral.global
+ASTRAL_API_URL=https://staging-api.astral.global
 ```
 
 ```typescript
