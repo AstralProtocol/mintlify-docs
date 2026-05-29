@@ -3,11 +3,11 @@ title: "Privacy"
 description: "Privacy properties of verification and computation"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Privacy
 
-Privacy is designed into Astral from the start — not bolted on afterward. A [TEE](/concepts/astral-location-services) running under attestation provides meaningful privacy properties, and zero-knowledge circuits for location proof verification and geospatial computations are an active research direction for stronger properties in the future. The privacy properties below assume the enclave runs under continuous remote attestation; see the [trust model](/trust-model/what-you-are-trusting) for the current deployment status.
+Privacy is a core design goal for Astral — but much of it is ahead of us, not behind us. Today, a [TEE](/concepts/astral-location-services) running under attestation keeps input data from the *operator* during computation. It does **not** yet make inputs or outputs private from whoever receives a result — signed results can still carry their inputs in plaintext (see below). Private inputs and private/shielded outputs are affordances we're actively designing; zero-knowledge approaches are a research direction. This page describes what holds today and where we're headed. (The properties that depend on the TEE assume the enclave runs under continuous remote attestation — see the [trust model](/trust-model/what-you-are-trusting) for current deployment status.)
 
 ## TEE Privacy Guarantees
 
@@ -30,6 +30,18 @@ However, in v0 the signed results **do include input data in plaintext**. Comput
 <Warning>
   v0 does not strip input data from signed results. A privacy-preserving output mode — returning only the answer, operation type, and hashed input references — is planned. See [astral-location-services#57](https://github.com/AstralProtocol/astral-location-services/issues/57) for progress.
 </Warning>
+
+## Privacy modes we're designing
+
+To be clear: Astral does not offer private inputs or private outputs as features today. These are the affordances we're scoping — the design feels feasible on this architecture, and we'd welcome input from anyone who needs them:
+
+- **Private input coordinates** — encrypted lat/lng, decrypted only inside the enclave and never echoed in the result.
+- **Private reference geometries** — keep the comparison geometry (a geofence or boundary) hidden, so a `contains`/`within` check doesn't reveal it.
+- **Private evaluation functions** — keep a verifier's evaluation/weighting logic confidential.
+- **Shielded outputs** — return a policy decision (trigger / don't trigger) carrying no identifying detail about who or where.
+- **Encrypted outputs** — results encrypted so only a specified counterparty can read them.
+
+The output-stripping piece is tracked in [astral-location-services#57](https://github.com/AstralProtocol/astral-location-services/issues/57); the broader set is being collected. If any of this matters to you, [get in touch](mailto:contact@astral.global).
 
 ## Information Leakage From Results
 
@@ -59,9 +71,9 @@ Zero-knowledge proofs would allow verification of location claims without reveal
 | Raw inputs hidden from verifier | No | Yes |
 | No trusted hardware required | No | Yes |
 | Verification without re-execution | No | Yes |
-| Maturity | Research preview (test TEE deployments) | Not yet — active research |
+| Maturity | Research Preview (test TEE deployments) | Not yet — active research |
 
-ZK location proofs are an active area of research. The challenge is constructing efficient circuits for geospatial operations — polygon containment and distance calculations are expensive to express in arithmetic circuits. This is future work, not a current capability.
+The hard part isn't only the geometry. ZK *computational geometry* circuits — polygon containment, distance — are expensive but tractable; [zkMaps](https://github.com/zkMaps/zkMaps), a project Astral has supported, has done some benchmarking here. But ZK geometry on its own isn't very useful: a location proof's value comes from *evaluating evidence*, not from computing a bare predicate. The frontier we care about is **ZK evaluation functions combined with ZK computational geometry** — proving privately that a credible body of evidence supports a claim. That's research, not a current capability.
 
 ## TEE Limitations
 
