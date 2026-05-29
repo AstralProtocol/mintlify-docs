@@ -110,6 +110,10 @@ const result = await response.json();
 
 ## Example response
 
+<Note>
+  Example only. `details` contents are plugin-specific, and some fields shown here (for example `certificateChainValid`) correspond to checks that are **planned but not yet performed in v0**. See the [ProofMode plugin](/plugins/proofmode) for exactly what stamp verification does today.
+</Note>
+
 ```json
 {
   "valid": true,
@@ -145,6 +149,6 @@ Errors follow [RFC 7807](https://tools.ietf.org/html/rfc7807):
 | `rate-limited` | 429 | Too many requests |
 | `unauthorized` | 401 | Invalid or missing API key |
 
-<Card title="SDK: Verify" icon="code" href="/sdk/verify">
+<Card title="SDK: Location proofs" icon="code" href="/sdk/location-proofs">
   See the SDK documentation for client-side usage
 </Card>

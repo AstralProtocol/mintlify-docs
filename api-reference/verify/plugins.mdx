@@ -48,6 +48,11 @@ const { plugins } = await response.json();
 | `version` | `string` | Semver version string |
 | `environments` | `string[]` | Runtime environments the plugin supports |
 | `description` | `string` | Human-readable description |
+| `status` | `string` | Implementation status: `"alpha"`, `"planned"`, or `"testing"` |
+
+<Note>
+  A plugin appearing in this list describes an interface, not a guarantee that it's fully implemented. Today `proofmode` is alpha, `mock` is for testing, and `witnesschain` is planned (interface defined, not yet built). Check the `status` field.
+</Note>
 
 ## Example response
 
@@ -58,19 +63,22 @@ const { plugins } = await response.json();
       "name": "proofmode",
       "version": "0.1.0",
       "environments": ["mobile", "server"],
-      "description": "Device attestation with hardware-backed cryptographic signatures"
+      "description": "Device attestation with hardware-backed cryptographic signatures",
+      "status": "alpha"
     },
     {
       "name": "witnesschain",
       "version": "0.1.0",
       "environments": ["server", "node"],
-      "description": "Infrastructure verification via network latency triangulation"
+      "description": "Infrastructure verification via network latency triangulation",
+      "status": "planned"
     },
     {
       "name": "mock",
       "version": "0.1.0",
       "environments": ["server", "node", "browser"],
-      "description": "Mock plugin for testing and development"
+      "description": "Mock plugin for testing and development",
+      "status": "testing"
     }
   ]
 }
@@ -84,6 +92,6 @@ const { plugins } = await response.json();
 | `rate-limited` | 429 | Too many requests |
 | `unauthorized` | 401 | Invalid or missing API key |
 
-<Card title="SDK: Verify" icon="code" href="/sdk/verify">
+<Card title="SDK: Location proofs" icon="code" href="/sdk/location-proofs">
   See the SDK documentation for client-side usage
 </Card>

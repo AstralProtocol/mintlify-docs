@@ -40,7 +40,7 @@ https://staging-api.astral.global/compute/v0
 
 ## Authentication
 
-All requests require an API key, passed as a header:
+The hosted staging service is currently open: the **public tier needs no API key**. Supplying an API key as a header raises your rate limit:
 
 ```bash
 # Either header works
@@ -52,9 +52,13 @@ All requests require an API key, passed as a header:
 
 | Tier | Limit | How to get |
 |------|-------|------------|
-| **Public** | 100 requests/hour | Default — no signup required |
+| **Public** | 100 requests/hour | Default — no API key required |
 | **Developer** | 1,000 requests/hour | Request a developer key |
 | **Internal** | 10,000 requests/hour | Astral team only |
+
+<Note>
+  Rate-limit tiers are an evolving part of the research preview. The public tier is open today; authenticated tiers are being rolled out.
+</Note>
 
 Rate limit headers are included in every response:
 

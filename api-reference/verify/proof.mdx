@@ -142,6 +142,10 @@ The response contains the verified proof, a credibility vector, and optional EAS
 
 ## Example response
 
+<Warning>
+  **Illustrative example.** The two-stamp response below uses a `witnesschain` stamp to show what multi-source cross-correlation looks like. WitnessChain is **not yet implemented** — today only `proofmode` (alpha) and `mock` are available, so a real multi-stamp proof would pair `proofmode` with `mock`. Some `details` fields shown here (for example `certificateChainValid`) correspond to checks that are **planned but not yet performed in v0** — see the [ProofMode plugin](/plugins/proofmode) for exactly what verification does today. The credibility-vector structure is also still evolving.
+</Warning>
+
 ```json
 {
   "proof": {
@@ -297,6 +301,6 @@ Errors follow [RFC 7807](https://tools.ietf.org/html/rfc7807):
 | `rate-limited` | 429 | Too many requests |
 | `unauthorized` | 401 | Invalid or missing API key |
 
-<Card title="SDK: Verify" icon="code" href="/sdk/verify">
+<Card title="SDK: Location proofs" icon="code" href="/sdk/location-proofs">
   See the SDK documentation for client-side usage
 </Card>
