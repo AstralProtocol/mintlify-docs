@@ -95,7 +95,9 @@ const proof = astral.proofs.create(
 // 4. Verify — the TEE evaluates the stamp's signatures, structure,
 //    and consistency with the claim
 const verified = await astral.verify.proof(proof, { chainId: 84532 });
-console.log(`Credibility: ${verified.credibility.confidence}`);
+// `credibility` is a multidimensional vector, not a single score —
+// your application decides how to weight the dimensions.
+console.log(verified.credibility);
 
 // 5. Compute — use the verified location in a spatial operation
 const inside = await astral.compute.contains({
@@ -129,7 +131,7 @@ await astral.eas.submitDelegated(inside.delegatedAttestation);
 
 ## What You Can Build
 
-Verified location data and verifiable spatial computation unlock applications that were previously impossible or required blind trust:
+Verified location data and verifiable spatial computation support applications that have, until now, depended on blind trust in self-reported location:
 
 <CardGroup cols={2}>
   <Card title="Delivery Verification" icon="truck">

@@ -75,11 +75,11 @@ Submit the location proof to Astral's Verify endpoint. Verification runs inside 
 ```typescript
 const verified = await astral.verify.proof(proof, { chainId: 84532 });
 
-console.log(verified.credibility.confidence);  // 0.85
-console.log(verified.uid);                     // 0xabc123...
+console.log(verified.credibility);  // a multidimensional credibility vector (illustrative)
+console.log(verified.uid);          // 0xabc123...
 ```
 
-The result is a credibility score — not a binary yes/no, but a structured assessment of how strongly the evidence supports the claim. You now have a verified, signed answer to "was this entity actually at this location?"
+The result is a **credibility vector** — not a binary yes/no, and not a single score, but a structured assessment of how strongly the evidence supports the claim across several dimensions (its exact structure is still an [open research question](/concepts/location-proof-evaluation)). It tells you how well the evidence backs the claim — not, by itself, that the entity was definitely there. How much that's worth, and what threshold to require, is your application's call.
 
 ## Step 3: Run a Spatial Computation
 
@@ -115,7 +115,7 @@ await db.insert({ delivery_id, proof: inside });
 
 Or submit it onchain. [EAS](https://docs.attest.org/) (the Ethereum Attestation Service) is an open protocol for structured, signed attestations, plus a smart contract to register attestations onchain. 
 
-Astral's signed results are pre-packaged as EAS attestations. EAS supports **resolver contracts** — smart contracts that execute arbitrary logic when an attestation is created onchain. A verified spatial result can directly trigger token transfers, access grants, escrow releases, or any other onchain action.
+Astral's signed results can be packaged as EAS attestations. EAS supports **resolver contracts** — smart contracts that execute arbitrary logic when an attestation is created onchain. A verified spatial result can then trigger token transfers, access grants, escrow releases, or any other onchain action. (This is one path among several — most applications use signed results offchain, as in Step 4 above.)
 
 ```typescript
 import { ethers } from 'ethers';
