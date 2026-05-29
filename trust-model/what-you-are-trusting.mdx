@@ -13,12 +13,17 @@ We're transparent about what's verified and what's assumed because trust is the 
 
 | Assumption | Status | Notes |
 |------------|--------|-------|
-| TEE executes code correctly | Verified | EigenCompute provides hardware attestation |
-| Astral operates service honestly | Required | Single operator in MVP |
-| Signing key held securely in TEE | Verified | Key cannot be extracted by operator |
-| Input locations are truthful | **Not verified** | GPS is spoofable; future work |
+| TEE executes code correctly | Verified **under attestation** | EigenCompute provides hardware attestation; continuous attested deployment is target-state (see below) |
+| Service runs under continuous attestation | **Not yet** | Demonstrated in test deployments; not continuously funded today |
+| Astral operates service honestly | Required | Single operator in the research preview |
+| Signing key held securely in TEE | Verified **under attestation** | Intended to be non-extractable when the enclave is attested |
+| Input locations are truthful | **Not verified** | GPS is spoofable; addressed by location proofs (future work) |
 
-The MVP uses a **centralized trust model**: a single service with a known signer, running inside a TEE. The TEE provides execution attestation, and deterministic operations ensure reproducibility. But you are trusting Astral to operate the service honestly.
+The research preview uses a **centralized trust model**: a single service with a known signer, designed to run inside a TEE. The TEE provides execution attestation, and deterministic operations ensure reproducibility. But you are trusting Astral to operate the service honestly.
+
+<Warning>
+  **Deployment status.** Astral has run the service on real TEE hardware in test deployments, but does not currently fund continuous operation on attested hardware. On the hosted staging service today, a valid signature proves that a key Astral controls produced the result — not yet that an independently attested enclave did. This is the gap between "signed by a key" and "signed by an attested enclave," and we'd rather state it plainly. If you want to evaluate Astral against real TEEs, reach out at [contact@astral.global](mailto:contact@astral.global).
+</Warning>
 
 ## Location inputs are not verified
 
@@ -36,7 +41,7 @@ Even with these assumptions, verifiable computation is meaningful:
 
 - **The computation is correct.** You know the spatial relationship was evaluated faithfully, not fabricated.
 - **The inputs are recorded.** `inputRefs` let you audit which data went into the computation.
-- **The result is tamper-evident.** The signature proves the output came from the attested environment.
+- **The result is tamper-evident.** The signature proves the output was produced by Astral's key and hasn't been altered since. Under attestation, it further proves the output came from the attested environment.
 
 This is substantially better than trusting an opaque API that returns `true` or `false` with no proof.
 
