@@ -3,14 +3,14 @@ title: "Geofence Compliance"
 description: "Prove an asset stayed within an approved boundary"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Geofence compliance
 
 You're managing a drone fleet. Regulators require proof that each drone stayed within its approved flight corridor. Astral's `contains` operation produces a signed result recording whether each reported position fell inside the corridor — verifiable, auditable evidence of the *check*.
 
 <Info>
-  The drone's reported position is supplied as coordinates. The signed result proves the containment **computation** was performed correctly on those coordinates — it does not, by itself, prove the drone was physically there. Raw GPS can be spoofed. To strengthen the position itself, attach [location proofs](/concepts/location-proofs) (for example, hardware-attested device evidence) so the input carries its own credibility, not just the computation. This is a research preview — be direct with regulators about which inputs are evidence-backed and which are self-reported.
+  The drone's reported position is supplied as coordinates. The signed result proves the containment **computation** was performed correctly on those coordinates — it does not, by itself, prove the drone was physically there. Raw GPS can be spoofed. To strengthen the position itself, attach [location proofs](/concepts/location-proofs) (for example, hardware-attested device evidence) so the input carries its own credibility, not just the computation. This is a Research Preview — be direct with regulators about which inputs are evidence-backed and which are self-reported.
 </Info>
 
 ## How it works

@@ -367,7 +367,7 @@ Astral supports EAS on multiple EVM-compatible chains. See [Schema registry](/re
 
 ## Key rotation
 
-Resolver contracts should support updating the Astral signer address. For the research preview, a simple owner-controlled approach works:
+Resolver contracts should support updating the Astral signer address. For the Research Preview, a simple owner-controlled approach works:
 
 ```solidity
 function updateAstralSigner(address newSigner) external onlyOwner {
