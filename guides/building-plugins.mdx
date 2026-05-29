@@ -3,7 +3,7 @@ title: "Building Verification Plugins"
 description: "Connect a new proof-of-location system to Astral"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Building verification plugins
 
@@ -26,35 +26,33 @@ Each plugin handles three responsibilities:
 ## Plugin interface
 
 ```typescript
+type Runtime = 'react-native' | 'node' | 'browser';
+
 interface LocationProofPlugin {
   name: string;
   version: string;
+  runtimes: Runtime[];
+  requiredCapabilities: string[];
+  description: string;
 
-  // Collect raw signals from the PoL system
-  collectSignals(config: PluginConfig): Promise<Signal[]>;
-
-  // Process signals into a location stamp
-  createStamp(signals: Signal[]): Promise<UnsignedLocationStamp>;
-
-  // Verify a stamp's authenticity and structure
-  verifyStamp(stamp: LocationStamp): Promise<StampVerificationResult>;
+  // Each method is optional — a plugin implements the stages it supports
+  collect?(options?: CollectOptions): Promise<RawSignals>;
+  create?(signals: RawSignals): Promise<UnsignedLocationStamp>;
+  sign?(stamp: UnsignedLocationStamp, signer?: StampSigner): Promise<LocationStamp>;
+  verify?(stamp: LocationStamp): Promise<StampVerificationResult>;
 }
 
-interface PluginConfig {
-  timeout: number;
-  [key: string]: unknown;
-}
-
-interface Signal {
-  type: string;
-  value: unknown;
-  timestamp: number;
-  source: string;
+interface RawSignals {
+  plugin: string;
+  timestamp: number;             // Unix seconds
+  data: Record<string, unknown>; // plugin-specific signal data
 }
 
 interface StampVerificationResult {
   valid: boolean;
-  errors: string[];
+  signaturesValid: boolean;
+  structureValid: boolean;
+  signalsConsistent: boolean;
   details: Record<string, unknown>;
 }
 ```
@@ -225,18 +223,16 @@ import { describe, it, expect } from 'vitest';
 
 describe('wifi-triangulation plugin', () => {
   it('collects signals from nearby networks', async () => {
-    const signals = await wifiPlugin.collectSignals({ timeout: 5000 });
+    const signals = await wifiPlugin.collect();
 
-    expect(signals.length).toBeGreaterThan(0);
-    for (const signal of signals) {
-      expect(signal.type).toBe('wifi-ap');
-      expect(signal.timestamp).toBeGreaterThan(0);
-    }
+    expect(signals.plugin).toBe('wifi-triangulation');
+    expect(signals.timestamp).toBeGreaterThan(0);
+    expect((signals.data.accessPoints as unknown[]).length).toBeGreaterThan(0);
   });
 
   it('creates a valid stamp from signals', async () => {
     const signals = mockWifiSignals(5);
-    const stamp = await wifiPlugin.createStamp(signals);
+    const stamp = await wifiPlugin.create(signals);
 
     expect(stamp.lpVersion).toBe('0.2');
     expect(stamp.plugin).toBe('wifi-triangulation');
@@ -246,12 +242,10 @@ describe('wifi-triangulation plugin', () => {
 
   it('rejects stamps with fewer than 3 access points', async () => {
     const stamp = createMockStamp({ accessPointCount: 2 });
-    const result = await wifiPlugin.verifyStamp(stamp);
+    const result = await wifiPlugin.verify(stamp);
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('at least 3 access points')
-    );
+    expect(result.structureValid).toBe(false);
   });
 });
 ```
