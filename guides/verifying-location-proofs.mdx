@@ -56,40 +56,30 @@ Key fields:
 Stamps are evidence from proof-of-location plugins. Each plugin collects signals from its PoL system and produces a stamp:
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralSDK, MockPlugin } from '@decentralized-geo/astral-sdk';
 
 const astral = new AstralSDK({ chainId: 84532 });
 
-// Collect signals from ProofMode (device attestation)
-const proofmodeSignals = await astral.stamps.collect({
-  name: 'proofmode',
-  version: '0.1.0',
-  config: { timeout: 5000 }
-});
+// Register a plugin and collect signals. The SDK ships MockPlugin for
+// local development; on a real device, evidence comes from a source like
+// the ProofMode app. stamps.collect returns an array.
+astral.plugins.register(new MockPlugin({ name: 'mock-1', lat: 37.7749, lon: -122.4194 }));
 
-// Create and sign the stamp
-const unsignedStamp = await astral.stamps.create(
-  { name: 'proofmode', version: '0.1.0', config: {} },
-  proofmodeSignals
-);
-const stamp1 = await astral.stamps.sign(unsignedStamp, deviceSigner);
+const signals = await astral.stamps.collect({ plugins: ['mock-1'] });
+const unsignedStamp = await astral.stamps.create({ plugin: 'mock-1' }, signals[0]);
+const stamp1 = await astral.stamps.sign({ plugin: 'mock-1' }, unsignedStamp, deviceSigner);
 ```
 
-For stronger verification, collect stamps from multiple independent systems:
+For stronger verification, collect stamps from multiple **independent** systems — independence is what cross-correlation rewards, so two stamps from the same source add little. Real independence means genuinely different proof-of-location systems (for example the ProofMode app plus a network-based plugin). Those client plugins are still being built; the shape is the same:
 
 ```typescript
-// Collect from a second independent system
-const witnessSignals = await astral.stamps.collect({
-  name: 'witnesschain',
-  version: '0.1.0',
-  config: { timeout: 10000 }
-});
+// A second stamp from an independent system (illustrated with a second
+// mock instance; in practice this would be a different PoL system).
+astral.plugins.register(new MockPlugin({ name: 'mock-2', lat: 37.7750, lon: -122.4193 }));
 
-const unsignedWitnessStamp = await astral.stamps.create(
-  { name: 'witnesschain', version: '0.1.0', config: {} },
-  witnessSignals
-);
-const stamp2 = await astral.stamps.sign(unsignedWitnessStamp, nodeSigner);
+const witnessSignals = await astral.stamps.collect({ plugins: ['mock-2'] });
+const unsignedStamp2 = await astral.stamps.create({ plugin: 'mock-2' }, witnessSignals[0]);
+const stamp2 = await astral.stamps.sign({ plugin: 'mock-2' }, unsignedStamp2, nodeSigner);
 ```
 
 ## Bundling into a proof
@@ -107,13 +97,15 @@ A single-stamp proof is valid. Multiple stamps from independent systems enable c
 Submit the proof for verification:
 
 ```typescript
-const result = await astral.verify.proof(proof);
+// `mode: 'tee'` routes to the hosted service; the default 'local' mode
+// evaluates in-process and returns the credibility vector directly.
+const result = await astral.proofs.verify(proof, { mode: 'tee', chainId: 84532 });
 ```
 
 Or via raw HTTP:
 
 ```bash
-curl -X POST https://staging-api.astral.global/verify/proof \
+curl -X POST https://staging-api.astral.global/verify/v0/proof \
   -H "Content-Type: application/json" \
   -d '{
     "claim": {
@@ -134,54 +126,64 @@ curl -X POST https://staging-api.astral.global/verify/proof \
 
 The verification result is a structured credibility assessment, not a simple pass/fail:
 
+<Warning>
+  The exact structure of the credibility vector is an [open research question](/concepts/location-proof-evaluation) and will change. The fields below are illustrative of the current shape, not a stable contract.
+</Warning>
+
 ```json
 {
   "credibility": {
-    "confidence": 0.85,
-    "stampResults": [
-      {
-        "plugin": "proofmode",
-        "valid": true,
-        "spatialAccuracy": 0.9,
-        "temporalIntegrity": 0.8,
-        "forgeryResistance": 0.7
+    "dimensions": {
+      "spatial": {
+        "meanDistanceMeters": 12.5,
+        "maxDistanceMeters": 18.3,
+        "withinRadiusFraction": 1.0
       },
-      {
-        "plugin": "witnesschain",
-        "valid": true,
-        "spatialAccuracy": 0.85,
-        "temporalIntegrity": 0.9,
-        "forgeryResistance": 0.8
+      "temporal": {
+        "meanOverlap": 0.95,
+        "minOverlap": 0.90,
+        "fullyOverlappingFraction": 0.5
+      },
+      "validity": {
+        "signaturesValidFraction": 1.0,
+        "structureValidFraction": 1.0,
+        "signalsConsistentFraction": 1.0
+      },
+      "independence": {
+        "uniquePluginRatio": 1.0,
+        "spatialAgreement": 0.88,
+        "pluginNames": ["mock-1", "mock-2"]
       }
-    ],
-    "correlation": {
-      "independence": 0.95,
-      "agreement": 0.92
-    }
+    },
+    "stampResults": [ "..." ],
+    "meta": { "stampCount": 2, "evaluatedAt": 1706400000, "evaluationMode": "tee" }
   },
-  "uid": "0xabc123...",
-  "attester": "0x590fdb53...",
-  "timestamp": 1706400000
+  "evaluationMethod": "multifactor-v0",
+  "evaluatedAt": 1706400000,
+  "attestation": {
+    "uid": "0xabc123...",
+    "attester": "0x590fdb53..."
+  }
 }
 ```
 
 ### Credibility dimensions
 
-Credibility scores are a multidimensional assessment. Each stamp is evaluated along several dimensions:
+The credibility vector is a multidimensional assessment grouped into four dimensions — each an object of metrics, not a single score:
 
 | Dimension | What it measures |
 |-----------|-----------------|
-| **Spatial accuracy** | How precisely the stamp's observed location matches the claimed location |
-| **Temporal integrity** | Whether the stamp's timestamps are consistent and within the claimed time window |
-| **Forgery resistance** | How difficult it would be to fabricate this stamp (depends on the PoL system's threat model) |
-| **Source independence** | Whether the stamp comes from a system that is independent of other stamps in the proof |
+| **Spatial** | How closely the stamps' observed locations match the claimed location (mean/max distance, fraction within the claimed radius) |
+| **Temporal** | How well the stamps' time windows overlap the claimed time window |
+| **Validity** | Fraction of stamps with valid signatures, structure, and consistent signals |
+| **Independence** | How independent and corroborating the sources are (unique-plugin ratio, spatial agreement) |
 
-### Overall confidence
+### No single score
 
-The top-level `confidence` score (0 to 1) is a summary of the per-stamp assessments and cross-correlation analysis. It reflects the overall strength of evidence for the claim.
+There is **no top-level `confidence` field**. Collapsing the vector into one number requires deciding which dimensions matter most — that judgment belongs to your application, not to Astral. The SDK ships an `exampleWeighting()` helper you can use as a starting point, but you're expected to define your own.
 
 <Warning>
-  **Confidence is not probability.** A confidence of 0.85 does not mean "85% chance the claim is true." It means the evidence is strong. Calibrating confidence scores to true probabilities is future work.
+  **A credibility score is not a probability.** Strong metrics mean the evidence is strong — not "an X% chance the claim is true." Calibrating these to true probabilities is future work.
 </Warning>
 
 ### Cross-correlation
@@ -196,21 +198,23 @@ When a proof includes multiple stamps, the verification engine analyzes their re
 Multiple stamps from independent systems increase confidence because an attacker would need to compromise multiple unrelated systems simultaneously:
 
 ```typescript
-// Single stamp: moderate confidence
-const singleResult = await astral.verify.proof(
-  astral.proofs.create(claim, [proofmodeStamp])
+// Single stamp
+const singleResult = await astral.proofs.verify(
+  astral.proofs.create(claim, [stamp1]),
+  { mode: 'tee', chainId: 84532 }
 );
-// singleResult.credibility.confidence → 0.7
 
-// Multi-stamp from independent systems: higher confidence
-const multiResult = await astral.verify.proof(
-  astral.proofs.create(claim, [proofmodeStamp, witnessStamp])
+// Multi-stamp from independent systems: the independence dimension reflects
+// that the evidence is corroborated rather than redundant
+const multiResult = await astral.proofs.verify(
+  astral.proofs.create(claim, [stamp1, stamp2]),
+  { mode: 'tee', chainId: 84532 }
 );
-// multiResult.credibility.confidence → 0.9
-// multiResult.credibility.correlation.independence → 0.95
+// multiResult.credibility.dimensions.independence.uniquePluginRatio → higher
+// multiResult.credibility.dimensions.independence.spatialAgreement   → higher
 ```
 
-The improvement comes from source independence. Redundant stamps from the same system do not meaningfully increase confidence, but they do not decrease it either.
+The improvement comes from source independence. Redundant stamps from the same system do not meaningfully strengthen the assessment, but they do not weaken it either.
 
 ### Choosing the right level of evidence
 
@@ -225,15 +229,15 @@ The level of evidence you need depends on the value of the transaction the proof
 Verified location proofs can serve as trusted inputs to geocomputation operations. This connects the verification pipeline to the spatial reasoning pipeline:
 
 ```typescript
-const verifiedProof = await astral.verify.proof(proof);
+const verifiedProof = await astral.proofs.verify(proof, { mode: 'tee', chainId: 84532 });
 
-// Use the verified proof as input to a spatial operation
-const result = await astral.compute.contains({
-  container: approvedZonePolygonUID,
-  geometry: { verifiedProof: verifiedProof.uid },
-  chainId: 84532,
-  schema: SCHEMA_UID
-});
+// Use the verified proof as input to a spatial operation. Compute args are
+// positional; a verified proof is passed as { verifiedProof } (the whole object).
+const result = await astral.compute.contains(
+  approvedZonePolygonUID,        // container
+  { verifiedProof },             // containee — the verified location proof
+  { schema: SCHEMA_UID }
+);
 ```
 
 ## Next steps

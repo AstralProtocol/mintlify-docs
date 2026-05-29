@@ -97,7 +97,7 @@ A successful response means the service is up and connected to the database.
 Run a distance computation between the Eiffel Tower and a point across the Seine:
 
 ```bash
-curl -X POST http://localhost:3004/compute/distance \
+curl -X POST http://localhost:3004/compute/v0/distance \
   -H "Content-Type: application/json" \
   -d '{
     "from": { "type": "Point", "coordinates": [2.2945, 48.8584] },
