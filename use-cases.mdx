@@ -4,24 +4,24 @@ description: "What you can build with location-based smart contracts"
 ---
 
 <Warning>
-  **Development Preview** — These examples demonstrate the intended patterns.
+  **Research Preview** — These examples illustrate intended patterns. The code is pseudocode for the ideas, not tested snippets, and may not match current SDK call signatures (the SDK uses object arguments — see the [SDK reference](/sdk/overview)). They also gate value on location, so remember: raw GPS is spoofable, and Astral verifies the *computation*, not that a user was truly somewhere. Use [location proofs](/concepts/location-proofs) where the input needs to be trustworthy.
 </Warning>
 
 # What You Can Build
 
-Astral Location Services enables a new category of decentralized applications: **location-based smart contracts**. By combining geospatial computation with EAS resolvers, you can gate any onchain action by real-world location.
+One thing you can build with Astral is **location-based smart contracts**: by combining geospatial computation with EAS resolvers, you can gate an onchain action by real-world location. The examples below are the onchain slice of a broader capability — the same signed results work just as well offchain (agents, backends, compliance records).
 
 ## The Pattern
 
 <Steps>
-  <Step title="User proves location">
-    Creates a location attestation (or submits raw coordinates)
+  <Step title="User provides location">
+    Creates a location record (or submits raw coordinates)
   </Step>
   <Step title="Astral computes">
-    Performs spatial operation (distance, containment, etc.) in TEE
+    Performs spatial operation (distance, containment, etc.) in the TEE
   </Step>
   <Step title="Signed result">
-    Returns Policy Attestation with computation result
+    Returns a signed result with the computation output
   </Step>
   <Step title="Contract executes">
     Resolver verifies and triggers business logic
@@ -290,7 +290,7 @@ All of these are built with just a few core operations:
 | `within(point, target, radius)` | Proof-of-visit, event check-ins |
 | `intersects(a, b)` | Overlapping territories, coverage verification |
 
-Combined with EAS resolvers, these primitives unlock an entirely new design space for Ethereum applications.
+Combined with EAS resolvers, these primitives open up a broad design space for location-aware applications — onchain and off.
 
 <Card title="Get Started" icon="rocket" href="/quickstart">
   Build your first location-based dApp

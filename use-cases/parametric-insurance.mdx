@@ -7,7 +7,11 @@ description: "Policies that trigger based on verified proximity"
 
 # Parametric insurance
 
-You're building crop insurance. When a qualifying weather event occurs within a certain distance of insured farmland, the policy pays out automatically. No claims process, no adjuster visits — just verified spatial computation.
+You're building crop insurance. When a qualifying weather event occurs within a certain distance of insured farmland, the policy pays out — without a manual claims process or an adjuster visit — once the spatial condition is verified.
+
+<Info>
+  Astral verifies the **distance computation** between the inputs you supply. It does not establish that a qualifying weather event actually occurred, or that the weather-station coordinates are truthful — those come from outside the system (an oracle, a data feed, a registered location). The signed result is one trustworthy link in the chain, not the whole chain. Design the event-reporting and location inputs with the same care, and be explicit with policyholders about what is verified and what is trusted. This is a research preview, not a production insurance product.
+</Info>
 
 ## How it works
 
@@ -211,7 +215,7 @@ Traditional crop insurance requires:
 - Waiting for an adjuster
 - Disputing coverage decisions
 
-Parametric insurance removes all of that. The spatial condition is defined upfront, the computation is verifiable, and the payout is automatic. The signed result is auditable proof that the trigger condition was met.
+Parametric insurance reduces much of that. The spatial condition is defined upfront, the distance computation is independently verifiable, and the payout can be automated against it. The signed result is auditable proof that the *spatial condition was computed correctly on the given inputs* — the remaining trust (that the event occurred, that the station data is honest) sits with whatever feeds those inputs.
 
 ## Variations
 

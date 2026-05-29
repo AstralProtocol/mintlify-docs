@@ -7,7 +7,11 @@ description: "Using Astral as a spatial oracle in agent workflows"
 
 # Agent integration
 
-Autonomous agents need spatial reasoning — is this delivery within the geofence? How far is the nearest facility? Does this route intersect a restricted zone? Astral provides verified spatial answers that agents can use in decision-making.
+Autonomous agents need spatial reasoning — is this delivery within the geofence? How far is the nearest facility? Does this route intersect a restricted zone? Astral provides verifiable spatial answers that agents can use in decision-making.
+
+<Info>
+  The examples on this page pass **raw coordinates** to the compute API. A signed result proves the *computation* was done correctly on those coordinates — it does **not** prove the coordinates are truthful (raw GPS is spoofable, and an agent could supply any position). To make the input trustworthy too, feed in a verified [location proof](/concepts/location-proofs) rather than bare coordinates. Keep the distinction clear when an agent's decision carries real consequences.
+</Info>
 
 ## The pattern
 
@@ -20,7 +24,7 @@ graph LR
     C --> D[Uses result in decision]
 ```
 
-The signed result provides an audit trail. Anyone reviewing the agent's decisions can verify that the spatial reasoning was based on correctly computed data, not fabricated or hallucinated.
+The signed result provides an audit trail. Anyone reviewing the agent's decisions can verify that the spatial answer was computed correctly on the stated inputs, rather than fabricated or hallucinated by the agent. (Whether those inputs are themselves truthful is a separate question — see the note above.)
 
 ## Raw HTTP from any framework
 
