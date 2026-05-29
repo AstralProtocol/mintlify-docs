@@ -130,6 +130,10 @@ contract LocationAwareValidator is IERC8004Validator {
 
 A TypeScript agent that collects location evidence, generates a proof, and submits with its task result:
 
+<Warning>
+  **Illustrative pseudocode.** The agent-side API below (`AstralClient`, `collectEvidence`, `generateProof`) is a sketch for the OpenClaw concept and does **not** match the shipping SDK surface. The real SDK is `AstralSDK` from `@decentralized-geo/astral-sdk`, using `stamps.collect(...)` and `proofs.create(...)` — see the [SDK overview](/sdk/overview). Treat this as a design illustration, not a working import.
+</Warning>
+
 ```typescript
 import { AstralClient } from "@astral-protocol/sdk";
 import { ERC8004Agent } from "@erc8004/agent-sdk";
@@ -140,7 +144,7 @@ class LocationAwareAgent extends ERC8004Agent {
   constructor(config: AgentConfig) {
     super(config);
     this.astral = new AstralClient({
-      endpoint: "https://api.astral.global",
+      endpoint: "https://staging-api.astral.global",
       agentId: this.id,
     });
   }
@@ -173,7 +177,7 @@ class LocationAwareAgent extends ERC8004Agent {
 
 ## Location signals
 
-Astral cross-correlates multiple signals to produce a credibility score. No single signal is trusted alone.
+Astral cross-correlates multiple signals to produce a [credibility vector](/concepts/location-proof-evaluation) — a multidimensional assessment, not a single score. No single signal is trusted alone. (OpenClaw's on-chain `LocationProof` struct collapses that vector into one `credibility` scalar for cheap on-chain comparison; that scalarization is OpenClaw's design choice, not Astral's native output.)
 
 | Signal | Accuracy | Spoofing difficulty |
 |--------|----------|-------------------|
@@ -184,7 +188,11 @@ Astral cross-correlates multiple signals to produce a credibility score. No sing
 | Bluetooth beacons | ~1-5m | Medium — beacons can be cloned |
 | Peer attestation | Varies | Scales with collusion cost |
 
-When signals agree, credibility is high. When they disagree, credibility drops and the credibility vector flags the inconsistency:
+When signals agree, the evidence is stronger; when they disagree, the assessment reflects the inconsistency.
+
+<Note>
+  The JSON below is **OpenClaw's own illustration** of reducing signals to a weighted scalar — it is **not** the shape Astral returns. Astral returns a structured credibility vector (spatial, temporal, validity, independence dimensions, currently), with no single `overall` score by design, and that structure is still evolving. See [Location Proof Evaluation](/concepts/location-proof-evaluation).
+</Note>
 
 ```json
 {
@@ -198,8 +206,6 @@ When signals agree, credibility is high. When they disagree, credibility drops a
   "flags": []
 }
 ```
-
-For more on how credibility works, see [Location Proof Evaluation](/concepts/location-proof-evaluation).
 
 ## Building on OpenClaw
 
