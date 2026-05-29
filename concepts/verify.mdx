@@ -7,7 +7,7 @@ description: "The verification endpoint — submit a location proof, get a verif
 
 # Verify
 
-The Verify service accepts a [location proof](/concepts/location-proof-structure) and returns a **verified location proof** — the original proof, a [credibility vector](/concepts/location-proof-evaluation#the-credibility-vector), and a signed EAS attestation. It's a hosted, verifiable implementation of the [evaluation function](/concepts/location-proof-evaluation). This page describes *how the service works*; the evaluation page describes *what is checked and why*.
+The Verify service accepts a [location proof](/concepts/location-proof-structure) and returns a **verified location proof** — the original proof, a [credibility vector](/concepts/location-proof-evaluation#the-credibility-vector), and a signed result that can be recorded onchain as an EAS attestation. It's a hosted implementation of the [evaluation function](/concepts/location-proof-evaluation). This page describes *how the service works*; the evaluation page describes *what is checked and why*.
 
 ## How It Works
 
@@ -21,9 +21,9 @@ When a location proof is submitted to the verify endpoint:
 
 4. **Claim assessment** — The service evaluates how well the evidence from the location stamps supports the [location claim](/concepts/location-claims): spatial overlap, temporal overlap, and overall consistency.
 
-5. **Credibility vector generation** — The per-stamp results, correlation analysis, and claim assessment are combined into a structured credibility vector with spatial, temporal, validity, and independence dimensions.
+5. **Credibility vector generation** — The per-stamp results, correlation analysis, and claim assessment are combined into a structured credibility vector. It currently spans spatial, temporal, validity, and independence dimensions, though [that structure is an open research question](/concepts/location-proof-evaluation#the-credibility-vector) and will change.
 
-All of this happens inside the [TEE](/concepts/astral-location-services), which means the evaluation logic is attested and the signing key is protected.
+All of this is designed to happen inside the [TEE](/concepts/astral-location-services), so that — under attestation — the evaluation logic is attested and the signing key is protected. See the [trust model](/trust-model/what-you-are-trusting) for current deployment status.
 
 ## Two Endpoints
 
@@ -38,8 +38,8 @@ The stamp endpoint is useful for confirming that a location stamp's signatures a
 
 **Verify proof** returns a verified location proof containing:
 - **The original proof** — the location claim and location stamps as submitted
-- **Credibility vector** — structured assessment across spatial, temporal, validity, and independence dimensions, with per-stamp detail
-- **Signed EAS attestation** — the verification result signed by the TEE key, independently verifiable by any downstream consumer
+- **Credibility vector** — structured assessment across (currently) spatial, temporal, validity, and independence dimensions, with per-stamp detail; the dimension structure is still evolving
+- **Signed result** — the verification result signed by the TEE key, independently verifiable by any downstream consumer and optionally recorded onchain as an EAS attestation
 
 **Verify stamp** returns a validity result: whether signatures, structure, and signals pass their checks.
 

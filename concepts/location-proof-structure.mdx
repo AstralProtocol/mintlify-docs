@@ -27,7 +27,7 @@ Multi-stamp location proofs from independent proof-of-location systems are stron
 Redundant location stamps from the *same* proof-of-location system don't meaningfully increase confidence. Cross-correlation looks for independence between sources.
 
 <Info>
-  We are building a taxonomy of proof-of-location systems and quantifying these dimensions as an area of active [research](https://github.com/AstralProtocol/research/blob/feature/research-agenda/docs/research-agenda.md#cross-cutting-research-questions).
+  We are building a taxonomy of proof-of-location systems and quantifying these dimensions as an area of active [research](https://github.com/AstralProtocol/research).
 </Info>
 
 ## Location Proof Plugins
@@ -42,16 +42,16 @@ Redundant location stamps from the *same* proof-of-location system don't meaning
 
 This common interface means a developer can compose evidence from multiple proof-of-location systems — and any future system — using the same SDK patterns. The plugin handles the system-specific details; the SDK handles composition and orchestration.
 
-Currently available plugins:
+Plugins and their status:
 
-| Plugin | Proof-of-location system | Environment |
-|--------|------------------------|-------------|
-| [ProofMode](/plugins/proofmode) | Device attestation + sensor fusion | iOS, Android, React Native |
-| [WitnessChain](/plugins/witnesschain) | Infrastructure latency triangulation | Node.js, any HTTP client |
-| [Mock](/plugins/mock) | Configurable test evidence | Any JavaScript/TypeScript environment |
+| Plugin | Proof-of-location system | Environment | Status |
+|--------|------------------------|-------------|--------|
+| [ProofMode](/plugins/proofmode) | Device attestation + sensor fusion | iOS, Android, React Native | Implemented (alpha) |
+| [WitnessChain](/plugins/witnesschain) | Infrastructure latency triangulation | Node.js, any HTTP client | Planned — interface defined, not yet built |
+| [Mock](/plugins/mock) | Configurable test evidence | Any JavaScript/TypeScript environment | Available for testing |
 
 <Tip>
-  Different devices and environments support different plugins. A mobile app might use ProofMode for on-device attestation, while a backend service uses WitnessChain for network-based verification. See [Plugins](/plugins/overview) for details on each.
+  Different devices and environments suit different plugins. A mobile app might use ProofMode for on-device attestation, while a backend service could use a network-based plugin like WitnessChain once it's built. Today, ProofMode is the only implemented proof-of-location source. See [Plugins](/plugins/overview) for details on each.
 </Tip>
 
 ## Composing From Multiple Plugins

@@ -25,8 +25,8 @@ Astral's geocomputation capabilities span three areas, at different stages of ma
 
 | Capability | Status | What it does |
 |-----------|--------|-------------|
-| **[Location proof verification](/concepts/verify)** | Shipping | Evaluates location proof credibility |
-| **[Geospatial operations](/concepts/compute)** | Shipping | Distance, containment, intersection, area, length |
+| **[Location proof verification](/concepts/verify)** | Available (research preview) | Evaluates location proof credibility |
+| **[Geospatial operations](/concepts/compute)** | Available (research preview) | Distance, containment, intersection, area, length |
 | **Geospatial AI/ML** | Planned | Spatial analysis, prediction, pattern detection |
 
 ## Verifiable geocomputation
@@ -35,7 +35,7 @@ Computation is only useful in adversarial contexts if you can trust the result. 
 
 Astral makes geocomputation verifiable through three approaches, at different stages of development:
 
-**Trusted Execution Environments (v0 — shipped).** Astral's Compute engine runs inside a TEE (currently [EigenCompute](https://blog.eigencloud.xyz/eigencloud-brings-verifiable-ai-to-mass-market-with-eigenai-and-eigencompute-launches/)), which provides hardware-level isolation. The TEE guarantees that the attested code executed on the attested inputs, and that the signing key never left the enclave. This is the foundation of [Astral Location Services](/concepts/astral-location-services), our hosted service.
+**Trusted Execution Environments (v0).** Astral's Compute engine is designed to run inside a TEE (currently [EigenCompute](https://blog.eigencloud.xyz/eigencloud-brings-verifiable-ai-to-mass-market-with-eigenai-and-eigencompute-launches/)), which provides hardware-level isolation. Under attestation, the TEE guarantees that the attested code executed on the attested inputs, and that the signing key never left the enclave. This is the foundation of [Astral Location Services](/concepts/astral-location-services), our hosted service. (Continuous attested operation is not yet funded — see the [trust model](/trust-model/what-you-are-trusting) for current status.)
 
 **Zero-knowledge circuits (research).** ZK proofs would allow verification of correct computation without any trusted hardware — a verifier could confirm the result was computed correctly without re-executing the computation or trusting a TEE manufacturer. This is an active research direction, not yet implemented.
 
