@@ -71,25 +71,23 @@ The delegated attestation pattern means:
 - **Resolver contracts** can verify `attestation.attester == astralSigner`
 
 ```typescript
-const result = await astral.compute.within({
-  geometry: uid1,
-  target: uid2,
-  radius: 500,
-  chainId: 84532,
-  schema: RESOLVER_SCHEMA_UID,
-  recipient: userAddress
-});
+// Compute args are positional: (geometry, target, radius, options)
+const result = await astral.compute.within(
+  uid1,
+  uid2,
+  500,
+  { schema: RESOLVER_SCHEMA_UID, recipient: userAddress }
+);
 
 // Submit to EAS — triggers your resolver
-const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
-await tx.wait();
+const { uid } = await astral.compute.submit(result.delegatedAttestation);
 ```
 
 The `delegatedAttestation.deadline` indicates when the signature expires. Submissions after the deadline will fail:
 
 ```typescript
 if (Date.now() / 1000 < result.delegatedAttestation.deadline) {
-  await astral.eas.submitDelegated(result.delegatedAttestation);
+  await astral.compute.submit(result.delegatedAttestation);
 }
 ```
 
@@ -308,27 +306,23 @@ Location attestations — the spatial inputs to computations — can be stored o
 
 ```typescript
 // Create onchain attestation
-const location = await astral.location.create(geojson, {
-  submitOnchain: true
-});
+const location = await astral.location.onchain.create({ location: geojson });
 
 // Reference by UID only
-await astral.compute.distance(location.uid, otherUID);
+await astral.compute.distance(location.uid, otherUID, { schema: SCHEMA_UID });
 ```
 
 ### Offchain
 
 ```typescript
 // Create offchain attestation
-const location = await astral.location.create(geojson, {
-  submitOnchain: false,
-  storage: 'ipfs'  // or 'arweave', 'https', etc.
-});
+const location = await astral.location.offchain.create({ location: geojson });
 
 // Reference by UID + URI
 await astral.compute.distance(
   { uid: location.uid, uri: location.uri },
-  otherUID
+  otherUID,
+  { schema: SCHEMA_UID }
 );
 ```
 

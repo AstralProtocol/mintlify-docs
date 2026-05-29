@@ -64,13 +64,12 @@ async function checkCompliance(
     location: { type: 'Point', coordinates: droneCoords }
   });
 
-  // Check containment
-  const result = await astral.compute.contains({
-    container: corridorUID,
-    geometry: dronePosition.uid,
-    chainId: 84532,
-    schema: SCHEMA_UID
-  });
+  // Check containment — args are positional: (container, containee, options)
+  const result = await astral.compute.contains(
+    corridorUID,
+    dronePosition.uid,
+    { schema: SCHEMA_UID }
+  );
 
   return {
     inCorridor: result.result,
@@ -134,10 +133,12 @@ async function submitComplianceProof(
 ) {
   const astral = new AstralSDK({ chainId: 84532, signer: wallet });
 
-  const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
-  await tx.wait();
+  const { uid } = await astral.compute.submit({
+    attestation: result.attestation,
+    delegatedAttestation: result.delegatedAttestation,
+  });
 
-  return tx.hash;
+  return uid;
 }
 ```
 

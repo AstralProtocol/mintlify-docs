@@ -38,7 +38,7 @@ Create neighborhood economies where you must be present to participate. SF resid
 
 ```typescript
 // User in San Francisco
-const myLocation = await astral.location.create(userGPS);
+const myLocation = await astral.location.onchain.create({ location: userGPS });
 const eligibility = await astral.compute.contains(
   sfBayAreaUID,
   myLocation.uid,

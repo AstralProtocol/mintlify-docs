@@ -48,10 +48,9 @@ const { plugins } = await response.json();
 | `version` | `string` | Semver version string |
 | `environments` | `string[]` | Runtime environments the plugin supports |
 | `description` | `string` | Human-readable description |
-| `status` | `string` | Implementation status: `"alpha"`, `"planned"`, or `"testing"` |
 
 <Note>
-  A plugin appearing in this list describes an interface, not a guarantee that it's fully implemented. Today `proofmode` is alpha, `mock` is for testing, and `witnesschain` is planned (interface defined, not yet built). Check the `status` field.
+  The verify service registers verification logic for several proof-of-location systems. They sit at varying levels of maturity in this research preview — appearing in this list means the service can route a stamp of that type to a verifier, not that the plugin is production-hardened. On the client side, the SDK currently bundles `MockPlugin` for creating stamps in development; ProofMode evidence comes from the ProofMode app.
 </Note>
 
 ## Example response
@@ -63,22 +62,37 @@ const { plugins } = await response.json();
       "name": "proofmode",
       "version": "0.1.0",
       "environments": ["mobile", "server"],
-      "description": "Device attestation with hardware-backed cryptographic signatures",
-      "status": "alpha"
+      "description": "Device attestation with hardware-backed cryptographic signatures"
     },
     {
       "name": "witnesschain",
       "version": "0.1.0",
       "environments": ["server", "node"],
-      "description": "Infrastructure verification via network latency triangulation",
-      "status": "planned"
+      "description": "WitnessChain proof-of-location via network latency triangulation"
     },
     {
-      "name": "mock",
+      "name": "gpsd",
       "version": "0.1.0",
-      "environments": ["server", "node", "browser"],
-      "description": "Mock plugin for testing and development",
-      "status": "testing"
+      "environments": ["server", "node"],
+      "description": "GPS daemon (gpsd) location readings"
+    },
+    {
+      "name": "geoclue",
+      "version": "0.1.0",
+      "environments": ["server", "node"],
+      "description": "GeoClue geolocation service"
+    },
+    {
+      "name": "wifi-mls",
+      "version": "0.1.0",
+      "environments": ["server", "node"],
+      "description": "Wi-Fi positioning via Mozilla Location Service"
+    },
+    {
+      "name": "ip-geolocation",
+      "version": "0.1.0",
+      "environments": ["server", "node"],
+      "description": "IP-based geolocation lookup"
     }
   ]
 }
