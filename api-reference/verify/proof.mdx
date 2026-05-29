@@ -143,7 +143,7 @@ The response contains the verified proof, a credibility vector, and optional EAS
 ## Example response
 
 <Warning>
-  **Illustrative example.** The verify service registers verifiers for several proof-of-location systems (`proofmode`, `witnesschain`, `gpsd`, `geoclue`, `wifi-mls`, `ip-geolocation`) at varying maturity in this research preview. Some `details` fields shown here (for example `certificateChainValid`) correspond to checks that are **planned but not yet performed in v0** — see the [ProofMode plugin](/plugins/proofmode) for exactly what verification does today. The credibility-vector structure is also still evolving.
+  **Illustrative example.** ProofMode verification is working today; the `witnesschain` stamp below is shown to illustrate multi-source cross-correlation, but WitnessChain (along with `gpsd`, `geoclue`, `wifi-mls`, `ip-geolocation`) is still experimental. Some `details` fields shown here (for example `certificateChainValid`) correspond to checks that are **planned but not yet performed in v0** — see the [ProofMode plugin](/plugins/proofmode) for exactly what verification does today. The credibility-vector structure is also still evolving.
 </Warning>
 
 ```json

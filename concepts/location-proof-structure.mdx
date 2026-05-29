@@ -46,14 +46,14 @@ Plugins and their status:
 
 | Plugin | Proof-of-location system | Environment | Status |
 |--------|------------------------|-------------|--------|
-| [ProofMode](/plugins/proofmode) | Device attestation + sensor fusion | iOS, Android, React Native | Most developed device-side source (alpha) |
-| [WitnessChain](/plugins/witnesschain) | Infrastructure latency triangulation | Node.js, any HTTP client | Server-side verifier implemented; client plugin maturing |
+| [ProofMode](/plugins/proofmode) | Device attestation + sensor fusion | iOS, Android, React Native | Working — verification implemented (alpha) |
+| [WitnessChain](/plugins/witnesschain) | Infrastructure latency triangulation | Node.js, any HTTP client | Experimental — interface defined, early verifier |
 | [Mock](/plugins/mock) | Configurable test evidence | Any JavaScript/TypeScript environment | Available for testing (client) |
 
-The verify service also registers verifiers for `gpsd`, `geoclue`, `wifi-mls`, and `ip-geolocation`, at varying maturity in this research preview.
+The verify service also registers experimental verifiers for `gpsd`, `geoclue`, `wifi-mls`, and `ip-geolocation`.
 
 <Tip>
-  Different devices and environments suit different plugins. A mobile app might use ProofMode for on-device attestation, while a backend service could use a network-based source like WitnessChain. Appearing in the registry means the service can verify a stamp of that type — not that the plugin is production-hardened. See [Plugins](/plugins/overview) for details on each.
+  Different devices and environments suit different plugins. A mobile app might use ProofMode for on-device attestation, while a backend service could use a network-based source like WitnessChain. ProofMode is working today; the others are experimental with interfaces defined — we're keen to develop new ones with partners. See [Plugins](/plugins/overview) for details on each.
 </Tip>
 
 ## Composing From Multiple Plugins

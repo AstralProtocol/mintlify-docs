@@ -37,21 +37,21 @@ That said, significant value comes from "softer" proof-of-location systems too. 
 
 ## Available plugins
 
-v0 of Astral connects to proof-of-location systems through [location proof plugins](/plugins/overview). ProofMode is the most developed today; the two highlighted below are the documented examples:
+v0 of Astral connects to proof-of-location systems through [location proof plugins](/plugins/overview). **ProofMode is working today** — its stamps can be verified end to end. The other plugins are experimental, with interfaces defined and early verifiers in place. The two highlighted below are the documented examples:
 
 <CardGroup cols={2}>
   <Card title="ProofMode — implemented" icon="mobile" href="/plugins/proofmode">
     Device attestation + sensor fusion. Uses iOS Secure Enclave and Android hardware keystore to attest to device sensor readings (GPS, Wi-Fi, cellular, magnetometer). Trust derives from device hardware integrity. This is the one proof-of-location plugin available today (alpha).
   </Card>
-  <Card title="WitnessChain" icon="server" href="/plugins/witnesschain">
-    Infrastructure verification. Uses UDP latency triangulation across a distributed challenger network, where trust derives from the speed of light — you can't fake being close to many geographically distributed nodes at once. The verify service has a server-side implementation; the client-side plugin is still maturing.
+  <Card title="WitnessChain — experimental" icon="server" href="/plugins/witnesschain">
+    Infrastructure verification. The design uses UDP latency triangulation across a distributed challenger network, where trust derives from the speed of light — you can't fake being close to many geographically distributed nodes at once. The interface is defined and an experimental server-side verifier exists; it's not production yet.
   </Card>
 </CardGroup>
 
-The verify service also registers verifiers for several other systems (`gpsd`, `geoclue`, `wifi-mls`, `ip-geolocation`), at varying maturity. The [Mock plugin](/plugins/mock) is available for development and testing on the client.
+The verify service also registers experimental verifiers for `gpsd`, `geoclue`, `wifi-mls`, and `ip-geolocation`. The [Mock plugin](/plugins/mock) is available for development and testing on the client.
 
 <Info>
-  This is an early, evolving plugin set — appearing in the registry means the service can route a stamp of that type to a verifier, not that the plugin is production-hardened. ProofMode is the most developed device-side source today. We're [researching](https://github.com/location-proofs) more proof-of-location plugins and would welcome collaborators — if you work on a proof-of-location system, [get in touch](mailto:contact@astral.global).
+  ProofMode is working today; the others are experimental, with interfaces defined and early verifiers in place. We're actively interested in developing new proof-of-location plugins with partners — if you work on a proof-of-location system, [get in touch](mailto:contact@astral.global).
 </Info>
 
 ## Building new plugins
