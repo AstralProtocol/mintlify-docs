@@ -14,38 +14,36 @@ This guide walks through both of Astral's core capabilities: creating and verify
 A location proof starts on the device. You collect signals from proof-of-location systems, process them into stamps, sign them, and compose the proof.
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralSDK, MockPlugin } from '@decentralized-geo/astral-sdk';
 
 const astral = new AstralSDK({
   chainId: 84532,
+  signer: wallet,
   apiUrl: 'https://staging-api.astral.global'
 });
 
-// 1. Collect raw signals from a proof-of-location plugin on the device
-//    ProofMode reads GPS, accelerometer, cell towers, and signs with the Secure Enclave
-const signals = await astral.stamps.collect({
-  name: 'proofmode',
-  version: '0.1.0',
-  config: { timeout: 5000 }
-});
+// 1. Register a proof-of-location plugin. The SDK ships MockPlugin for local
+//    development; on a real device, evidence comes from a source like the
+//    ProofMode app (GPS, sensors, hardware-backed signatures).
+astral.plugins.register(new MockPlugin({ name: 'mock-1', lat: 37.7749, lon: -122.4194 }));
 
-// 2. Create an unsigned stamp from the raw signals
-const unsigned = await astral.stamps.create(
-  { name: 'proofmode', version: '0.1.0' },
-  signals
-);
+// 2. Collect raw signals (returns an array), then create an unsigned stamp
+const signals = await astral.stamps.collect({ plugins: ['mock-1'] });
+const unsigned = await astral.stamps.create({ plugin: 'mock-1' }, signals[0]);
 
 // 3. Sign the stamp with the device key
-const stamp = await astral.stamps.sign(unsigned, deviceSigner);
+const stamp = await astral.stamps.sign({ plugin: 'mock-1' }, unsigned, deviceSigner);
 
 // 4. Compose a location proof: a claim ("I was here") bundled with signed stamps
 const claim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
   location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
   subject: { scheme: 'eth-address', value: '0x1234...' },
   radius: 100,
   time: { start: Date.now() / 1000 - 60, end: Date.now() / 1000 },
-  // lpVersion, locationType, srs — Location Protocol v0.2 defaults
-}
+};
 const proof = astral.proofs.create(claim, [stamp]);
 ```
 
@@ -73,10 +71,12 @@ See [Location Proofs](/concepts/location-proofs) for the full data model.
 Submit the location proof to Astral's Verify endpoint. Verification runs inside a TEE — each stamp is checked for signature validity, structural integrity, and consistency with the claim. Multiple stamps from independent systems are cross-correlated to strengthen confidence.
 
 ```typescript
-const verified = await astral.verify.proof(proof, { chainId: 84532 });
+// `mode: 'tee'` routes verification to the hosted service and returns a
+// VerifiedLocationProof; the default 'local' mode returns the vector directly.
+const verified = await astral.proofs.verify(proof, { mode: 'tee', chainId: 84532 });
 
-console.log(verified.credibility);  // a multidimensional credibility vector (illustrative)
-console.log(verified.uid);          // 0xabc123...
+console.log(verified.credibility);          // a multidimensional credibility vector
+const locationUID = verified.attestation.uid;
 ```
 
 The result is a **credibility vector** — not a binary yes/no, and not a single score, but a structured assessment of how strongly the evidence supports the claim across several dimensions (its exact structure is still an [open research question](/concepts/location-proof-evaluation)). It tells you how well the evidence backs the claim — not, by itself, that the entity was definitely there. How much that's worth, and what threshold to require, is your application's call.
@@ -86,11 +86,13 @@ The result is a **credibility vector** — not a binary yes/no, and not a single
 Now use the verified location in a spatial operation. The computation runs inside the same TEE — PostGIS computes the spatial relationship and the TEE signs the result.
 
 ```typescript
-const inside = await astral.compute.contains({
-  container: geofencePolygon,
-  geometry: verified.uid,
-  chainId: 84532
-});
+// Arguments are positional: (container, containee, options).
+// `schema` is the EAS schema UID the signed result is encoded against.
+const inside = await astral.compute.contains(
+  geofencePolygon,   // container
+  locationUID,       // containee — the verified location
+  { schema: SCHEMA_UID }
+);
 
 console.log(`Inside geofence: ${inside.result}`);  // true
 ```
@@ -127,18 +129,20 @@ const astral = new AstralSDK({
   apiUrl: 'https://staging-api.astral.global'
 });
 
-const result = await astral.compute.within({
-  geometry: verified.uid,
-  target: landmarkUID,
-  radius: 500,
-  chainId: 84532,
-  schema: RESOLVER_SCHEMA_UID,
-  recipient: wallet.address
-});
+// Arguments are positional: (geometry, target, radius, options).
+const result = await astral.compute.within(
+  locationUID,         // geometry — the verified location
+  landmarkUID,         // target
+  500,                 // radius in meters
+  { schema: RESOLVER_SCHEMA_UID, recipient: wallet.address }
+);
 
 // Submit to EAS — triggers your resolver contract onchain
-const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
-console.log('Onchain:', tx.hash);
+const { uid } = await astral.compute.submit({
+  attestation: result.attestation,
+  delegatedAttestation: result.delegatedAttestation,
+});
+console.log('Onchain attestation:', uid);
 ```
 
 For the full blockchain flow — writing resolver contracts, registering schemas, chain configuration — see [Blockchain Integration](/guides/blockchain-integration).
