@@ -7,11 +7,11 @@ description: "Privacy properties of verification and computation"
 
 # Privacy
 
-Privacy is designed into Astral from the start — not bolted on afterward. The [TEE](/concepts/astral-location-services) provides meaningful privacy guarantees today, and zero-knowledge circuits for location proof verification and geospatial computations are an active research direction for stronger properties in the future.
+Privacy is designed into Astral from the start — not bolted on afterward. A [TEE](/concepts/astral-location-services) running under attestation provides meaningful privacy properties, and zero-knowledge circuits for location proof verification and geospatial computations are an active research direction for stronger properties in the future. The privacy properties below assume the enclave runs under continuous remote attestation; see the [trust model](/trust-model/what-you-are-trusting) for the current deployment status.
 
 ## TEE Privacy Guarantees
 
-The Trusted Execution Environment processes location data inside hardware-isolated memory that the operator cannot inspect, even with physical access to the machine:
+When running under attestation, the Trusted Execution Environment processes location data inside hardware-isolated memory that the operator is not able to inspect:
 
 **What stays private:**
 - Raw input coordinates — the exact lat/lng values submitted
@@ -55,11 +55,11 @@ Zero-knowledge proofs would allow verification of location claims without reveal
 
 | Property | TEE (today) | ZK (future) |
 |----------|------------|-------------|
-| Raw inputs hidden from operator | Yes | Yes |
+| Raw inputs hidden from operator | Yes (under attestation) | Yes |
 | Raw inputs hidden from verifier | No | Yes |
 | No trusted hardware required | No | Yes |
 | Verification without re-execution | No | Yes |
-| Production-ready | Yes | Not yet |
+| Maturity | Research preview (test TEE deployments) | Not yet — active research |
 
 ZK location proofs are an active area of research. The challenge is constructing efficient circuits for geospatial operations — polygon containment and distance calculations are expensive to express in arithmetic circuits. This is future work, not a current capability.
 

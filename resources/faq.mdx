@@ -4,7 +4,7 @@ description: "Frequently asked questions"
 ---
 
 <Warning>
-  **Development Preview** — This project is under active development.
+  **Research Preview** — This project is under active development.
 </Warning>
 
 # Frequently Asked Questions
@@ -13,11 +13,11 @@ description: "Frequently asked questions"
 
 <AccordionGroup>
   <Accordion title="What is Astral Location Services?">
-    Astral Location Services is a verifiable geospatial computation oracle for Ethereum. It runs spatial operations (distance, containment, intersection) in a trusted execution environment and produces signed attestations you can verify onchain.
+    Astral Location Services is verifiable geospatial computation infrastructure. It runs spatial operations (distance, containment, intersection) inside a trusted execution environment and produces signed results that any downstream system can verify independently — an agent, a backend, a compliance report, or a smart contract via EAS.
   </Accordion>
 
   <Accordion title="How is this different from a regular oracle?">
-    Unlike traditional oracles that report external data, Astral performs **computation** on location data and signs the results. The computation runs in a TEE (EigenCompute), providing cryptographic proof that the operation was performed correctly.
+    Unlike traditional oracles that report external data, Astral performs **computation** on location data and signs the results. The computation is designed to run in a TEE (EigenCompute), which provides a hardware-backed attestation that the operation was performed correctly. (This is a trusted-hardware assurance, not a zero-knowledge proof — and it depends on the service running under attestation; see the [trust model](/trust-model/what-you-are-trusting) for current deployment status.)
   </Accordion>
 
   <Accordion title="What can I build with this?">
@@ -58,13 +58,15 @@ description: "Frequently asked questions"
 
   <Accordion title="How does verification work?">
     1. Operations run in EigenCompute's TEE (Trusted Execution Environment)
-    2. The TEE attests that specific code executed on specific inputs
+    2. Under remote attestation, the TEE attests that specific code executed on specific inputs
     3. Results are signed with a key held inside the TEE
     4. Smart contracts verify `attestation.attester == astralSigner`
+
+    Note: continuous attested operation is not yet funded — today a valid signature proves Astral's key produced the result. See the [trust model](/trust-model/what-you-are-trusting).
   </Accordion>
 
   <Accordion title="What's the trust model?">
-    **MVP:** Centralized service with TEE execution attestation. Trust Astral + TEE.
+    **Today:** Centralized service with TEE execution attestation. You are trusting Astral + the TEE.
 
     **Future:** AVS consensus (multiple operators), ZK proofs, decentralized signing.
   </Accordion>
@@ -72,7 +74,7 @@ description: "Frequently asked questions"
   <Accordion title="Can users spoof their GPS?">
     Yes. GPS is spoofable. Astral verifies that **computations are correct**, not that **inputs are authentic**. If a user provides a fake GPS coordinate, we'll compute on that fake coordinate.
 
-    We're actively researching [Location Proofs](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) — a framework for providing evidence-based location claims using multiple corroborating stamps. As location proof plugins are developed, they'll plug into Astral Location Services for stronger verification.
+    We're researching [Location Proofs](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) — a framework for evidence-based location claims using multiple corroborating stamps. The aim is to raise the cost of spoofing, not to make it impossible. So far the ProofMode plugin is the only implemented proof-of-location source; others are planned. As more plugins are developed, they plug into Astral for stronger verification.
   </Accordion>
 </AccordionGroup>
 
@@ -93,7 +95,7 @@ description: "Frequently asked questions"
   </Accordion>
 
   <Accordion title="Can I use this without submitting onchain?">
-    Yes. Policy Attestations are signed offchain and can be used in your application directly. Onchain submission is optional.
+    Yes. Signed results are produced offchain and can be used in your application directly. Onchain submission is optional.
   </Accordion>
 
   <Accordion title="How do I verify in my smart contract?">
@@ -149,8 +151,8 @@ description: "Frequently asked questions"
   </Accordion>
 
   <Accordion title="Where is data stored?">
-    - **Location attestations**: On EAS (onchain) or IPFS/your storage (offchain)
-    - **Policy attestations**: Returned to you; optionally submitted to EAS
+    - **Location records**: On EAS (onchain) or IPFS/your storage (offchain)
+    - **Signed results**: Returned to you; optionally submitted to EAS as attestations
     - **Compute service**: Stateless, no persistent storage
   </Accordion>
 </AccordionGroup>
@@ -160,12 +162,12 @@ description: "Frequently asked questions"
 <AccordionGroup>
   <Accordion title="Where can I get help?">
     - **Documentation**: You're here!
-    - **GitHub**: [astral-location-services](https://github.com/DecentralizedGeo/astral-location-services)
+    - **GitHub**: [astral-location-services](https://github.com/AstralProtocol/astral-location-services)
     - **Telegram**: [Join our community](https://t.me/+UkTOSXnDcDM5ZTBk)
   </Accordion>
 
   <Accordion title="How can I contribute?">
-    We're building in public! Once the repo is public:
+    We're building in public:
     - Open issues with feedback
     - Share your use cases
     - Submit PRs for improvements
