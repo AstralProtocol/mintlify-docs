@@ -4,7 +4,7 @@ description: "EAS schema definitions for Astral attestations"
 ---
 
 <Warning>
-  **Development Preview** — Schema UIDs will be published when deployed.
+  **Research Preview** — Additional schema UIDs will be published as they are deployed.
 </Warning>
 
 # EAS Schemas
@@ -45,7 +45,7 @@ bool result, bytes32[] inputRefs, uint64 timestamp, string operation
 | `result` | bool | The boolean computation result |
 | `inputRefs` | bytes32[] | References to inputs (UIDs or hashes) |
 | `timestamp` | uint64 | Unix timestamp of computation |
-| `operation` | string | Operation with parameters (e.g., "within:500", "contains") |
+| `operation` | string | Operation with parameters (e.g., "within:50000", "contains") — the `within` radius is encoded in centimeters; see the note below |
 
 ### NumericPolicyAttestation
 
