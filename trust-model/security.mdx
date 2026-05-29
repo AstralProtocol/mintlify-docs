@@ -79,11 +79,19 @@ It does **not** prove:
 
 ### GPS spoofing
 
-**Status:** Out of scope for MVP
+**Status:** Partially addressed by location proofs; an active research area
 
-Astral can verify that a computation was correct, but cannot verify that the input location represents where the user actually was. GPS can be spoofed.
+Astral verifies that a computation was correct, not that the input location is where the device actually was. Raw GPS can be spoofed. Location proofs raise the cost: ProofMode, for example, includes on-device protections that resist some *software* spoofing (such as detecting rooted or tampered devices), but offers little against *hardware/physical* attacks like attenuating or replaying the RF signal. The goal is to raise the cost of forgery above the value of the action a proof supports, not to achieve certainty.
 
-**Future:** Location proofs with multiple corroborating stamps will make spoofing harder.
+**Future:** Combining multiple independent, corroborating stamps raises the bar further, and we're researching harder proof-of-location systems — including authenticated GNSS signals such as Galileo [OSNMA](https://www.gsc-europa.eu/galileo/services/galileo-open-service-navigation-message-authentication-osnma).
+
+### TEE attestation deployment
+
+**Status:** Test deployments only; continuous attested operation not yet funded
+
+The signature on a result proves it was produced by a key Astral controls. Binding that key to an independently attested enclave — so a valid signature also proves *which code* ran and *where* — requires the service to run under continuous remote attestation. Astral has demonstrated this on real TEE hardware in test deployments but does not currently fund continuous attested operation.
+
+Until then, treat a valid Astral signature as "signed by Astral's key," not as a hardware-attestation guarantee. If you want to evaluate Astral against real TEEs, reach out at [contact@astral.global](mailto:contact@astral.global).
 
 ## Best practices
 
@@ -131,8 +139,8 @@ Astral can verify that a computation was correct, but cannot verify that the inp
 
 ### Service signing key
 
-- Key generated or provisioned within TEE
-- Cannot be extracted by operators
+- Key generated or provisioned within the TEE
+- Intended to be non-extractable by operators when the enclave runs under attestation (see [TEE attestation deployment](#tee-attestation-deployment))
 - Used to sign all results
 
 ### Key rotation
@@ -151,7 +159,7 @@ function updateAstralSigner(address newSigner) external onlyOwner {
 ```
 
 <Note>
-  For the research preview, a simple owner-controlled update is sufficient. For production, consider making the owner a multisig.
+  For the Research Preview, a simple owner-controlled update is sufficient. For production, consider making the owner a multisig.
 </Note>
 
 ## Audit status

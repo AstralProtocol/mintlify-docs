@@ -21,7 +21,7 @@ This page documents the security model, known considerations, and best practices
 
 ## Trust Model
 
-### Current (research preview)
+### Current (Research Preview)
 
 | Trust Assumption | Status |
 |------------------|--------|
@@ -31,7 +31,7 @@ This page documents the security model, known considerations, and best practices
 | Signing key held securely in TEE | ✓ Verified **under attestation** |
 | Input locations verified | ✗ Future work |
 
-The research preview uses a **centralized trust model**:
+The Research Preview uses a **centralized trust model**:
 - Single service with known signer
 - TEE (EigenCompute) provides execution attestation when running under continuous remote attestation — see [TEE attestation deployment](#tee-attestation-deployment)
 - Deterministic operations ensure reproducibility
@@ -112,11 +112,11 @@ It does **NOT** prove:
 
 ### GPS Spoofing
 
-**Status:** Out of scope for the research preview
+**Status:** Partially addressed by location proofs; an active research area
 
-Astral can verify that a computation was correct, but cannot verify that the input location represents where the user actually was. GPS can be spoofed. Location proofs raise the cost of spoofing but do not make it impossible — the goal is to raise forgery cost above the value of the action a proof supports, not to achieve absolute certainty.
+Astral verifies that a computation was correct, not that the input location is where the device actually was. Raw GPS can be spoofed. Location proofs raise the cost: ProofMode, for example, includes on-device protections that resist some *software* spoofing (such as detecting rooted or tampered devices), but offers little against *hardware/physical* attacks like attenuating or replaying the RF signal. The goal is to raise the cost of forgery above the value of the action a proof supports, not to achieve certainty.
 
-**Future:** Location proofs with multiple corroborating stamps will make spoofing harder.
+**Future:** Combining multiple independent, corroborating stamps raises the bar further, and we're researching harder proof-of-location systems — including authenticated GNSS signals such as Galileo [OSNMA](https://www.gsc-europa.eu/galileo/services/galileo-open-service-navigation-message-authentication-osnma).
 
 ---
 
@@ -198,7 +198,7 @@ function updateAstralSigner(address newSigner) external onlyOwner {
 ```
 
 <Note>
-  For the research preview, a simple owner-controlled update is sufficient. For production, consider making the owner a multisig.
+  For the Research Preview, a simple owner-controlled update is sufficient. For production, consider making the owner a multisig.
 </Note>
 
 ---

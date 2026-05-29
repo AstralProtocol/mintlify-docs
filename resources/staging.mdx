@@ -39,6 +39,10 @@ curl -X POST https://staging-api.astral.global/compute/v0/distance \
   }'
 ```
 
+<Note>
+  `chainId` only tells the service which EAS chain to format the delegated attestation for, so the result *could* be submitted onchain later. Nothing here touches a blockchain unless you choose to submit the result yourself — the call above just returns a signed result.
+</Note>
+
 ## Verifying signatures
 
 <Warning>
