@@ -95,26 +95,37 @@ Here is a step-by-step walkthrough for building a hypothetical plugin that uses 
 ### Step 1: Define signal collection
 
 ```typescript
-import type { LocationProofPlugin, PluginConfig, Signal } from '@decentralized-geo/astral-sdk';
+import type {
+  LocationProofPlugin,
+  RawSignals,
+  UnsignedLocationStamp,
+  LocationStamp,
+  StampVerificationResult,
+} from '@decentralized-geo/astral-sdk';
 
 const wifiPlugin: LocationProofPlugin = {
   name: 'wifi-triangulation',
   version: '0.1.0',
+  runtimes: ['node', 'browser'],
+  requiredCapabilities: ['wifi-scan'],
+  description: 'Wi-Fi triangulation via nearby access points',
 
-  async collectSignals(config: PluginConfig): Promise<Signal[]> {
-    const networks = await scanNearbyNetworks(config.timeout);
+  // `collect` returns a single RawSignals object: { plugin, timestamp, data }
+  async collect(): Promise<RawSignals> {
+    const networks = await scanNearbyNetworks();
 
-    return networks.map((network) => ({
-      type: 'wifi-ap',
-      value: {
-        bssid: network.bssid,
-        ssid: network.ssid,
-        rssi: network.signalStrength,
-        frequency: network.frequency
-      },
+    return {
+      plugin: 'wifi-triangulation',
       timestamp: Date.now() / 1000,
-      source: 'device-wifi-scan'
-    }));
+      data: {
+        accessPoints: networks.map((network) => ({
+          bssid: network.bssid,
+          ssid: network.ssid,
+          rssi: network.signalStrength,
+          frequency: network.frequency,
+        })),
+      },
+    };
   },
 
   // ... continued below
@@ -124,11 +135,12 @@ const wifiPlugin: LocationProofPlugin = {
 ### Step 2: Create stamps from signals
 
 ```typescript
-  async createStamp(signals: Signal[]): Promise<UnsignedLocationStamp> {
+  // `create` transforms RawSignals into an unsigned stamp
+  async create(signals: RawSignals): Promise<UnsignedLocationStamp> {
+    const accessPoints = signals.data.accessPoints as WifiAccessPoint[];
+
     // Triangulate position from Wi-Fi signals
-    const position = triangulateFromAccessPoints(
-      signals.map((s) => s.value as WifiSignal)
-    );
+    const position = triangulateFromAccessPoints(accessPoints);
 
     return {
       lpVersion: '0.2',
@@ -138,14 +150,11 @@ const wifiPlugin: LocationProofPlugin = {
         coordinates: [position.longitude, position.latitude]
       },
       srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
-      temporalFootprint: {
-        start: Math.min(...signals.map((s) => s.timestamp)),
-        end: Math.max(...signals.map((s) => s.timestamp))
-      },
+      temporalFootprint: { start: signals.timestamp, end: signals.timestamp },
       plugin: 'wifi-triangulation',
       pluginVersion: '0.1.0',
       signals: {
-        accessPoints: signals.map((s) => s.value),
+        accessPoints,
         triangulationMethod: 'weighted-centroid'
       }
     };
@@ -155,37 +164,30 @@ const wifiPlugin: LocationProofPlugin = {
 ### Step 3: Implement stamp verification
 
 ```typescript
-  async verifyStamp(stamp: LocationStamp): Promise<StampVerificationResult> {
-    const errors: string[] = [];
-
-    // Check plugin identification
-    if (stamp.plugin !== 'wifi-triangulation') {
-      errors.push(`Expected plugin 'wifi-triangulation', got '${stamp.plugin}'`);
-    }
-
-    // Verify signal structure
+  // `verify` returns a StampVerificationResult:
+  // { valid, signaturesValid, structureValid, signalsConsistent, details }
+  async verify(stamp: LocationStamp): Promise<StampVerificationResult> {
     const signals = stamp.signals as { accessPoints?: unknown[] };
-    if (!signals.accessPoints || signals.accessPoints.length < 3) {
-      errors.push('Wi-Fi triangulation requires at least 3 access points');
-    }
+    const accessPointCount = signals.accessPoints?.length ?? 0;
 
-    // Verify temporal bounds are reasonable
+    // Structure: Wi-Fi triangulation needs at least 3 access points
+    const structureValid =
+      stamp.plugin === 'wifi-triangulation' && accessPointCount >= 3;
+
+    // Signal consistency: collection window should be tight (≤ 60s)
     const duration = stamp.temporalFootprint.end - stamp.temporalFootprint.start;
-    if (duration > 60) {
-      errors.push('Signal collection window exceeds 60 seconds');
-    }
+    const signalsConsistent = duration <= 60;
 
-    // Verify signatures
+    // Signatures
     const signaturesValid = await verifyStampSignatures(stamp);
-    if (!signaturesValid) {
-      errors.push('Stamp signatures are invalid');
-    }
 
     return {
-      valid: errors.length === 0,
-      errors,
+      valid: structureValid && signalsConsistent && signaturesValid,
+      signaturesValid,
+      structureValid,
+      signalsConsistent,
       details: {
-        accessPointCount: signals.accessPoints?.length ?? 0,
+        accessPointCount,
         collectionDuration: duration,
         signaturesChecked: stamp.signatures.length
       }
@@ -204,17 +206,14 @@ const astral = new AstralSDK({ chainId: 84532 });
 
 astral.plugins.register(wifiPlugin);
 
-// Now you can collect stamps using your plugin
-const signals = await astral.stamps.collect({
-  name: 'wifi-triangulation',
-  version: '0.1.0',
-  config: { timeout: 5000 }
-});
+// Now you can collect stamps using your plugin (collect returns an array)
+const signals = await astral.stamps.collect({ plugins: ['wifi-triangulation'] });
 
-const stamp = await astral.stamps.create(
-  { name: 'wifi-triangulation', version: '0.1.0', config: {} },
-  signals
+const unsigned = await astral.stamps.create(
+  { plugin: 'wifi-triangulation' },
+  signals[0]
 );
+const stamp = await astral.stamps.sign({ plugin: 'wifi-triangulation' }, unsigned, signer);
 ```
 
 ## Testing
@@ -259,14 +258,14 @@ describe('wifi-triangulation plugin', () => {
 
 ## Existing plugins
 
-Two plugins are currently in development:
+The verify service registers verifiers for several proof-of-location systems — `proofmode`, `witnesschain`, `gpsd`, `geoclue`, `wifi-mls`, and `ip-geolocation` — at varying maturity in this research preview. Two are highlighted here:
 
 <CardGroup cols={2}>
   <Card title="ProofMode" icon="mobile">
     Device attestation and sensor fusion. Uses Secure Enclave (iOS) or hardware keystore (Android) to sign location observations.
   </Card>
   <Card title="WitnessChain" icon="server">
-    Infrastructure verification using UDP latency triangulation and a challenger network. Trust derives from speed-of-light constraints and cryptoeconomic incentives.
+    Infrastructure verification using UDP latency triangulation and a challenger network. Trust is intended to derive from speed-of-light constraints and cryptoeconomic incentives.
   </Card>
 </CardGroup>
 
