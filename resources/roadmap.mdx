@@ -91,8 +91,8 @@ Astral is infrastructure for verifiable location: signed answers to spatial ques
 We're actively researching location proof mechanisms. See the [Location Proof framework design](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323).
 
 - [x] Framework design and specification
-- [x] First plugin implementation (ProofMode)
-- [ ] Additional proof-of-location plugins (WitnessChain and others — planned)
+- [x] First plugin implementations (ProofMode, plus server-side verifiers for WitnessChain, gpsd, GeoClue, Wi-Fi/MLS, IP geolocation — at varying maturity)
+- [ ] Harden and document each plugin's threat model
 - [ ] Multi-stamp verification
 - [ ] Sensor fusion (accelerometer, barometer)
 - [ ] Physical proof integration (NFC/QR)
@@ -112,7 +112,7 @@ These are explicitly **out of scope** for the MVP:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Full location proof verification | In progress | ProofMode stamp verification is live (experimental); broader plugin coverage and multi-stamp correlation are ongoing |
+| Full location proof verification | In progress | Verifiers for several PoL systems are live (experimental); hardening and multi-stamp correlation are ongoing |
 | Gas sponsorship | Deferred | Developers pay via delegated attestations |
 | Reference data caching | Deferred | Start stateless, add if needed |
 | Complex geometry limits | Deferred | Add based on usage patterns |

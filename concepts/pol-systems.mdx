@@ -37,21 +37,21 @@ That said, significant value comes from "softer" proof-of-location systems too. 
 
 ## Available plugins
 
-v0 of Astral targets these proof-of-location systems through [location proof plugins](/plugins/overview). So far only ProofMode is implemented:
+v0 of Astral connects to proof-of-location systems through [location proof plugins](/plugins/overview). ProofMode is the most developed today; the two highlighted below are the documented examples:
 
 <CardGroup cols={2}>
   <Card title="ProofMode — implemented" icon="mobile" href="/plugins/proofmode">
     Device attestation + sensor fusion. Uses iOS Secure Enclave and Android hardware keystore to attest to device sensor readings (GPS, Wi-Fi, cellular, magnetometer). Trust derives from device hardware integrity. This is the one proof-of-location plugin available today (alpha).
   </Card>
-  <Card title="WitnessChain — planned" icon="server" href="/plugins/witnesschain">
-    Infrastructure verification. Intended to use UDP latency triangulation across a distributed challenger network, where trust derives from the speed of light — you can't fake being close to many geographically distributed nodes at once. The plugin interface is defined, but the integration is not yet built.
+  <Card title="WitnessChain" icon="server" href="/plugins/witnesschain">
+    Infrastructure verification. Uses UDP latency triangulation across a distributed challenger network, where trust derives from the speed of light — you can't fake being close to many geographically distributed nodes at once. The verify service has a server-side implementation; the client-side plugin is still maturing.
   </Card>
 </CardGroup>
 
-The [Mock plugin](/plugins/mock) is available for development and testing.
+The verify service also registers verifiers for several other systems (`gpsd`, `geoclue`, `wifi-mls`, `ip-geolocation`), at varying maturity. The [Mock plugin](/plugins/mock) is available for development and testing on the client.
 
 <Info>
-  Beyond ProofMode, the plugin set is still to be developed. We're [researching](https://github.com/location-proofs) more proof-of-location plugins and would welcome collaborators — if you work on a proof-of-location system, [get in touch](mailto:contact@astral.global).
+  This is an early, evolving plugin set — appearing in the registry means the service can route a stamp of that type to a verifier, not that the plugin is production-hardened. ProofMode is the most developed device-side source today. We're [researching](https://github.com/location-proofs) more proof-of-location plugins and would welcome collaborators — if you work on a proof-of-location system, [get in touch](mailto:contact@astral.global).
 </Info>
 
 ## Building new plugins
