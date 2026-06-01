@@ -20,7 +20,7 @@ The Astral location proof pipeline has four stages:
 3. **Sign** — Add a cryptographic signature to produce a `LocationStamp`
 4. **Verify** — Check a stamp's internal validity (signatures, structure, signal consistency)
 
-Not every plugin implements every stage. ProofMode, for example, collects evidence on-device via its mobile app — the plugin handles parsing and verification, not collection. WitnessChain collects via an API. The MockPlugin implements all four for testing. **ProofMode is working today** (its stamps can be verified end to end); the other plugins are experimental, with interfaces defined and early verifiers in the service. Client-side, the SDK ships MockPlugin for development. We're keen to build new proof-of-location plugins with partners.
+Not every plugin implements every stage. ProofMode, for example, collects evidence on-device via its mobile app — the plugin handles parsing and verification, not collection. WitnessChain collects via an API. The MockPlugin implements all four for testing. **ProofMode is working today** (its stamps can be verified end to end); the other plugins are experimental, with interfaces defined and early verification logic in the service. Client-side, the SDK ships MockPlugin for development. We're keen to build new proof-of-location plugins with partners.
 
 Once you have signed stamps, the SDK's `ProofsModule` bundles them with a claim and verifies the proof as a whole, producing a multidimensional `CredibilityVector`.
 

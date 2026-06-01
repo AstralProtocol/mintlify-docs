@@ -73,7 +73,7 @@ description: "Frequently asked questions"
   <Accordion title="Can users spoof their GPS?">
     Yes. GPS is spoofable. Astral verifies that **computations are correct**, not that **inputs are authentic**. If a user provides a fake GPS coordinate, we'll compute on that fake coordinate.
 
-    We've developed a framework for [multifactor location proofs](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323), which compose evidence from multiple corroborating proof-of-location systems to support a location claim. The aim is to raise the cost of spoofing, not to make it impossible. ProofMode is working today; experimental verifiers for several other systems (witnesschain, gpsd, geoclue, wifi-mls, ip-geolocation) are registered with interfaces defined. We're keen to develop new proof-of-location plugins with partners. As these mature, they plug into Astral for stronger verification.
+    We've developed a framework for [multifactor location proofs](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323), which compose evidence from multiple corroborating proof-of-location systems to support a location claim. The aim is to raise the cost of spoofing, not to make it impossible. ProofMode is working today; experimental stamp-verification logic for several other systems (witnesschain, gpsd, geoclue, wifi-mls, ip-geolocation) also exists, with interfaces defined. We're keen to develop new proof-of-location plugins with partners. As these mature, they plug into Astral for stronger verification.
   </Accordion>
 </AccordionGroup>
 
