@@ -35,7 +35,7 @@ Under attestation, the TEE is designed to provide four properties that together 
 | **Input verification** | Signatures on signed inputs are verified at the TEE boundary, and inputs are validated before computation begins. (Raw GeoJSON carries no signature and is accepted as unverified.) |
 | **Deterministic computation** | Same inputs always produce the same result. PostGIS version is pinned, precision is fixed at centimeter level, and no persistent state exists between requests. |
 | **Signed output** | Results are signed by a key held inside the TEE, intended to be non-extractable by the operator when the enclave is attested. |
-| **TEE attestation** | EigenCompute is designed to provide hardware-generated attestation that specific code executed on specific inputs inside the enclave. |
+| **TEE attestation** | The TEE is designed to provide hardware-generated attestation that specific code executed on specific inputs inside the enclave (currently via EigenCompute, though the design isn't tied to one provider). |
 
 Together, under attestation: the code is attested, signed inputs are verified, the computation is deterministic, and the output is signed by a key the operator cannot access. An observer can then verify that the result came from the correct code running on the referenced inputs — without re-executing the computation. This is a statement about the *computation*, not about whether the input locations are truthful.
 
@@ -53,9 +53,9 @@ Under attestation, the TEE provides meaningful privacy properties. Inputs and ou
 
 Some information also leaks from the result itself (a `contains` answer of `true` tells you the point is inside the polygon), but that is inherent to the computation, not a limitation of the privacy model.
 
-## EigenCompute TEE stack
+## TEE stack
 
-The service runs on [EigenCompute](https://blog.eigencloud.xyz/eigencloud-brings-verifiable-ai-to-mass-market-with-eigenai-and-eigencompute-launches/), part of the EigenCloud ecosystem:
+Astral is **not tied to a specific TEE provider**. The architecture is a self-contained Docker container, so in principle it can run in any TEE that supports containerized workloads — assessing portability across providers is ongoing. The current deployment target is [EigenCompute](https://blog.eigencloud.xyz/eigencloud-brings-verifiable-ai-to-mass-market-with-eigenai-and-eigencompute-launches/) (part of the EigenCloud ecosystem):
 
 ```mermaid
 sequenceDiagram
