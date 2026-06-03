@@ -3,11 +3,15 @@ title: "Agent Integration"
 description: "Using Astral as a spatial oracle in agent workflows"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Agent integration
 
-Autonomous agents need spatial reasoning — is this delivery within the geofence? How far is the nearest facility? Does this route intersect a restricted zone? Astral provides verified spatial answers that agents can use in decision-making.
+Autonomous agents need spatial reasoning — is this delivery within the geofence? How far is the nearest facility? Does this route intersect a restricted zone? Astral provides verifiable spatial answers that agents can use in decision-making.
+
+<Info>
+  The examples on this page pass **raw coordinates** to the compute API. A signed result proves the *computation* was done correctly on those coordinates — it does **not** prove the coordinates are truthful (raw GPS is spoofable, and an agent could supply any position). To make the input trustworthy too, feed in a verified [location proof](/concepts/location-proofs) rather than bare coordinates. Keep the distinction clear when an agent's decision carries real consequences.
+</Info>
 
 ## The pattern
 
@@ -20,7 +24,7 @@ graph LR
     C --> D[Uses result in decision]
 ```
 
-The signed result provides an audit trail. Anyone reviewing the agent's decisions can verify that the spatial reasoning was based on correctly computed data, not fabricated or hallucinated.
+The signed result provides an audit trail. Anyone reviewing the agent's decisions can verify that the spatial answer was computed correctly on the stated inputs, rather than fabricated or hallucinated by the agent. (Whether those inputs are themselves truthful is a separate question — see the note above.)
 
 ## Raw HTTP from any framework
 
@@ -31,7 +35,7 @@ Astral is a REST API, so any language or framework that can make HTTP requests w
 ```python
 import httpx
 
-response = httpx.post("https://staging-api.astral.global/compute/distance", json={
+response = httpx.post("https://staging-api.astral.global/compute/v0/distance", json={
     "from": {"type": "Point", "coordinates": [2.2945, 48.8584]},
     "to": {"type": "Point", "coordinates": [2.3522, 48.8566]},
     "chainId": 84532
@@ -44,7 +48,7 @@ distance_meters = result["result"]
 ### TypeScript
 
 ```typescript
-const response = await fetch('https://staging-api.astral.global/compute/distance', {
+const response = await fetch('https://staging-api.astral.global/compute/v0/distance', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -76,9 +80,9 @@ else:
 For boolean operations like containment or intersection, the result is `true` or `false`:
 
 ```python
-response = httpx.post("https://staging-api.astral.global/compute/contains", json={
+response = httpx.post("https://staging-api.astral.global/compute/v0/contains", json={
     "container": geofence_polygon,
-    "geometry": {"type": "Point", "coordinates": agent_location},
+    "containee": {"type": "Point", "coordinates": agent_location},
     "chainId": 84532
 })
 
@@ -109,7 +113,7 @@ def check_delivery_proximity(
     chain_id: int = 84532
 ) -> dict:
     """Check if courier is within delivery radius of destination."""
-    response = httpx.post(f"{ASTRAL_URL}/compute/distance", json={
+    response = httpx.post(f"{ASTRAL_URL}/compute/v0/distance", json={
         "from": {"type": "Point", "coordinates": courier_coords},
         "to": {"type": "Point", "coordinates": destination_coords},
         "chainId": chain_id

@@ -13,22 +13,25 @@ We're transparent about what's verified and what's assumed because trust is the 
 
 | Assumption | Status | Notes |
 |------------|--------|-------|
-| TEE executes code correctly | Verified | EigenCompute provides hardware attestation |
-| Astral operates service honestly | Required | Single operator in MVP |
-| Signing key held securely in TEE | Verified | Key cannot be extracted by operator |
-| Input locations are truthful | **Not verified** | GPS is spoofable; future work |
+| TEE executes code correctly | Verified **under attestation** | EigenCompute provides hardware attestation; continuous attested deployment is target-state (see below) |
+| Service runs under continuous attestation | **Not yet** | Demonstrated in test deployments; not continuously funded today |
+| Astral operates service honestly | Required | Single operator in the Research Preview |
+| Signing key held securely in TEE | Verified **under attestation** | Intended to be non-extractable when the enclave is attested |
+| Input locations are truthful | **Depends on the input** | Raw coordinates are trust-based; a [location proof](/concepts/location-proofs) backs the input with evaluable evidence — available today (ProofMode end to end; other plugins experimental) |
 
-The MVP uses a **centralized trust model**: a single service with a known signer, running inside a TEE. The TEE provides execution attestation, and deterministic operations ensure reproducibility. But you are trusting Astral to operate the service honestly.
+The Research Preview uses a **centralized trust model**: a single service with a known signer, designed to run inside a TEE. The TEE provides execution attestation, and deterministic operations ensure reproducibility. But you are trusting Astral to operate the service honestly.
 
-## Location inputs are not verified
+<Warning>
+  **Deployment status.** Astral has run the service on real TEE hardware in test deployments, but does not currently fund continuous operation on attested hardware. On the hosted staging service today, a valid signature proves that a key Astral controls produced the result — not yet that an independently attested enclave did. This is the gap between "signed by a key" and "signed by an attested enclave," and we'd rather state it plainly. If you want to evaluate Astral against real TEEs, reach out at [contact@astral.global](mailto:contact@astral.global).
+</Warning>
 
-Astral verifies computation, not location. Until location proof plugins are integrated, you are trusting that the GPS coordinates provided as input are honest.
+## Raw location inputs are trust-based — location proofs change that
 
-GPS is spoofable. A user can claim to be anywhere. The signed result proves that *if* the user was at location A, *then* they were within 500m of location B. It does not prove the user was actually at location A.
+If you pass **raw coordinates** to Astral, you are trusting they're honest. GPS is spoofable; a user can claim to be anywhere. A signed result over raw coordinates proves that *if* the user was at location A, *then* they were within 500m of location B — not that they were actually at A.
 
-This is why we're developing the [Location Proof framework](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323) — to provide evidence-based location claims that feed into Astral for a fully verifiable pipeline. As proof mechanisms mature, they plug directly into the existing system.
+This is exactly what [location proofs](/concepts/location-proofs) address, and they exist today. Instead of bare coordinates, you submit a claim backed by evidence — stamps from one or more [proof-of-location systems](/concepts/pol-systems). Astral evaluates that evidence and returns a [credibility vector](/concepts/location-proof-evaluation). It can't make weak evidence strong, but it turns "trust the input" into "weigh the evidence and the evaluation." ProofMode works end to end now; other plugins are experimental, with interfaces defined (we're keen to develop more with partners — [get in touch](mailto:contact@astral.global)).
 
-**Be direct with your users**: if your application depends on truthful location inputs, communicate that the location data is currently trust-based.
+**Be direct with your users**: if you rely on raw coordinates rather than location proofs, the location data is trust-based — say so.
 
 ## What verification buys you today
 
@@ -36,7 +39,7 @@ Even with these assumptions, verifiable computation is meaningful:
 
 - **The computation is correct.** You know the spatial relationship was evaluated faithfully, not fabricated.
 - **The inputs are recorded.** `inputRefs` let you audit which data went into the computation.
-- **The result is tamper-evident.** The signature proves the output came from the attested environment.
+- **The result is tamper-evident.** The signature proves the output was produced by Astral's key and hasn't been altered since. Under attestation, it further proves the output came from the attested environment.
 
 This is substantially better than trusting an opaque API that returns `true` or `false` with no proof.
 

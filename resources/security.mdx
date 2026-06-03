@@ -21,18 +21,19 @@ This page documents the security model, known considerations, and best practices
 
 ## Trust Model
 
-### Current (MVP)
+### Current (Research Preview)
 
 | Trust Assumption | Status |
 |------------------|--------|
-| TEE executes code correctly | ✓ Verified |
+| TEE executes code correctly | ✓ Verified **under attestation** |
+| Service runs under continuous attestation | ✗ Test deployments only (not yet funded) |
 | Astral operates service honestly | ✓ Required |
-| Signing key held securely in TEE | ✓ Verified |
+| Signing key held securely in TEE | ✓ Verified **under attestation** |
 | Input locations verified | ✗ Future work |
 
-The MVP uses a **centralized trust model**:
+The Research Preview uses a **centralized trust model**:
 - Single service with known signer
-- TEE (EigenCompute) provides execution attestation
+- TEE (EigenCompute) provides execution attestation when running under continuous remote attestation — see [TEE attestation deployment](#tee-attestation-deployment)
 - Deterministic operations ensure reproducibility
 
 ### Future Enhancements
@@ -51,9 +52,9 @@ The MVP uses a **centralized trust model**:
 
 **Status:** Documented, resolver responsibility
 
-Policy Attestations could potentially be reused:
-- **Temporal replay:** Old attestation used for current benefit
-- **Cross-context replay:** Attestation for one resolver used at another
+Signed results (once submitted onchain as attestations) could potentially be reused:
+- **Temporal replay:** Old result used for current benefit
+- **Cross-context replay:** Result for one resolver used at another
 
 **Mitigations (your responsibility):**
 
@@ -98,7 +99,7 @@ const result = await astral.compute.contains(
 );
 ```
 
-The Policy Attestation proves:
+The signed result proves:
 - "Astral computed the relationship between A and B"
 
 It does **NOT** prove:
@@ -111,11 +112,21 @@ It does **NOT** prove:
 
 ### GPS Spoofing
 
-**Status:** Out of scope for MVP
+**Status:** Partially addressed by location proofs; an active research area
 
-Astral can verify that a computation was correct, but cannot verify that the input location represents where the user actually was. GPS can be spoofed.
+Astral verifies that a computation was correct, not that the input location is where the device actually was. Raw GPS can be spoofed. Location proofs raise the cost: ProofMode, for example, includes on-device protections that resist some *software* spoofing (such as detecting rooted or tampered devices), but offers little against *hardware/physical* attacks like attenuating or replaying the RF signal. The goal is to raise the cost of forgery above the value of the action a proof supports, not to achieve certainty.
 
-**Future:** Location proofs with multiple corroborating stamps will make spoofing harder.
+**Future:** Combining multiple independent, corroborating stamps raises the bar further, and we're researching harder proof-of-location systems — including authenticated GNSS signals such as Galileo [OSNMA](https://www.gsc-europa.eu/galileo/services/galileo-open-service-navigation-message-authentication-osnma).
+
+---
+
+### TEE Attestation Deployment
+
+**Status:** Test deployments only; continuous attested operation not yet funded
+
+A valid signature proves a result was produced by a key Astral controls. Binding that key to an independently attested enclave — so the signature also proves *which code* ran and *where* — requires continuous remote attestation. Astral has demonstrated this on real TEE hardware in test deployments but does not currently fund continuous attested operation.
+
+Until then, treat a valid Astral signature as "signed by Astral's key," not as a hardware-attestation guarantee. To evaluate Astral against real TEEs, reach out at [contact@astral.global](mailto:contact@astral.global).
 
 ---
 
@@ -167,9 +178,9 @@ Astral can verify that a computation was correct, but cannot verify that the inp
 
 ### Service Signing Key
 
-- Key generated/provisioned within TEE
-- Cannot be extracted by operators
-- Used to sign all Policy Attestations
+- Key generated/provisioned within the TEE
+- Intended to be non-extractable by operators when the enclave runs under attestation (see [TEE Attestation Deployment](#tee-attestation-deployment))
+- Used to sign all results
 
 ### Key Rotation
 
@@ -187,7 +198,7 @@ function updateAstralSigner(address newSigner) external onlyOwner {
 ```
 
 <Note>
-  For the research preview, a simple owner-controlled update is sufficient. For production, consider making the owner a multisig.
+  For the Research Preview, a simple owner-controlled update is sufficient. For production, consider making the owner a multisig.
 </Note>
 
 ---

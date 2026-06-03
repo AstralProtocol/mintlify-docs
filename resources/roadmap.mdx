@@ -9,7 +9,7 @@ description: "What's built, what's coming, and what's missing"
 
 # Roadmap
 
-Astral Location Services is infrastructure for location-based smart contracts. This page tracks what's done, what we're working on, and what's planned.
+Astral is infrastructure for verifiable location: signed answers to spatial questions, and evidence-based verification of location claims. (Smart contracts are one place those signed results can go, not the whole story.) This page tracks what's done, what we're working on, and what's planned.
 
 ## Current Status
 
@@ -53,10 +53,10 @@ Astral Location Services is infrastructure for location-based smart contracts. T
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Compute Service API | ✓ Deployed | Express/Fastify service |
-| PostGIS Integration | ✓ Deployed | Docker container setup |
-| SDK Compute Extension | ✓ Built | TypeScript client |
-| EigenCompute Deployment | ✓ Deployed | TEE environment setup |
+| Compute Service API | Running (staging) | Express/Fastify service |
+| PostGIS Integration | Running (staging) | Docker container setup |
+| SDK Compute Extension | Built | TypeScript client |
+| EigenCompute (TEE) | Test deployments | Validated on real TEE hardware; continuous attested operation not yet funded |
 | Example Contracts | In Development | Resolver templates |
 
 ---
@@ -67,7 +67,7 @@ Astral Location Services is infrastructure for location-based smart contracts. T
 
 - [x] Core operations: `distance`, `contains`, `within`, `intersects`, `area`, `length`
 - [x] PostGIS-powered computations
-- [x] EigenCompute TEE deployment
+- [x] EigenCompute TEE test deployments (continuous attested operation not yet funded)
 - [x] Delegated attestation signing
 - [x] SDK with compute namespace
 - [ ] Basic rate limiting (IP-based)
@@ -91,7 +91,9 @@ Astral Location Services is infrastructure for location-based smart contracts. T
 We're actively researching location proof mechanisms. See the [Location Proof framework design](https://collective.flashbots.net/t/towards-stronger-location-proofs/5323).
 
 - [x] Framework design and specification
-- [ ] First plugin implementation
+- [x] First working plugin (ProofMode — verification end to end)
+- [x] Experimental plugin interfaces defined (WitnessChain, gpsd, GeoClue, Wi-Fi/MLS, IP geolocation)
+- [ ] Mature the experimental plugins; develop new ones with partners
 - [ ] Multi-stamp verification
 - [ ] Sensor fusion (accelerometer, barometer)
 - [ ] Physical proof integration (NFC/QR)
@@ -111,7 +113,7 @@ These are explicitly **out of scope** for the MVP:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Location proof verification | Deferred | Stamps/verification is separate workstream |
+| Full location proof verification | In progress | ProofMode verification works; other plugins' verification logic is experimental; multi-stamp correlation and hardening are ongoing |
 | Gas sponsorship | Deferred | Developers pay via delegated attestations |
 | Reference data caching | Deferred | Start stateless, add if needed |
 | Complex geometry limits | Deferred | Add based on usage patterns |
@@ -149,7 +151,7 @@ We're building in public! Ways to contribute:
 
 - **Feedback**: Open issues with suggestions or questions
 - **Use cases**: Share what you'd build with location-based contracts
-- **Code**: Contributions welcome once repo is public
+- **Code**: Contributions welcome — see the [GitHub org](https://github.com/AstralProtocol)
 
 <Card title="Back: Security" icon="arrow-left" href="/resources/security">
   Security considerations

@@ -35,15 +35,9 @@ import { AstralSDK } from '@decentralized-geo/astral-sdk';
 const astral = new AstralSDK({ chainId: 84532, signer: wallet });
 
 // Create the landmark location
-const landmark = await astral.location.create({
-  type: 'Point',
-  coordinates: [-122.4194, 37.7749]  // San Francisco
-}, {
-  submitOnchain: true,
-  metadata: {
-    name: "SF Visitor Center",
-    description: "San Francisco Welcome NFT location"
-  }
+const landmark = await astral.location.onchain.create({
+  location: { type: 'Point', coordinates: [-122.4194, 37.7749] },  // San Francisco
+  memo: "SF Visitor Center — San Francisco Welcome NFT location"
 });
 
 console.log('Landmark UID:', landmark.uid);
@@ -199,7 +193,7 @@ console.log('Schema UID:', SCHEMA_UID);
 ```
 
 <Warning>
-  **Schema must use `revocable: true`** — Astral signs delegated attestations with `revocable: true`. If your schema is registered with `revocable: false`, EAS will reject the attestation with an `Irrevocable()` or `InvalidSignature()` error. See [#9](https://github.com/AstralProtocol/mintlify-docs/issues/9) for discussion on this behavior.
+  **Schema must use `revocable: true`** — Astral signs delegated attestations with `revocable: true`. If your schema is registered with `revocable: false`, EAS will reject the attestation with an `Irrevocable()` or `InvalidSignature()` error.
 </Warning>
 
 ---
@@ -247,11 +241,8 @@ async function mintNFT(userCoords: [number, number], wallet: Signer) {
   const astral = new AstralSDK({ chainId: 84532, signer: wallet });
 
   // Create user's location attestation
-  const userLocation = await astral.location.create({
-    type: 'Point',
-    coordinates: userCoords
-  }, {
-    submitOnchain: true
+  const userLocation = await astral.location.onchain.create({
+    location: { type: 'Point', coordinates: userCoords }
   });
 
   // Compute proximity and submit attestation
@@ -270,12 +261,10 @@ async function mintNFT(userCoords: [number, number], wallet: Signer) {
   }
 
   // Submit to EAS (triggers resolver → mints NFT)
-  const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
-  const receipt = await tx.wait();
+  const { uid } = await astral.compute.submit(result.delegatedAttestation);
 
   return {
-    transactionHash: tx.hash,
-    attestationUID: result.attestation.uid
+    attestationUID: uid
   };
 }
 ```

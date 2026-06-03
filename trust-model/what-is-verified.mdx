@@ -7,24 +7,43 @@ description: "What the signature covers and what computation reproducibility mea
 
 # What is verified
 
-When Astral produces a signed result, that signature makes specific claims. This page spells out exactly what is covered.
+When Astral produces a signed result, that signature makes specific claims. This page spells out exactly what is covered — and what that coverage depends on.
+
+<Warning>
+  **Deployment status.** The guarantees below hold when the service runs inside an enclave under continuous remote attestation. Astral has done this on real TEE hardware in test deployments, but does not currently fund continuous operation on attested hardware. On the hosted staging service today, a valid signature proves a key Astral controls produced the result — binding that key to an independently attested enclave is target-state. To evaluate Astral against real TEEs, reach out at [contact@astral.global](mailto:contact@astral.global).
+</Warning>
 
 ## Verifiability properties
 
 | Property | How it's achieved |
 |----------|-------------------|
-| **Input integrity** | Input signatures verified at TEE boundary before processing |
-| **Execution integrity** | TEE ensures code runs as deployed, can't be modified |
-| **Output authenticity** | Signing key held inside TEE, can't be extracted |
+| **Input integrity** | Input signatures verified at the TEE boundary before processing |
+| **Execution integrity** | Under attestation, the TEE ensures code runs as deployed and can't be modified |
+| **Output authenticity** | Signing key held inside the TEE; under attestation, can't be extracted |
 | **Determinism** | Stateless model + fixed precision = same inputs produce same outputs |
+
+The integrity and authenticity properties depend on the enclave running under continuous remote attestation — see the deployment-status note above for what holds on the hosted service today.
+
+<Info>
+  **Privacy is a near-term design direction.** Today, signed results can still expose their inputs (see [Privacy](/concepts/privacy)). The same TEE design makes stronger privacy feasible — encrypted input coordinates, shielded outputs (a policy decision carrying no identifying detail), and outputs encrypted so only a specified counterparty can read them. We're designing these now; if that would be useful to you, reach out at [contact@astral.global](mailto:contact@astral.global).
+</Info>
 
 ## What the signature covers
 
-A signed result from Astral proves three things:
+Under attestation (see deployment status above), a signed result from Astral is intended to prove three things:
 
-1. **The computation ran inside the TEE.** EigenCompute provides hardware attestation that the expected code is executing in the attested environment.
-2. **The inputs were hashed and recorded.** Every signed result includes `inputRefs` — hashes of the inputs used. You can verify which inputs went into the computation.
-3. **The output was produced by that computation.** The signing key exists only inside the TEE. If the signature is valid, the output came from the attested code running on the referenced inputs.
+1. **The computation ran inside the TEE.** EigenCompute is designed to provide hardware attestation that the expected code is executing in the attested environment.
+2. **The inputs were hashed and recorded.** Every signed result includes `inputRefs` — hashes of the inputs used. You can verify which inputs went into the computation. This holds today regardless of attestation status.
+3. **The output was produced by that computation.** The signing key is held inside the TEE. When the enclave is attested, a valid signature means the output came from the attested code running on the referenced inputs. Without live attestation, a valid signature proves only that Astral's key signed the result.
+
+## What the signature does not establish: location correspondence
+
+The signature proves the *computation* (or, for verification, the *evaluation*) ran correctly on the stated inputs. It does **not**, on its own, establish that a location claim corresponds to physical reality. That correspondence comes from two things outside the signature:
+
+- the **evidence** bundled into the [location proof](/concepts/location-proofs) — stamps from one or more proof-of-location systems, and
+- the **evaluation function** applied to that evidence, which produces the [credibility vector](/concepts/location-proof-evaluation).
+
+Astral runs that evaluation and reports it honestly; it does not pronounce a claim "true." **It is up to the verifier to decide whether a given evidence set and evaluation function are convincing enough for their context** — a $10 check-in and a $10M asset transfer warrant very different thresholds.
 
 ## Input references (inputRefs)
 
@@ -50,9 +69,13 @@ Astral achieves this through:
 The service holds a signing key **inside** the TEE:
 
 - Key is generated within the TEE or securely provisioned
-- Cannot be extracted by the operator
+- Intended to be non-extractable by the operator when the enclave is attested
 - All results are signed with this key
 - Downstream consumers verify that results came from the known Astral signer
+
+<Note>
+  Verifying that the attester matches Astral's signer proves the result came from a key Astral controls. Binding that key to an independently attested enclave — so a matching signature also proves *where* and *how* it was produced — is the target-state property described in the deployment-status note above.
+</Note>
 
 ```solidity
 // In a resolver contract

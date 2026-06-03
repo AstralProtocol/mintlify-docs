@@ -3,11 +3,15 @@ title: "Geofence Compliance"
 description: "Prove an asset stayed within an approved boundary"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Geofence compliance
 
-You're managing a drone fleet. Regulators require proof that each drone stayed within its approved flight corridor. Astral's `contains` operation verifies this with a signed result that constitutes auditable compliance evidence.
+You're managing a drone fleet. Regulators require proof that each drone stayed within its approved flight corridor. Astral's `contains` operation produces a signed result recording whether each reported position fell inside the corridor — verifiable, auditable evidence of the *check*.
+
+<Info>
+  The drone's reported position is supplied as coordinates. The signed result proves the containment **computation** was performed correctly on those coordinates — it does not, by itself, prove the drone was physically there. Raw GPS can be spoofed. To strengthen the position itself, attach [location proofs](/concepts/location-proofs) (for example, hardware-attested device evidence) so the input carries its own credibility, not just the computation. This is a Research Preview — be direct with regulators about which inputs are evidence-backed and which are self-reported.
+</Info>
 
 ## How it works
 
@@ -60,13 +64,12 @@ async function checkCompliance(
     location: { type: 'Point', coordinates: droneCoords }
   });
 
-  // Check containment
-  const result = await astral.compute.contains({
-    container: corridorUID,
-    geometry: dronePosition.uid,
-    chainId: 84532,
-    schema: SCHEMA_UID
-  });
+  // Check containment — args are positional: (container, containee, options)
+  const result = await astral.compute.contains(
+    corridorUID,
+    dronePosition.uid,
+    { schema: SCHEMA_UID }
+  );
 
   return {
     inCorridor: result.result,
@@ -93,6 +96,10 @@ async function runComplianceLoop(
   intervalMs: number,
   wallet: Signer
 ): Promise<ComplianceRecord[]> {
+  // `records` is returned immediately and filled over time as the interval
+  // fires (the caller holds the same array reference). In real use you'd
+  // persist each record as it's produced and clear the interval when the
+  // flight ends — illustrative here.
   const records: ComplianceRecord[] = [];
 
   const interval = setInterval(async () => {
@@ -121,15 +128,17 @@ For regulatory requirements that demand onchain proof, submit each signed result
 
 ```typescript
 async function submitComplianceProof(
-  result: PolicyAttestationResult<boolean>,
+  result: BooleanComputeResponse,
   wallet: Signer
 ) {
   const astral = new AstralSDK({ chainId: 84532, signer: wallet });
 
-  const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
-  await tx.wait();
+  const { uid } = await astral.compute.submit({
+    attestation: result.attestation,
+    delegatedAttestation: result.delegatedAttestation,
+  });
 
-  return tx.hash;
+  return uid;
 }
 ```
 
@@ -145,7 +154,7 @@ Each signed result in the compliance report includes:
 | Timestamp | When the check was performed |
 | Attester | Astral's TEE signing key |
 
-The regulator can verify each result independently — the Astral signature proves the computation was performed correctly inside the TEE, and the input references tie it to the specific corridor and position.
+The regulator can verify each result independently — the Astral signature proves the containment computation was performed correctly and the input references tie it to the specific corridor and reported position. What it does **not** prove on its own is that the drone was physically at that position: that depends on how the position was sourced (see the note above). A compliance story is only as strong as its weakest input.
 
 ## Variations
 

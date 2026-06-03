@@ -4,12 +4,12 @@ description: "Verifiable geospatial computation methods"
 ---
 
 <Warning>
-  **Research preview** — The SDK is under active development.
+  **Research Preview** — The SDK is under active development.
 </Warning>
 
 # Compute module
 
-The `ComputeModule` provides verifiable geospatial operations that run in a trusted execution environment. Each operation returns a signed delegated attestation that can be submitted to EAS.
+The `ComputeModule` provides geospatial operations designed to run in a trusted execution environment, so the computation can be verified independently. Each operation returns a signed result (a delegated attestation that can be submitted to EAS). Note that the TEE makes the *computation* verifiable, not the input locations truthful, and continuous attested operation is not yet funded — see the [trust model](/trust-model/what-you-are-trusting).
 
 ```typescript
 import { AstralSDK } from '@decentralized-geo/astral-sdk';

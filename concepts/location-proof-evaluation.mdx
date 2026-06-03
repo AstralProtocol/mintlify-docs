@@ -3,14 +3,14 @@ title: "Location Proof Evaluation"
 description: "How Astral assesses the credibility of a location proof"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Location Proof Evaluation
 
 When a [location proof](/concepts/location-proof-structure) is submitted for verification, Astral evaluates it through a three-phase process. The output is a **credibility vector** — a structured assessment describing how strongly the evidence supports the claim across multiple dimensions.
 
 <Info>
-  Why not a binary yes/no? Different applications value different properties — a logistics platform cares most about spatial precision, while a compliance system may prioritize source independence. The credibility vector provides a dense quantification of the evidence so applications can apply their own weighting.
+  Why not a binary yes/no? Different applications value different properties — a logistics platform cares most about spatial precision, while a compliance system may prioritize source independence. The credibility vector provides a structured, multidimensional quantification of the evidence so applications can apply their own weighting.
 </Info>
 
 ## The Three Evaluation Phases
@@ -44,7 +44,11 @@ The evaluator compares the observed evidence (from the location stamps) against 
 
 ## The Credibility Vector
 
-The output of evaluation is a credibility vector with four dimensions. Each dimension is a structured object containing multiple metrics — not a single score.
+<Warning>
+  **The structure of the credibility vector is an open research question.** The dimensions, metrics, and naming shown below are a working proposal under active development — not a finalized schema. Expect them to change. Treat the example below as illustrative, and don't hard-code dependencies on a fixed structure yet.
+</Warning>
+
+The output of evaluation is a credibility vector — currently modeled with four dimensions, each a structured object containing multiple metrics rather than a single score.
 
 | Dimension | What it measures | Example metrics |
 |-----------|-----------------|----------------|

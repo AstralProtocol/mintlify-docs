@@ -3,11 +3,11 @@ title: "Compute"
 description: "Geospatial operations inside the TEE — distance, containment, and more"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Compute
 
-The Compute endpoint runs geospatial operations on location data inside the [TEE](/concepts/astral-location-services) and returns [signed results](/concepts/signed-results). It answers spatial questions — how far apart are these locations? is this point inside that boundary? — with cryptographically verifiable answers.
+The Compute endpoint runs geospatial operations on location data inside the [TEE](/concepts/astral-location-services) and returns [signed results](/concepts/signed-results). It answers spatial questions — how far apart are these locations? is this point inside that boundary? — and signs the answer so the *computation* can be verified independently. (Whether the *input* locations are truthful is a separate question — see [accepted inputs](#accepted-inputs) below.)
 
 ## Accepted Inputs
 
@@ -17,7 +17,7 @@ The compute endpoint accepts location data at any level of the [verifiability sp
 |-----------|-----------|-----------------|
 | **Raw GeoJSON** | Unsigned geometry | Proves computation was correct; does not prove input provenance |
 | **Signed location record** | EAS attestation UID (onchain) or UID + URI (offchain) | Attribution + integrity + correct computation |
-| **Verified location proof** | UID of a verified location proof | Evidence of physical correspondence + correct computation |
+| **Verified location proof** | UID of a verified location proof | Evidence supporting physical correspondence (per the credibility vector) + correct computation |
 
 You can mix input types in a single operation. A geofencing check might use raw GeoJSON for the boundary (a publicly known polygon) and a verified location proof for the user's position.
 
@@ -62,7 +62,7 @@ This scaling ensures deterministic integer representation, which is important fo
 
 Every compute operation returns a [signed result](/concepts/signed-results) containing:
 - The computed answer (boolean or numeric)
-- References to the specific inputs used
+- References to the specific inputs used (note: in v0 the result may also carry the full input data in plaintext — see [Privacy](/concepts/privacy))
 - A timestamp
 - The operation name
 - A cryptographic signature from the TEE-held signing key

@@ -49,6 +49,10 @@ const { plugins } = await response.json();
 | `environments` | `string[]` | Runtime environments the plugin supports |
 | `description` | `string` | Human-readable description |
 
+<Note>
+  **ProofMode is working today** — the Verify service implements ProofMode stamp verification. The other plugins listed (`witnesschain`, `gpsd`, `geoclue`, `wifi-mls`, `ip-geolocation`) are **experimental**: their interfaces are defined and early verification logic exists, but they aren't production yet. We're keen to develop new proof-of-location plugins with partners — [get in touch](mailto:contact@astral.global). On the client side, the SDK bundles `MockPlugin` for development; ProofMode evidence comes from the ProofMode app.
+</Note>
+
 ## Example response
 
 ```json
@@ -64,13 +68,31 @@ const { plugins } = await response.json();
       "name": "witnesschain",
       "version": "0.1.0",
       "environments": ["server", "node"],
-      "description": "Infrastructure verification via network latency triangulation"
+      "description": "WitnessChain proof-of-location via network latency triangulation"
     },
     {
-      "name": "mock",
+      "name": "gpsd",
       "version": "0.1.0",
-      "environments": ["server", "node", "browser"],
-      "description": "Mock plugin for testing and development"
+      "environments": ["server", "node"],
+      "description": "GPS daemon (gpsd) location readings"
+    },
+    {
+      "name": "geoclue",
+      "version": "0.1.0",
+      "environments": ["server", "node"],
+      "description": "GeoClue geolocation service"
+    },
+    {
+      "name": "wifi-mls",
+      "version": "0.1.0",
+      "environments": ["server", "node"],
+      "description": "Wi-Fi positioning via Mozilla Location Service"
+    },
+    {
+      "name": "ip-geolocation",
+      "version": "0.1.0",
+      "environments": ["server", "node"],
+      "description": "IP-based geolocation lookup"
     }
   ]
 }
@@ -84,6 +106,6 @@ const { plugins } = await response.json();
 | `rate-limited` | 429 | Too many requests |
 | `unauthorized` | 401 | Invalid or missing API key |
 
-<Card title="SDK: Verify" icon="code" href="/sdk/verify">
+<Card title="SDK: Location proofs" icon="code" href="/sdk/location-proofs">
   See the SDK documentation for client-side usage
 </Card>

@@ -17,10 +17,12 @@ Build an escrow contract that releases payment only when the delivery is confirm
 
 ## Concept
 
-A trustless delivery system where:
+An evidence-based delivery system where:
 - Buyer locks payment in escrow
-- Delivery person proves they arrived at the destination
-- Escrow releases automatically on location verification
+- Delivery person submits a location check at the destination
+- Escrow releases when that check verifies against the destination
+
+(Not "trustless" — you're still trusting the location input and Astral's signer; see the note above. It removes the need to trust the *computation*, not the inputs.)
 
 ---
 

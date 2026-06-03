@@ -3,11 +3,15 @@ title: "Parametric Insurance"
 description: "Policies that trigger based on verified proximity"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Parametric insurance
 
-You're building crop insurance. When a qualifying weather event occurs within a certain distance of insured farmland, the policy pays out automatically. No claims process, no adjuster visits — just verified spatial computation.
+You're building crop insurance. When a qualifying weather event occurs within a certain distance of insured farmland, the policy pays out — without a manual claims process or an adjuster visit — once the spatial condition is verified.
+
+<Info>
+  Astral verifies the **distance computation** between the inputs you supply. It does not establish that a qualifying weather event actually occurred, or that the weather-station coordinates are truthful — those come from outside the system (an oracle, a data feed, a registered location). The signed result is one trustworthy link in the chain, not the whole chain. Design the event-reporting and location inputs with the same care, and be explicit with policyholders about what is verified and what is trusted. This is a Research Preview, not a production insurance product.
+</Info>
 
 ## How it works
 
@@ -62,14 +66,13 @@ async function checkPolicyTrigger(
 ) {
   const astral = new AstralSDK({ chainId: 84532, signer: wallet });
 
-  // Compute distance from weather event to farmland
-  const result = await astral.compute.distance({
-    from: weatherStationUID,
-    to: farmlandUID,
-    chainId: 84532,
-    schema: SCHEMA_UID,
-    recipient: INSURANCE_CONTRACT_ADDRESS
-  });
+  // Compute distance from weather event to farmland.
+  // Args are positional: (from, to, options). The numeric result is in meters.
+  const result = await astral.compute.distance(
+    weatherStationUID,
+    farmlandUID,
+    { schema: SCHEMA_UID, recipient: INSURANCE_CONTRACT_ADDRESS }
+  );
 
   const distanceKm = result.result / 1000;
 
@@ -78,10 +81,12 @@ async function checkPolicyTrigger(
   }
 
   // Submit signed result to trigger payout
-  const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
-  await tx.wait();
+  const { uid } = await astral.compute.submit({
+    attestation: result.attestation,
+    delegatedAttestation: result.delegatedAttestation,
+  });
 
-  return { triggered: true, distanceKm, txHash: tx.hash };
+  return { triggered: true, distanceKm, attestationUID: uid };
 }
 ```
 
@@ -211,7 +216,7 @@ Traditional crop insurance requires:
 - Waiting for an adjuster
 - Disputing coverage decisions
 
-Parametric insurance removes all of that. The spatial condition is defined upfront, the computation is verifiable, and the payout is automatic. The signed result is auditable proof that the trigger condition was met.
+Parametric insurance reduces much of that. The spatial condition is defined upfront, the distance computation is independently verifiable, and the payout can be automated against it. The signed result is auditable proof that the *spatial condition was computed correctly on the given inputs* — the remaining trust (that the event occurred, that the station data is honest) sits with whatever feeds those inputs.
 
 ## Variations
 

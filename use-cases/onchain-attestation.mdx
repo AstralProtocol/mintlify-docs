@@ -3,7 +3,7 @@ title: "Onchain Attestation"
 description: "End-to-end blockchain flow from computation to smart contract"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Onchain attestation
 
@@ -216,12 +216,10 @@ async function mintNFT(userCoords: [number, number], wallet: Signer) {
   }
 
   // Submit to EAS — triggers resolver, mints NFT
-  const tx = await astral.eas.submitDelegated(result.delegatedAttestation);
-  const receipt = await tx.wait();
+  const { uid } = await astral.compute.submit(result.delegatedAttestation);
 
   return {
-    transactionHash: tx.hash,
-    attestationUID: result.attestation.uid
+    attestationUID: uid
   };
 }
 ```

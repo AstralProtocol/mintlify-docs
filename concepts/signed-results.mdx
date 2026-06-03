@@ -3,21 +3,25 @@ title: "Signed Results"
 description: "Output formats from verification and computation — and how to use them"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Signed Results
 
-Both the [Verify](/concepts/verify) and [Compute](/concepts/compute) endpoints return signed results — cryptographically signed records of what was computed, what inputs were used, and what the answer was. The signature comes from the Astral signing key, held exclusively inside the [TEE](/concepts/astral-location-services).
+Both the [Verify](/concepts/verify) and [Compute](/concepts/compute) endpoints return signed results — cryptographically signed records of what was computed, what inputs were used, and what the answer was. The signature comes from the Astral signing key, held inside the [TEE](/concepts/astral-location-services).
 
 ## What a Signed Result Proves
 
-A signed result proves three things:
+Under attestation (see deployment status below), a signed result is intended to prove three things:
 
 1. **Correct execution** — The computation was performed by attested code inside the TEE
 2. **Specific inputs** — The result references the exact inputs that were used (via hashes or UIDs)
-3. **Authentic output** — The signing key that produced the signature cannot be extracted by the operator
+3. **Authentic output** — The signing key that produced the signature is held inside the TEE and, under attestation, cannot be extracted by the operator
 
 Any downstream consumer can verify these properties by checking the signature against the known Astral public key — without re-executing the computation or trusting an intermediary.
+
+<Warning>
+  **Deployment status.** Astral has run these services on real TEE hardware in test deployments but does not currently fund continuous attested operation. Today a valid signature proves a key Astral controls produced the result; binding it to an independently attested enclave (point 1 above) is target-state. See [What you are trusting](/trust-model/what-you-are-trusting).
+</Warning>
 
 ## Result Types
 
@@ -30,6 +34,10 @@ The signed result format depends on the operation:
 | **Verification** | Credibility | Credibility vector with dimensional scores |
 
 Each result also includes: input references (UIDs or hashes), a timestamp, the operation name, and the Astral signing key's signature.
+
+<Note>
+  In v0, signed results may also carry the full input data in plaintext (for example, the complete claim and stamps for a verification), not just hashed references. A privacy-preserving output mode that returns only the answer and hashed references is planned — see [Privacy](/concepts/privacy).
+</Note>
 
 ## Using Signed Results Offchain
 

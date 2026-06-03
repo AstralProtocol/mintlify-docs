@@ -61,48 +61,51 @@ graph LR
 Create a location proof, verify it, then check if the verified position is inside a geofence:
 
 ```typescript
-import { AstralSDK } from '@decentralized-geo/astral-sdk';
+import { AstralSDK, MockPlugin } from '@decentralized-geo/astral-sdk';
 
 const astral = new AstralSDK({
   chainId: 84532,
+  signer: wallet,
   apiUrl: 'https://staging-api.astral.global'
 });
 
-// 1. Collect signals from a proof-of-location plugin on the device
-const signals = await astral.stamps.collect({
-  name: 'proofmode', version: '0.1.0'
-});
+// 1. Register a proof-of-location plugin. The SDK ships MockPlugin for local
+//    development; real device evidence comes from sources like the ProofMode app.
+astral.plugins.register(new MockPlugin({ name: 'mock-1', lat: 37.7749, lon: -122.4194 }));
 
-// 2. Create and sign a stamp from the raw signals
-const unsigned = await astral.stamps.create(
-  { name: 'proofmode', version: '0.1.0' }, signals
-);
-const stamp = await astral.stamps.sign(unsigned, deviceSigner);
+// 2. Collect signals, then create and sign a stamp
+const signals = await astral.stamps.collect({ plugins: ['mock-1'] });
+const unsigned = await astral.stamps.create({ plugin: 'mock-1' }, signals[0]);
+const stamp = await astral.stamps.sign({ plugin: 'mock-1' }, unsigned, deviceSigner);
 
 // 3. Compose a location proof: a claim ("I was here") bundled with evidence
 const claim = {
+  lpVersion: '0.2',
+  locationType: 'geojson-point',
   location: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+  srs: 'http://www.opengis.net/def/crs/OGC/1.3/CRS84',
   subject: { scheme: 'eth-address', value: '0x1234...' },
   radius: 100,
   time: { start: Date.now() / 1000 - 60, end: Date.now() / 1000 },
-  // lpVersion, locationType, srs — Location Protocol v0.2 defaults
-}
+};
 const proof = astral.proofs.create(
   claim,
   [stamp] // multi-stamp location proofs are supported, and more secure
 );
 
-// 4. Verify — the TEE evaluates the stamp's signatures, structure,
-//    and consistency with the claim
-const verified = await astral.verify.proof(proof, { chainId: 84532 });
-console.log(`Credibility: ${verified.credibility.confidence}`);
+// 4. Verify against the hosted service. The result includes a credibility
+//    vector — multidimensional, not a single score.
+const verified = await astral.proofs.verify(proof, { mode: 'tee', chainId: 84532 });
+console.log(verified.credibility);          // CredibilityVector — you decide how to weight it
+const locationUID = verified.attestation.uid;
 
-// 5. Compute — use the verified location in a spatial operation
-const inside = await astral.compute.contains({
-  container: geofencePolygon,
-  geometry: verified.uid,
-  chainId: 84532
-});
+// 5. Compute — use the verified location in a spatial operation.
+//    Compute arguments are positional; options carry the EAS schema UID.
+const inside = await astral.compute.contains(
+  geofencePolygon,   // container
+  locationUID,       // containee
+  { schema: SCHEMA_UID }
+);
 console.log(`Inside geofence: ${inside.result}`);
 ```
 
@@ -123,13 +126,16 @@ await db.insert({ delivery_id, proof: inside });
 Or submit it onchain to trigger smart contract logic:
 
 ```typescript
-// Submit as an EAS attestation — triggers your resolver contract
-await astral.eas.submitDelegated(inside.delegatedAttestation);
+// Submit onchain via EAS — triggers your resolver contract
+await astral.compute.submit({
+  attestation: inside.attestation,
+  delegatedAttestation: inside.delegatedAttestation,
+});
 ```
 
 ## What You Can Build
 
-Verified location data and verifiable spatial computation unlock applications that were previously impossible or required blind trust:
+Verified location data and verifiable spatial computation support applications that have, until now, depended on blind trust in self-reported location:
 
 <CardGroup cols={2}>
   <Card title="Delivery Verification" icon="truck">

@@ -39,7 +39,15 @@ curl -X POST https://staging-api.astral.global/compute/v0/distance \
   }'
 ```
 
+<Note>
+  `chainId` only tells the service which EAS chain to format the delegated attestation for, so the result *could* be submitted onchain later. Nothing here touches a blockchain unless you choose to submit the result yourself — the call above just returns a signed result.
+</Note>
+
 ## Verifying signatures
+
+<Warning>
+  **What a matching signature proves.** Checking the attester address proves the result was signed by a key Astral controls. It does **not**, on its own, prove the result was produced inside an independently attested TEE enclave: Astral has run the service on real TEE hardware in test deployments but does not currently fund continuous attested operation. Treat the staging signer as "Astral's staging key," not as a hardware-attestation guarantee. To evaluate against real TEEs, reach out at [contact@astral.global](mailto:contact@astral.global).
+</Warning>
 
 All attestations from the staging service are signed by the attester address above. To verify a result came from Astral's staging environment:
 

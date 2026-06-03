@@ -3,13 +3,15 @@ title: "Proof-of-Location Systems"
 description: "Strategies and technologies for producing location evidence"
 ---
 
-<Note>**Research preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
+<Note>**Research Preview** — APIs may change. [GitHub](https://github.com/AstralProtocol)</Note>
 
 # Proof-of-Location Systems
 
 A proof-of-location system is any system that produces evidence about physical location. These systems are the foundation of location proofs — each [location stamp](/concepts/location-stamps) comes from a proof-of-location system, wrapped in a [location proof plugin](/concepts/location-proof-structure#location-proof-plugins).
 
-// callout: Location verification is ubiquitous online, but it is usually ad hoc or unverifiable. Things ranging from GeoIP lookups, scanning a QR code, inputting a passphrase, checking in with an event host, even submitting a bank statement as proof-of-address... the Location Proof Framework is intended to make these different techniques more transparent and legible ... 
+<Info>
+  Location verification is already everywhere online, but it's usually ad hoc and hard to check: GeoIP lookups, scanning a QR code, entering a passphrase, checking in with an event host, even submitting a bank statement as proof of address. The Location Proof framework is an attempt to make these techniques more transparent and legible — not to replace them.
+</Info>
 
 ## Categories of proof-of-location systems
 
@@ -23,7 +25,7 @@ Proof-of-location systems span a wide range of approaches, from hardware-based m
 | **Delegated** | Trusted third party attests to location | Notarized presence, institutional witness | Leverages existing trust relationships | Only as trustworthy as the delegate |
 | **Social** | Peer confirmations of co-location | Mutual attestation, group check-in | Distributed trust; no infrastructure needed | Collusion risk |
 | **Authority-based** | Authorized entity confirms location | Government agency, licensed surveyor | High institutional trust | Centralized; requires authority access |
-| **Legal** | Location established through legal process | Court records, notarized documents, affadavits | Strong evidentiary weight, legal liability of fraud | Slow; expensive; not real-time |
+| **Legal** | Location established through legal process | Court records, notarized documents, affidavits | Strong evidentiary weight, legal liability of fraud | Slow; expensive; not real-time |
 
 ## Current state of the field
 
@@ -35,20 +37,22 @@ That said, significant value comes from "softer" proof-of-location systems too. 
 
 ## Available plugins
 
-v0 of the Astral Protocol is launching with limited support for  these proof-of-location systems through [location proof plugins](/plugins/overview):
+v0 of Astral connects to proof-of-location systems through [location proof plugins](/plugins/overview). **ProofMode is working today** — its stamps can be verified end to end. The other plugins are experimental, with interfaces defined and early verification logic in place. The two highlighted below are the documented examples:
 
 <CardGroup cols={2}>
-  <Card title="ProofMode" icon="mobile" href="/plugins/proofmode">
-    Device attestation + sensor fusion. Uses iOS Secure Enclave and Android hardware keystore to attest to device sensor readings (GPS, Wi-Fi, cellular, magnetometer). Trust comes from device hardware integrity.
+  <Card title="ProofMode — implemented" icon="mobile" href="/plugins/proofmode">
+    Device attestation + sensor fusion. Uses iOS Secure Enclave and Android hardware keystore to attest to device sensor readings (GPS, Wi-Fi, cellular, magnetometer). Trust derives from device hardware integrity. This is the one proof-of-location plugin available today (alpha).
   </Card>
-  <Card title="WitnessChain" icon="server" href="/plugins/witnesschain">
-    Infrastructure verification. Uses UDP latency triangulation across a distributed challenger network. Trust comes from the speed of light — you can't fake being close to multiple geographically distributed nodes simultaneously.
+  <Card title="WitnessChain — experimental" icon="server" href="/plugins/witnesschain">
+    Infrastructure verification. The design uses UDP latency triangulation across a distributed challenger network, where trust derives from the speed of light — you can't fake being close to many geographically distributed nodes at once. The interface is defined and an experimental server-side verification logic exists; it's not production yet.
   </Card>
 </CardGroup>
 
-The [Mock plugin](/plugins/mock) is available for development and testing.
+The Verify service also includes experimental stamp-verification logic for `gpsd`, `geoclue`, `wifi-mls`, and `ip-geolocation`. The [Mock plugin](/plugins/mock) is available for development and testing on the client.
 
-We are actively [researching](https://github.com/location-proofs/research) many more location proofs plugins, and invite collaboration here. 
+<Info>
+  ProofMode is working today; the others are experimental, with interfaces defined and early verification logic in place. We're actively interested in developing new proof-of-location plugins with partners — if you work on a proof-of-location system, [get in touch](mailto:contact@astral.global).
+</Info>
 
 ## Building new plugins
 
