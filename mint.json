@@ -9,6 +9,10 @@
     {
       "source": "/sdk/verify",
       "destination": "/sdk/stamps"
+    },
+    {
+      "source": "/resources/security",
+      "destination": "/trust-model/security"
     }
   ],
   "logo": {
