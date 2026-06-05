@@ -69,6 +69,20 @@ Every compute operation returns a [signed result](/concepts/signed-results) cont
 
 The signed result can be used offchain (in an agent, application, or database) or submitted onchain via EAS delegated attestation. EAS resolvers allow those attestations to trigger smart contract logic.
 
+## Zones and policy evaluation
+
+A predicate operation — `contains`, `within`, `intersects` — is a policy decision. "Is this verified position inside the permitted zone?" is at once a spatial question and a rule, and the boolean answer is the verdict. Astral evaluates the rule inside the TEE and signs the verdict; the application — or a resolver contract — decides what the verdict triggers.
+
+### Zones as reusable, verifiable references
+
+The boundary in a policy check doesn't have to travel with every request. Because any input can be a [signed location record](#accepted-inputs) — an EAS attestation UID — you can register a zone once as a [Location attestation](/resources/schemas#location-attestation-schema) and reference it by UID thereafter. Astral fetches the stored geometry into the TEE at evaluation time.
+
+That gives you a reusable registry of zones — permitted corridors, jurisdictional boundaries, geofences — without a bespoke registry service. The boundary's provenance and integrity come from its attestation, and every evaluation references the exact same geometry by UID, so a policy decision is reproducible and auditable: anyone can confirm *which* zone was checked.
+
+### From verdict to action
+
+Submitted onchain, a [Policy Attestation](/concepts/signed-results) carrying a `true`/`false` verdict can drive an [EAS resolver](/concepts/signed-results#using-signed-results-onchain) — releasing escrow, granting access, gating a mint to inside a boundary. The spatial rule is evaluated offchain in the TEE; only the signed verdict and the on-chain action it triggers touch the chain.
+
 ## What's Next
 
 The current operation set covers the most common spatial questions, but PostGIS exposes a much larger surface. Areas we're exploring:
