@@ -49,6 +49,8 @@ The output is a **credibility vector**: structured scores quantifying how well t
 
 Run geospatial operations — distance, containment, intersection, area, length — on location data inside the Astral TEE. The compute endpoints accept raw GeoJSON, signed location records, or verified location proofs as inputs. [PostGIS](https://postgis.net/) (backed by the [GEOS](https://libgeos.org/) library, the same computational geometry engine used by QGIS and other open-source geospatial tools) performs the computation; the TEE signs the result.
 
+A predicate operation is also a **policy decision**: "is this verified position inside the permitted zone?" is a rule, and the signed boolean is the verdict. Zones can be passed inline or referenced by EAS UID — a reusable, verifiable registry of boundaries — and the verdict can drive an on-chain resolver. See [zones and policy evaluation](/concepts/compute#zones-and-policy-evaluation).
+
 <Tip>
   **Why this step matters:** Verifiable spatial answers. The signed result proves not just "what was the answer" but "the answer was computed correctly by trusted code on these specific inputs."
 </Tip>
