@@ -42,7 +42,7 @@ Together, under attestation: the code is attested, signed inputs are verified, t
 ## Privacy Properties
 
 <Warning>
-  **No TEE or input encryption is live today.** The hosted service receives plaintext over HTTPS and processes it in an ordinary process; there is no client-to-enclave encryption in the design. The isolation described here is a property of a future attested deployment, not the current service. See [Privacy](/concepts/privacy) for the full picture.
+  **The current hosted service does not run in a TEE; nothing in the request path is encrypted.** It receives plaintext over HTTPS and processes it in an ordinary process, and there is no client-to-enclave encryption in the design. Astral has run the service on real TEE hardware in test deployments (which would provide the process isolation described here), but does not operate one continuously. See [Privacy](/concepts/privacy) and the [trust model](/trust-model/what-you-are-trusting) for the full picture.
 </Warning>
 
 Running the service inside an attested enclave would keep the *host operator* from inspecting the running process's memory — so raw input coordinates, exact geometries, and stamp signals would live only in enclave memory during computation. That is the privacy property a TEE provides, and it's narrow: it would **not** encrypt inputs end-to-end, and it would **not** stop the service from returning inputs in the result. True input and output privacy needs the affordances described in [Privacy](/concepts/privacy#privacy-modes-were-designing), not the TEE alone.
