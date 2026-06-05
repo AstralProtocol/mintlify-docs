@@ -7,23 +7,19 @@ description: "Privacy properties of verification and computation"
 
 # Privacy
 
-Privacy is a core design goal for Astral — but much of it is ahead of us, not behind us. Today, a [TEE](/concepts/astral-location-services) running under attestation keeps input data from the *operator* during computation. It does **not** yet make inputs or outputs private from whoever receives a result — signed results can still carry their inputs in plaintext (see below). Private inputs and private/shielded outputs are affordances we're actively designing; zero-knowledge approaches are a research direction. This page describes what holds today and where we're headed. (The properties that depend on the TEE assume the enclave runs under continuous remote attestation — see the [trust model](/trust-model/what-you-are-trusting) for current deployment status.)
+Privacy is a core design goal for Astral — but almost all of it is ahead of us, not behind us. The current hosted service does **not** run in a TEE and does **no** input encryption: it receives inputs as plaintext, and signed results can carry those inputs back in plaintext (see below). So Astral does not provide input or output privacy today. (Astral *has* run the service on real TEE hardware in test deployments — which isolates process memory from the host operator — but does not operate one continuously, and a TEE on its own would not add the privacy affordances below.) Private inputs and private/shielded outputs are on our **near-term development roadmap**; continuous attested operation and zero-knowledge approaches are the directions we're pursuing. See the [trust model](/trust-model/what-you-are-trusting) for current deployment status.
 
-## TEE Privacy Guarantees
+## What the TEE does and doesn't protect
 
-When running under attestation, the Trusted Execution Environment processes location data inside hardware-isolated memory that the operator is not able to inspect:
+<Warning>
+  **The current hosted service does not run in a TEE, and nothing in the request path is encrypted.** It receives plaintext JSON over HTTPS, computes in an ordinary process (and PostGIS), and — for proof inputs — echoes inputs back in the response. Astral has run the service on real TEE hardware in test deployments (which would provide the process isolation below), but does not operate one continuously. See the [trust model](/trust-model/what-you-are-trusting).
+</Warning>
 
-**What stays private:**
-- Raw input coordinates — the exact lat/lng values submitted
-- Exact geometries — polygon boundaries, line paths, and other spatial data used in computation
-- Location stamp signals — the raw evidence data from proof-of-location systems
+A TEE provides one specific thing: **process isolation**. Running the service inside an attested enclave would stop the *host operator* from inspecting the running process's memory. That's real, but narrow — on its own it would **not** encrypt your inputs end-to-end (there is no client-to-enclave encryption in the design; inputs arrive as plaintext), stop the service from returning your inputs in the response, or hide the reference geometry and evaluation function. Those need the privacy affordances we're [designing](#privacy-modes-were-designing), not just a TEE.
 
-These values exist only inside the TEE during computation and are discarded after the result is signed.
+**What an attested deployment is *intended* to keep from the host operator** (a goal, not a guarantee today): raw input coordinates, exact geometries, and location stamp signals would live only in enclave memory during computation.
 
-**What is visible:**
-- The signed result — a boolean, numeric value, or credibility vector
-- The operation type — which computation was performed
-- Input references — hashes of the inputs, not the raw data itself
+**What the service returns today:** the signed result (a boolean, numeric value, or credibility vector), the operation type, and input references (`inputRefs` — hashes or UIDs). The service is stateless and does not persist or log raw inputs — but "not persisted" is not the same as "private."
 
 However, in v0 the signed results **do include input data in plaintext**. Compute results can carry the full location claim and credibility vector via `proofInputs`, and verified location proofs include the original proof with all stamps and claim data. This means anyone who receives a signed result can see the raw location inputs.
 
@@ -33,7 +29,7 @@ However, in v0 the signed results **do include input data in plaintext**. Comput
 
 ## Privacy modes we're designing
 
-To be clear: Astral does not offer private inputs or private outputs as features today. These are the affordances we're scoping — the design feels feasible on this architecture, and we'd welcome input from anyone who needs them:
+To be clear: Astral does not offer private inputs or private outputs as features today. They're on our **near-term development roadmap** — the design feels feasible on this architecture, and we'd welcome input from anyone who needs them:
 
 - **Private input coordinates** — encrypted lat/lng, decrypted only inside the enclave and never echoed in the result.
 - **Private reference geometries** — keep the comparison geometry (a geofence or boundary) hidden, so a `contains`/`within` check doesn't reveal it.
@@ -65,13 +61,14 @@ This isn't a hack — it's a principled privacy-preserving approach. If the appl
 
 Zero-knowledge proofs would allow verification of location claims without revealing the underlying location data to anyone — including the verifier. A ZK location proof could prove "I was inside this boundary" without revealing where inside the boundary, or even what the boundary was.
 
-| Property | TEE (today) | ZK (future) |
+| Property | TEE (attested deployment) | ZK (future) |
 |----------|------------|-------------|
-| Raw inputs hidden from operator | Yes (under attestation) | Yes |
+| Raw inputs hidden from host operator | Only under a real attested deployment — **not live today** | Yes |
 | Raw inputs hidden from verifier | No | Yes |
+| Inputs encrypted client-to-enclave | No (not in the design) | Yes |
 | No trusted hardware required | No | Yes |
 | Verification without re-execution | No | Yes |
-| Maturity | Research Preview (test TEE deployments) | Not yet — active research |
+| Maturity | Not live — demonstrated in test deployments only | Not yet — active research |
 
 The hard part isn't only the geometry. ZK *computational geometry* circuits — polygon containment, distance — are expensive but tractable; [zkMaps](https://github.com/zkMaps/zkMaps), a project Astral has supported, has done some benchmarking here. But ZK geometry on its own isn't very useful: a location proof's value comes from *evaluating evidence*, not from computing a bare predicate. The frontier we care about is **ZK evaluation functions combined with ZK computational geometry** — proving privately that a credible body of evidence supports a claim. That's research, not a current capability.
 
