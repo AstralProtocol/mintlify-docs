@@ -41,14 +41,14 @@ Together, under attestation: the code is attested, signed inputs are verified, t
 
 ## Privacy Properties
 
-Under attestation, the TEE provides meaningful privacy properties. Inputs and outputs are encrypted in transit and decrypted only inside the enclave, so the infrastructure operator does not see raw location data:
+<Warning>
+  **No TEE or input encryption is live today.** The hosted service receives plaintext over HTTPS and processes it in an ordinary process; there is no client-to-enclave encryption in the design. The isolation described here is a property of a future attested deployment, not the current service. See [Privacy](/concepts/privacy) for the full picture.
+</Warning>
 
-- **Raw input coordinates** are processed inside the enclave and not exposed to the operator
-- **Exact geometries** (polygon boundaries, line paths) exist only during computation and are discarded after signing
-- **The operator** — whoever runs the Astral service — does not access the plaintext data inside an attested enclave
+Running the service inside an attested enclave would keep the *host operator* from inspecting the running process's memory — so raw input coordinates, exact geometries, and stamp signals would live only in enclave memory during computation. That is the privacy property a TEE provides, and it's narrow: it would **not** encrypt inputs end-to-end, and it would **not** stop the service from returning inputs in the result. True input and output privacy needs the affordances described in [Privacy](/concepts/privacy#privacy-modes-were-designing), not the TEE alone.
 
 <Warning>
-  **v0 caveat.** Today, signed results may still include input data in plaintext (the full claim, stamps, and credibility vector travel with the result), so anyone who *receives* a result can read those inputs even though the operator does not. A privacy-preserving output mode is planned. See [Privacy](/concepts/privacy) for the full picture.
+  **v0 caveat.** Today, signed results may still include input data in plaintext (the full claim, stamps, and credibility vector travel with the result), so anyone who *receives* a result can read those inputs. A privacy-preserving output mode is planned. See [Privacy](/concepts/privacy) for the full picture.
 </Warning>
 
 Some information also leaks from the result itself (a `contains` answer of `true` tells you the point is inside the polygon), but that is inherent to the computation, not a limitation of the privacy model.
