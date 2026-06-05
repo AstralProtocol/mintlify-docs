@@ -9,6 +9,10 @@ description: "Output formats from verification and computation — and how to us
 
 Both the [Verify](/concepts/verify) and [Compute](/concepts/compute) endpoints return signed results — cryptographically signed records of what was computed, what inputs were used, and what the answer was. The signature comes from the Astral signing key, held inside the [TEE](/concepts/astral-location-services).
 
+<Info>
+  **"Signed result" and "Policy Attestation" are the same artifact.** "Signed result" is the conceptual name used throughout these docs; **Policy Attestation** is its concrete encoded form — the [EAS schema](/resources/schemas#policy-attestation-schemas) the result is serialized into (`BooleanPolicyAttestation` for predicates, `NumericPolicyAttestation` for measurements). A signed result submitted to EAS *is* a Policy Attestation. The SDK, the schemas reference, and the API use "Policy Attestation" for the on-chain object; the concept pages say "signed result" for the same thing.
+</Info>
+
 ## What a Signed Result Proves
 
 Under attestation (see deployment status below), a signed result is intended to prove three things:
