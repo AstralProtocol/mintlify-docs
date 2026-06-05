@@ -9,6 +9,10 @@
     {
       "source": "/sdk/verify",
       "destination": "/sdk/stamps"
+    },
+    {
+      "source": "/resources/security",
+      "destination": "/trust-model/security"
     }
   ],
   "logo": {
@@ -106,6 +110,28 @@
       ]
     },
     {
+      "group": "Guides",
+      "pages": [
+        "guides/local-development",
+        "guides/calling-the-api",
+        "guides/verifying-location-proofs",
+        "guides/agent-integration",
+        "guides/blockchain-integration",
+        "guides/building-plugins"
+      ]
+    },
+    {
+      "group": "Use Cases",
+      "pages": [
+        "use-cases/delivery-verification",
+        "use-cases/parametric-insurance",
+        "use-cases/geofence-compliance",
+        "use-cases/onchain-attestation",
+        "guides/geofenced-token",
+        "guides/location-gated-nft"
+      ]
+    },
+    {
       "group": "API Reference",
       "pages": [
         "api-reference/overview",
@@ -159,7 +185,17 @@
     {
       "group": "Integrations",
       "pages": [
-        "integrations/erc-8004"
+        "integrations/erc-8004",
+        "integrations/openclaw"
+      ]
+    },
+    {
+      "group": "Trust Model",
+      "pages": [
+        "trust-model/architecture",
+        "trust-model/what-is-verified",
+        "trust-model/what-you-are-trusting",
+        "trust-model/security"
       ]
     },
     {
@@ -169,6 +205,7 @@
         "resources/staging",
         "resources/schemas",
         "resources/research",
+        "resources/roadmap",
         "resources/faq",
         "resources/changelog"
       ]
