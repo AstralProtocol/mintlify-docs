@@ -1,0 +1,413 @@
+---
+title: "EigenCompute TEE Deployment"
+description: "Deploy the Astral Compute Service to EigenCompute's Trusted Execution Environment for verifiable geospatial computation"
+icon: "shield-check"
+---
+
+<Info>
+  EigenCompute is currently in **Mainnet Alpha**. Visit [eigencloud.xyz](https://eigencloud.xyz) for access and status.
+</Info>
+
+## Overview
+
+The Astral Compute Service runs on [EigenCompute](https://eigencloud.xyz), providing hardware-attested, verifiable geospatial computation on **Intel TDX** hardware. This guide walks through the full deployment process.
+
+| Resource | Link |
+|----------|------|
+| EigenCompute Platform | [eigencloud.xyz](https://eigencloud.xyz) |
+| EigenCompute Docs | [docs.eigencloud.xyz](https://docs.eigencloud.xyz) |
+| Verifiability Dashboard | [verify.eigencloud.xyz](https://verify.eigencloud.xyz) |
+
+## Prerequisites
+
+<CardGroup cols={2}>
+  <Card title="Docker" icon="docker">
+    Required for building and testing the container image locally.
+  </Card>
+  <Card title="Node.js 20+" icon="node-js">
+    For building the TypeScript service and the `ecloud` CLI.
+  </Card>
+  <Card title="Ethereum Wallet" icon="wallet">
+    Testnet ETH (Holesky) for billing, or mainnet ETH for production.
+  </Card>
+  <Card title="Signer Key" icon="key">
+    An Ethereum private key for signing Policy Attestations.
+  </Card>
+</CardGroup>
+
+## Install and Authenticate the ecloud CLI
+
+<Steps>
+  <Step title="Install the CLI">
+    ```bash
+    npm install -g @layr-labs/ecloud-cli
+    ```
+
+    Verify installation:
+    ```bash
+    ecloud version
+    ```
+  </Step>
+
+  <Step title="Authenticate">
+    EigenCompute uses Ethereum private key authentication.
+
+    **Option A** — Login with an existing key:
+    ```bash
+    ecloud auth login
+    ```
+
+    **Option B** — Generate a new key:
+    ```bash
+    ecloud auth generate --store
+    ```
+
+    Confirm:
+    ```bash
+    ecloud auth whoami
+    ```
+  </Step>
+
+  <Step title="Subscribe to billing">
+    ```bash
+    ecloud billing subscribe
+    ```
+
+    Your wallet needs sufficient ETH (Holesky for testnet, mainnet for production).
+  </Step>
+</Steps>
+
+## Docker Image Preparation
+
+The compute service bundles **Node.js API + PostgreSQL + PostGIS** in a single container for TEE isolation.
+
+```
+┌──────────────────────────────────────────┐
+│       EigenCompute TEE (Intel TDX)       │
+│  ┌────────────────────────────────────┐  │
+│  │  Node.js API (TypeScript)         │  │
+│  │  ↕                                │  │
+│  │  PostgreSQL 15 + PostGIS 3.3      │  │
+│  │  (ephemeral, TEE-optimized)       │  │
+│  └────────────────────────────────────┘  │
+└──────────────────────────────────────────┘
+```
+
+### Build the image
+
+<CodeGroup>
+```bash Native (linux/amd64)
+docker build -f packages/astral-service/Dockerfile -t astral-compute .
+```
+
+```bash Apple Silicon (cross-compile)
+docker buildx build \
+  --platform linux/amd64 \
+  -f packages/astral-service/Dockerfile \
+  -t astral-compute .
+```
+</CodeGroup>
+
+<Warning>
+  Build context must be the repo root (`.`) — the Dockerfile references root workspace files.
+  EigenCompute runs on **linux/amd64** (Intel TDX). Always target this platform.
+</Warning>
+
+### Test locally
+
+```bash
+docker run --rm -it \
+  -p 3000:3000 \
+  -e SIGNER_PRIVATE_KEY="<test-private-key>" \
+  -e CHAIN_ID=84532 \
+  astral-compute
+```
+
+Wait ~30 seconds for PostGIS to initialize, then:
+
+```bash
+curl http://localhost:3000/health
+```
+
+```json
+{
+  "status": "healthy",
+  "version": "1.0.0",
+  "database": "connected",
+  "signer": "configured"
+}
+```
+
+## Environment Variables
+
+EigenCompute uses a `.env` file for both config and secrets. Contents are encrypted inside the TEE.
+
+<Note>
+  Variables with a `_PUBLIC` suffix are visible on the [Verifiability Dashboard](https://verify.eigencloud.xyz).
+  Variables without it are encrypted and only accessible inside the TEE.
+</Note>
+
+Create a `.env` file in your project root (**do not commit to git**):
+
+```bash .env
+# Required
+SIGNER_PRIVATE_KEY=<production-ethereum-private-key>
+CHAIN_ID_PUBLIC=84532
+NODE_ENV_PUBLIC=production
+
+# Optional
+PORT=3000
+EAS_CONTRACT_ADDRESS_PUBLIC=0x4200000000000000000000000000000000000021
+ALLOWED_ORIGINS=https://astral.global,https://app.astral.global
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SIGNER_PRIVATE_KEY` | Yes | Ethereum key for signing Policy Attestations. Keep private. |
+| `CHAIN_ID_PUBLIC` | Yes | Target chain (`84532` = Base Sepolia, `8453` = Base Mainnet). |
+| `NODE_ENV_PUBLIC` | Yes | Must be `production`. |
+| `PORT` | No | API port (default `3000`). Must match Dockerfile `EXPOSE`. |
+| `EAS_CONTRACT_ADDRESS_PUBLIC` | No | EAS contract address on target chain. |
+| `ALLOWED_ORIGINS` | No | CORS origins (comma-separated). |
+
+<Info>
+  `DATABASE_URL` is **not** needed — the database runs inside the container at
+  `postgresql://astral:astral@localhost:5432/astral`.
+</Info>
+
+### Auto-generated TEE wallet
+
+EigenCompute generates a `MNEMONIC` for each app via its KMS, giving the TEE instance its own Ethereum wallet. This is separate from your `SIGNER_PRIVATE_KEY`.
+
+## Deploy
+
+<Steps>
+  <Step title="Run the deploy command">
+    ```bash
+    ecloud compute app deploy
+    ```
+
+    The CLI will prompt you for:
+    - **Deployment method:** Select `Build and deploy from Dockerfile`
+    - **Dockerfile path:** `packages/astral-service/Dockerfile`
+    - **App name:** `astral-compute`
+    - **Instance type:** `g1-standard-4t` (recommended)
+    - **Verifiable:** `yes`
+  </Step>
+
+  <Step title="Verify deployment">
+    ```bash
+    ecloud compute app info
+    ```
+
+    Wait for status `RUNNING`, then test the endpoint:
+
+    ```bash
+    curl -f https://<app-name>.eigencloud.xyz/health
+    ```
+  </Step>
+</Steps>
+
+### Instance types
+
+| Instance | vCPU | RAM | Use Case |
+|----------|------|-----|----------|
+| `g1-standard-4t` | 4 | 16 GB | Standard workloads (recommended) |
+| `g1-standard-8t` | 8 | 32 GB | Heavy polygon operations, large GeoJSON |
+
+### Scripted deployment (CI/CD)
+
+```bash
+ecloud compute app deploy \
+  --name astral-compute \
+  --dockerfile packages/astral-service/Dockerfile \
+  --instance-type g1-standard-4t \
+  --verifiable
+```
+
+## TLS and Custom Domain
+
+EigenCompute provides automatic HTTPS via **Caddy + Let's Encrypt** inside the TEE.
+
+<Steps>
+  <Step title="Enable TLS">
+    ```bash
+    ecloud compute app configure tls
+    ```
+  </Step>
+
+  <Step title="Add TLS env vars to .env">
+    ```bash
+    DOMAIN=api.astral.global
+    APP_PORT=3000
+    ACME_STAGING=true    # Use staging certs first
+    ```
+
+    Once verified, switch to production:
+    ```bash
+    ACME_STAGING=false
+    ACME_FORCE_ISSUE=true
+    ```
+  </Step>
+
+  <Step title="Configure DNS">
+    Point your domain to the EigenCompute endpoint:
+
+    | Field | Value |
+    |-------|-------|
+    | Type | `CNAME` |
+    | Name | `api` |
+    | Target | `<app-name>.eigencloud.xyz` |
+    | Proxy | **OFF** (DNS only, gray cloud) |
+  </Step>
+</Steps>
+
+<Warning>
+  Cloudflare proxy must be **OFF** (DNS only). Proxying breaks Let's Encrypt validation and may disrupt TEE attestation verification.
+</Warning>
+
+## TEE Attestation Verification
+
+EigenCompute runs on **Intel TDX** hardware. Every deployment creates an onchain record for third-party verification.
+
+### What attestation proves
+
+1. **Code integrity** — the exact Docker image (by digest) running in the TEE
+2. **Execution isolation** — computation runs in an Intel TDX trust domain
+3. **Data confidentiality** — secrets are sealed inside the TEE
+
+### Verifiability Dashboard
+
+<CardGroup cols={2}>
+  <Card title="Mainnet" icon="globe" href="https://verify.eigencloud.xyz">
+    verify.eigencloud.xyz
+  </Card>
+  <Card title="Testnet (Sepolia)" icon="flask" href="https://verify-sepolia.eigencloud.xyz">
+    verify-sepolia.eigencloud.xyz
+  </Card>
+</CardGroup>
+
+The dashboard shows the Docker image digest, onchain deployment record, public environment variables, and Intel TDX measurement report.
+
+### Match your build to the deployment
+
+```bash
+# Local image digest
+docker inspect --format='{{index .RepoDigests 0}}' astral-compute
+
+# Deployed digest
+ecloud compute app info
+```
+
+Both digests must match — proving the TEE runs your exact, unmodified code.
+
+### Why this matters
+
+TEE attestation makes Astral's geospatial computations **verifiable**. When the service creates a Policy Attestation (via EAS) that "point X is inside polygon Y", anyone can verify the computation ran inside a genuine Intel TDX enclave with untampered code.
+
+## Monitoring and Logs
+
+```bash
+# View logs
+ecloud compute app logs astral-compute
+
+# App status and URL
+ecloud compute app info
+
+# List all apps
+ecloud compute app list
+
+# Release history
+ecloud compute app releases
+```
+
+## Upgrading
+
+After code changes, rebuild and upgrade the running app:
+
+```bash
+# Build new image
+docker buildx build --platform linux/amd64 \
+  -f packages/astral-service/Dockerfile \
+  -t astral-compute .
+
+# Upgrade
+ecloud compute app upgrade astral-compute
+```
+
+### Other management commands
+
+```bash
+ecloud compute app stop astral-compute      # Stop (preserves config)
+ecloud compute app start astral-compute     # Restart
+ecloud compute app terminate astral-compute # Permanently remove
+ecloud upgrade                              # Upgrade the CLI itself
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Container fails to start">
+    ```bash
+    ecloud compute app logs astral-compute
+    ```
+
+    | Cause | Fix |
+    |-------|-----|
+    | PostgreSQL fails to init | Use `g1-standard-4t` (16 GB) or larger. |
+    | Port not detected | Ensure `EXPOSE 3000` is in the Dockerfile. |
+    | Missing env vars | Check `.env` has `SIGNER_PRIVATE_KEY` and `CHAIN_ID_PUBLIC`. |
+    | Architecture mismatch | Build for `linux/amd64` with `docker buildx`. |
+    | Binds to localhost only | App must bind to `0.0.0.0`, not `127.0.0.1`. |
+  </Accordion>
+
+  <Accordion title="Health check failing">
+    - **PostGIS initializing** — startup takes ~30–60s. The Dockerfile `HEALTHCHECK` has a 60s start period.
+    - **PostGIS extension error** — check logs for `CREATE EXTENSION IF NOT EXISTS postgis` failures.
+    - **Database connection refused** — `DATABASE_URL` must be `postgresql://astral:astral@localhost:5432/astral` (in-container).
+  </Accordion>
+
+  <Accordion title="TLS certificate issues">
+    | Issue | Fix |
+    |-------|-----|
+    | Let's Encrypt validation fails | Turn off Cloudflare proxy (DNS only). |
+    | Rate limited | Use `ACME_STAGING=true` for testing. |
+    | Wrong domain | Verify `DOMAIN` in `.env` matches DNS. |
+    | Not renewing | Set `ACME_FORCE_ISSUE=true` temporarily. |
+  </Accordion>
+
+  <Accordion title="Attestation signing errors">
+    - Verify `SIGNER_PRIVATE_KEY` is a valid hex string (64 chars, with or without `0x`).
+    - Confirm `CHAIN_ID_PUBLIC` matches the chain your EAS schemas are on.
+    - Test signing locally first in staging.
+  </Accordion>
+
+  <Accordion title="DNS / network issues">
+    - Confirm CNAME: `dig api.astral.global CNAME`
+    - Check Cloudflare proxy is OFF (gray cloud)
+    - Test direct endpoint: `curl -v https://<app-name>.eigencloud.xyz/health`
+    - Verify TLS cert: `openssl s_client -connect api.astral.global:443`
+  </Accordion>
+
+  <Accordion title="Out of memory">
+    - Use `g1-standard-8t` (32 GB) for heavy polygon workloads.
+    - Tune PostgreSQL in `start.sh` (`shared_buffers`, `work_mem`).
+  </Accordion>
+</AccordionGroup>
+
+## Quick Reference
+
+| Task | Command |
+|------|---------|
+| Install CLI | `npm install -g @layr-labs/ecloud-cli` |
+| Authenticate | `ecloud auth login` |
+| Check identity | `ecloud auth whoami` |
+| Subscribe | `ecloud billing subscribe` |
+| Deploy | `ecloud compute app deploy` |
+| App info | `ecloud compute app info` |
+| Logs | `ecloud compute app logs astral-compute` |
+| Upgrade app | `ecloud compute app upgrade astral-compute` |
+| Configure TLS | `ecloud compute app configure tls` |
+| Stop | `ecloud compute app stop astral-compute` |
+| Terminate | `ecloud compute app terminate astral-compute` |
+| Upgrade CLI | `ecloud upgrade` |
